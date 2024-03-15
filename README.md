@@ -31,6 +31,27 @@ WORKOS_COOKIE_PASSWORD="<your password>"
 
 ## Usage
 
+### Middleware
+
+This library relies on Next.js middleware to provide session management for routes. Put the following in your `/src/middleware.ts` file:
+
+```ts
+import { authkitMiddleware } from '@workos-inc/nextjs';
+
+export default authkitMiddleware();
+
+// Match against the pages that require auth
+export const config = { matcher: ['/', '/account/:path*'] };
+```
+
+### Callback route
+
+WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `route.ts` in `/src/app/callback` and add the following:
+
+```ts
+export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
+```
+
 ### Conditional auth
 
 For pages where you want to display a logged in and logged out view, use `getUser` to retrieve the user profile from WorkOS.
