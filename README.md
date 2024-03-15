@@ -39,9 +39,6 @@ This library relies on Next.js middleware to provide session management for rout
 import { authkitMiddleware } from '@workos-inc/nextjs';
 
 export default authkitMiddleware();
-
-// Match against the pages that require auth
-export const config = { matcher: ['/', '/account/:path*'] };
 ```
 
 ### Callback route
