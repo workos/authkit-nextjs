@@ -18,7 +18,7 @@ npm i @workos-inc/nextjs
 
 ## Pre-flight
 
-Make sure the following values are present in your `.env.local` environment variables file. The API key
+Make sure the following values are present in your `.env.local` environment variables file. The client ID and API key can be found in the [WorkOS dashboard](https://dashboard.workos.com), and the redirect URI can also be configured there.
 
 ```sh
 WORKOS_CLIENT_ID="<your Client ID>"
@@ -62,7 +62,7 @@ export default async function HomePage() {
   const { user } = await getUser();
 
   // If there's no user, get the URL to redirect the user to AuthKit to sign in
-  const authorizationUrl = user ? null : await getSignInUrl();
+  const signInUrl = user ? null : await getSignInUrl();
 
   return (
     <Flex direction="column" align="center" gap="2">
@@ -79,8 +79,8 @@ export default async function HomePage() {
           <Text size="5" color="gray" mb="4">
             Sign in to view your account details
           </Text>
-          <Button size="3">
-            <a href={authorizationUrl}>Sign In with AuthKit</a>
+          <Button size="3" asChild>
+            <a href={signInUrl}>Sign In with AuthKit</a>
           </Button>
         </>
       )}
