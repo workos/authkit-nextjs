@@ -51,7 +51,7 @@ export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
 
 ### Conditional auth
 
-For pages where you want to display a logged in and logged out view, use `getUser` to retrieve the user profile from WorkOS.
+For pages where you want to display a siged-in and siged-out view, use `getUser` to retrieve the user profile from WorkOS.
 
 ```jsx
 import { getUser, getSignInUrl } from '@workos-inc/nextjs';
@@ -91,7 +91,7 @@ export default async function HomePage() {
 
 ### Required auth
 
-For pages where a logged in user is mandatory, you can use the `ensureSignedIn` option:
+For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` option:
 
 ```jsx
 const { user } = await getUser({ ensureSignedIn: true });
