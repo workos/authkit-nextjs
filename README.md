@@ -33,7 +33,7 @@ WORKOS_COOKIE_PASSWORD="<your password>"
 
 ### Callback route
 
-WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `/src/app/callback/route.ts` and add the following:
+WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `/src/app/callback/route.ts` and add the following. Make sure this route matches the `WORKOS_REDIRECT_URI` variable and the configured redirect URI in your WorkOS dashboard.
 
 ```ts
 export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
