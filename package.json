@@ -48,12 +48,12 @@
     "typescript": "5.4.2"
   },
   "license": "MIT",
-  "homepage": "https://github.com/workos/nworkos-nextjs#readme",
+  "homepage": "https://github.com/workos/workos-nextjs#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/workos/nworkos-nextjs.git"
+    "url": "git+https://github.com/workos/workos-nextjs.git"
   },
   "bugs": {
-    "url": "https://github.com/workos/nworkos-nextjs/issues"
+    "url": "https://github.com/workos/workos-nextjs/issues"
   }
 }
