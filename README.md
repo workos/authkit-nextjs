@@ -31,6 +31,14 @@ WORKOS_COOKIE_PASSWORD="<your password>"
 
 ## Usage
 
+### Callback route
+
+WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `/src/app/callback/route.ts` and add the following:
+
+```ts
+export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
+```
+
 ### Middleware
 
 This library relies on Next.js middleware to provide session management for routes. Put the following in your `/src/middleware.ts` file:
@@ -42,14 +50,6 @@ export default authkitMiddleware();
 
 // Match against pages that require auth, e.g.:
 export const config = { matcher: ['/', '/account/:path*'] };
-```
-
-### Callback route
-
-WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `/src/app/callback/route.ts` and add the following:
-
-```ts
-export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
 ```
 
 ### Conditional auth
