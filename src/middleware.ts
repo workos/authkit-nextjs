@@ -1,10 +1,8 @@
-import { NextMiddleware, NextResponse } from "next/server";
-import { updateSession } from "./session";
+import { NextMiddleware } from 'next/server';
+import { updateSession } from './session.js';
 
-type AuthkitMiddlewareConfig = {};
-
-export function authkitMiddleware({}: AuthkitMiddlewareConfig = {}): NextMiddleware {
-  return function (request, event) {
+export function authkitMiddleware(): NextMiddleware {
+  return function (request) {
     return updateSession(request);
   };
 }

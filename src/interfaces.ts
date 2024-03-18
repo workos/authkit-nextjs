@@ -1,4 +1,4 @@
-import { User } from "@workos-inc/node";
+import { User } from '@workos-inc/node';
 
 export interface Session {
   accessToken: string;

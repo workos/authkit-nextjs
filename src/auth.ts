@@ -1,7 +1,7 @@
-import { getAuthorizationUrl } from "./get-authorization-url";
-import { cookies } from "next/headers";
-import { cookieName } from "./cookie";
-import { terminateSession } from "./session";
+import { getAuthorizationUrl } from './get-authorization-url.js';
+import { cookies } from 'next/headers';
+import { cookieName } from './cookie.js';
+import { terminateSession } from './session.js';
 
 async function getSignInUrl() {
   return getAuthorizationUrl();

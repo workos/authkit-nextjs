@@ -1,19 +1,17 @@
-import { redirect } from "next/navigation";
-import { cookies, headers } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
-import { sealData, unsealData } from "iron-session";
-import { cookieName, cookieOptions } from "./cookie";
-import { workos } from "./workos";
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from "./env-variables";
-import { getAuthorizationUrl } from "./get-authorization-url";
-import { AccessToken, NoUserInfo, Session, UserInfo } from "./interfaces";
+import { redirect } from 'next/navigation';
+import { cookies, headers } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
+import { sealData, unsealData } from 'iron-session';
+import { cookieName, cookieOptions } from './cookie.js';
+import { workos } from './workos.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
+import { getAuthorizationUrl } from './get-authorization-url.js';
+import { AccessToken, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
-const sessionHeaderName = "x-workos-session";
+const sessionHeaderName = 'x-workos-session';
 
-const JWKS = createRemoteJWKSet(
-  new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID))
-);
+const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
 async function encryptSession(session: Session) {
   return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
@@ -32,7 +30,7 @@ async function updateSession(request: NextRequest) {
   const newRequestHeaders = new Headers(request.headers);
 
   if (hasValidSession) {
-    console.log("Session is valid");
+    console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
     newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
     return NextResponse.next({
@@ -41,16 +39,15 @@ async function updateSession(request: NextRequest) {
   }
 
   try {
-    console.log("Session invalid. Attempting refresh", session.refreshToken);
+    console.log('Session invalid. Attempting refresh', session.refreshToken);
 
     // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
-    const { accessToken, refreshToken } =
-      await workos.userManagement.authenticateWithRefreshToken({
-        clientId: WORKOS_CLIENT_ID,
-        refreshToken: session.refreshToken,
-      });
+    const { accessToken, refreshToken } = await workos.userManagement.authenticateWithRefreshToken({
+      clientId: WORKOS_CLIENT_ID,
+      refreshToken: session.refreshToken,
+    });
 
-    console.log("Refresh successful:", refreshToken);
+    console.log('Refresh successful:', refreshToken);
 
     // Encrypt session with new access and refresh tokens
     const encryptedSession = await encryptSession({
@@ -70,16 +67,14 @@ async function updateSession(request: NextRequest) {
     response.cookies.set(cookieName, encryptedSession, cookieOptions);
     return response;
   } catch (e) {
-    console.warn("Failed to refresh", e);
+    console.warn('Failed to refresh', e);
     const response = NextResponse.next();
     response.cookies.delete(cookieName);
     return response;
   }
 }
 
-async function getUser(options?: {
-  ensureSignedIn: false;
-}): Promise<UserInfo | NoUserInfo>;
+async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
 
@@ -92,9 +87,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
     return { user: null };
   }
 
-  const { sid: sessionId, org_id: organizationId } = decodeJwt<AccessToken>(
-    session.accessToken
-  );
+  const { sid: sessionId, org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
     user: session.user,
@@ -108,15 +101,15 @@ async function terminateSession() {
   if (sessionId) {
     redirect(workos.userManagement.getLogoutUrl({ sessionId }));
   }
-  redirect("/");
+  redirect('/');
 }
 
 async function verifyAccessToken(accessToken: string) {
   try {
-    const { payload } = await jwtVerify(accessToken, JWKS);
+    await jwtVerify(accessToken, JWKS);
     return true;
   } catch (e) {
-    console.warn("Failed to verify session:", e);
+    console.warn('Failed to verify session:', e);
     return false;
   }
 }

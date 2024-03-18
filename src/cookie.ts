@@ -1,9 +1,9 @@
-const cookieName = "wos-session";
+const cookieName = 'wos-session';
 const cookieOptions = {
-  path: "/",
+  path: '/',
   httpOnly: true,
   secure: true,
-  sameSite: "lax" as const,
+  sameSite: 'lax' as const,
 };
 
 export { cookieName, cookieOptions };

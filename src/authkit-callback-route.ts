@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { workos } from './workos';
-import { WORKOS_CLIENT_ID } from './env-variables';
-import { encryptSession } from './session';
-import { cookieName, cookieOptions } from './cookie';
+import { workos } from './workos.js';
+import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { encryptSession } from './session.js';
+import { cookieName, cookieOptions } from './cookie.js';
 
 export async function authkitCallbackRoute(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
