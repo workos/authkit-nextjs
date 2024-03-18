@@ -7,13 +7,13 @@ The WorkOS library for Next.js provides convenient helpers for authentication an
 Install the package with:
 
 ```
-yarn add @workos-inc/nextjs
+npm i @workos-inc/nextjs
 ```
 
 or
 
 ```
-npm i @workos-inc/nextjs
+yarn add @workos-inc/nextjs
 ```
 
 ## Pre-flight
@@ -39,11 +39,14 @@ This library relies on Next.js middleware to provide session management for rout
 import { authkitMiddleware } from '@workos-inc/nextjs';
 
 export default authkitMiddleware();
+
+// Match against pages that require auth, e.g.:
+export const config = { matcher: ['/', '/account/:path*'] };
 ```
 
 ### Callback route
 
-WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `route.ts` in `/src/app/callback` and add the following:
+WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, create `/src/app/callback/route.ts` and add the following:
 
 ```ts
 export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
@@ -51,7 +54,7 @@ export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
 
 ### Conditional auth
 
-For pages where you want to display a siged-in and siged-out view, use `getUser` to retrieve the user profile from WorkOS.
+For pages where you want to display a signed-in and signed-out view, use `getUser` to retrieve the user profile from WorkOS.
 
 ```jsx
 import { getUser, getSignInUrl } from '@workos-inc/nextjs';
