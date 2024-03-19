@@ -24,7 +24,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@workos-inc/node": "^6.2.0",
+    "@workos-inc/node": "^6.3.0",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3"
   },

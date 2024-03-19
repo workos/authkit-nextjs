@@ -87,12 +87,17 @@ async function getUser({ ensureSignedIn = false } = {}) {
     return { user: null };
   }
 
-  const { sid: sessionId, org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
+  const {
+    sid: sessionId,
+    org_id: organizationId,
+    role,
+  } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
     user: session.user,
     sessionId,
     organizationId,
+    role,
   };
 }
 
