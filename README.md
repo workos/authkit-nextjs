@@ -100,10 +100,10 @@ For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` 
 const { user } = await getUser({ ensureSignedIn: true });
 ```
 
-### Impersonation
+### Visualizing an impersonation
 
 Render the `Impersonation` component in your app so that it is clear when someone is impersonating a user.
-The component will display a frame with some information about the impersonation, as well as a button to stop it.
+The component will display a frame with some information about the impersonated user, as well as a button to stop it.
 
 ```jsx
 import { Impersonation } from '@workos-inc/nextjs';
