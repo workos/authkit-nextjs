@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/nextjs",
-  "version": "0.2.0",
+  "version": "0.3.0-rc.0",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with NextJS",
   "sideEffects": false,
   "type": "commonjs",
