@@ -24,15 +24,19 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@workos-inc/node": "^6.3.0",
+    "@workos-inc/node": "^6.7.0",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3"
   },
   "peerDependencies": {
-    "next": "^13.5.4 || ^14.0.3"
+    "next": "^13.5.4 || ^14.0.3",
+    "react": "^18.0",
+    "react-dom": "^18.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.28",
+    "@types/react": "18.2.67",
+    "@types/react-dom": "18.2.22",
     "eslint": "^8.29.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-require-extensions": "^0.1.3",

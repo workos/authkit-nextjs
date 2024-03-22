@@ -11,7 +11,7 @@ export async function authkitCallbackRoute(request: NextRequest) {
   if (code) {
     try {
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
-      const { user, accessToken, refreshToken } = await workos.userManagement.authenticateWithCode({
+      const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithCode({
         clientId: WORKOS_CLIENT_ID,
         code,
       });
@@ -29,11 +29,8 @@ export async function authkitCallbackRoute(request: NextRequest) {
 
       // The refreshToken should never be accesible publicly, hence why we encrypt it in the cookie session
       // Alternatively you could persist the refresh token in a backend database
-      cookies().set(
-        cookieName,
-        await encryptSession({ accessToken, refreshToken, user }),
-        cookieOptions,
-      );
+      const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
+      cookies().set(cookieName, session, cookieOptions);
 
       return response;
     } catch (error) {
@@ -55,8 +52,7 @@ function errorResponse() {
     {
       error: {
         message: 'Something went wrong',
-        description:
-          'Couldn’t sign in. If you are not sure what happened, please contact your organization admin.',
+        description: 'Couldn’t sign in. If you are not sure what happened, please contact your organization admin.',
       },
     },
     { status: 500 },
