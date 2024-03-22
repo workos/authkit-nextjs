@@ -30,7 +30,6 @@ async function updateSession(request: NextRequest) {
   const newRequestHeaders = new Headers(request.headers);
 
   if (hasValidSession) {
-    console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
     newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
     return NextResponse.next({
