@@ -99,3 +99,21 @@ For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` 
 ```jsx
 const { user } = await getUser({ ensureSignedIn: true });
 ```
+
+### Impersonation
+
+Render the `Impersonation` component in your app so that it is clear when someone is impersonating a user.
+The component will display a frame with some information about the impersonation, as well as a button to stop it.
+
+```jsx
+import { Impersonation } from '@workos-inc/nextjs';
+
+export default function App() {
+  return (
+    <div>
+      <Impersonation />
+      {/* Your app content */}
+    </div>
+  );
+}
+```
