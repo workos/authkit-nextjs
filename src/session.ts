@@ -17,7 +17,7 @@ async function encryptSession(session: Session) {
   return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-async function updateSession(request: NextRequest) {
+async function updateSession(request: NextRequest, debug: boolean) {
   const session = await getSessionFromCookie();
 
   // If no session, just continue
@@ -30,7 +30,7 @@ async function updateSession(request: NextRequest) {
   const newRequestHeaders = new Headers(request.headers);
 
   if (hasValidSession) {
-    console.log('Session is valid');
+    if (debug) console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
     newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
     return NextResponse.next({
@@ -39,7 +39,7 @@ async function updateSession(request: NextRequest) {
   }
 
   try {
-    console.log('Session invalid. Attempting refresh', session.refreshToken);
+    if (debug) console.log('Session invalid. Attempting refresh', session.refreshToken);
 
     // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
     const { accessToken, refreshToken } = await workos.userManagement.authenticateWithRefreshToken({
@@ -47,13 +47,14 @@ async function updateSession(request: NextRequest) {
       refreshToken: session.refreshToken,
     });
 
-    console.log('Refresh successful:', refreshToken);
+    if (debug) console.log('Refresh successful:', refreshToken);
 
     // Encrypt session with new access and refresh tokens
     const encryptedSession = await encryptSession({
       accessToken,
       refreshToken,
       user: session.user,
+      impersonator: session.impersonator,
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
@@ -87,17 +88,14 @@ async function getUser({ ensureSignedIn = false } = {}) {
     return { user: null };
   }
 
-  const {
-    sid: sessionId,
-    org_id: organizationId,
-    role,
-  } = decodeJwt<AccessToken>(session.accessToken);
+  const { sid: sessionId, org_id: organizationId, role } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
-    user: session.user,
     sessionId,
+    user: session.user,
     organizationId,
     role,
+    impersonator: session.impersonator,
   };
 }
 
