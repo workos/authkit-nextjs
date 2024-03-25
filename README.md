@@ -131,3 +131,13 @@ export default function App() {
   );
 }
 ```
+
+### Debugging
+
+To enable debug logs, initialize the middleware with the debug flag enabled.
+
+```js
+import { authkitMiddleware } from '@workos-inc/nextjs';
+
+export default authkitMiddleware({ debug: true });
+```
