@@ -33,7 +33,7 @@ WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
 openssl rand -base64 24
 ```
 
-To use the `signOut` method, you'll need to set your homepage in your WorkOS dashboard settings under "Redirects".
+To use the `signOut` method, you'll need to set your app's homepage in your WorkOS dashboard settings under "Redirects".
 
 ## Setup
 
@@ -102,7 +102,7 @@ For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` 
 const { user } = await getUser({ ensureSignedIn: true });
 ```
 
-Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access a page without being authed.
+Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
 
 ### Signing out
 
