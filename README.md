@@ -21,10 +21,10 @@ yarn add @workos-inc/nextjs
 Make sure the following values are present in your `.env.local` environment variables file. The client ID and API key can be found in the [WorkOS dashboard](https://dashboard.workos.com), and the redirect URI can also be configured there.
 
 ```sh
-WORKOS_CLIENT_ID="<your Client ID>" // retrieved from the WorkOS dashboard
-WORKOS_API_KEY="<your Secret Key>" // retrieved from the WorkOS dashboard
-WORKOS_REDIRECT_URI="<your Redirect URI>" // configured in the WorkOS dashboard
-WORKOS_COOKIE_PASSWORD="<your password>" // generate a secure password here
+WORKOS_CLIENT_ID="<your Client ID>" # retrieved from the WorkOS dashboard
+WORKOS_API_KEY="<your Secret Key>" # retrieved from the WorkOS dashboard
+WORKOS_REDIRECT_URI="<your Redirect URI>" # configured in the WorkOS dashboard
+WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
 ```
 
 `WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
