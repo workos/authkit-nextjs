@@ -21,13 +21,13 @@ yarn add @workos-inc/nextjs
 Make sure the following values are present in your `.env.local` environment variables file. The client ID and API key can be found in the [WorkOS dashboard](https://dashboard.workos.com), and the redirect URI can also be configured there.
 
 ```sh
-WORKOS_CLIENT_ID="<your Client ID>" # retrieved from the WorkOS dashboard
-WORKOS_API_KEY="<your Secret Key>" # retrieved from the WorkOS dashboard
-WORKOS_REDIRECT_URI="<your Redirect URI>" # configured in the WorkOS dashboard
+WORKOS_CLIENT_ID="client_..." # retrieved from the WorkOS dashboard
+WORKOS_API_KEY="sk_test_..." # retrieved from the WorkOS dashboard
+WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
 ```
 
-`WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
+`WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the session cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
 
 ```
 openssl rand -base64 24
@@ -78,24 +78,18 @@ export default async function HomePage() {
   // Get the URL to redirect the user to AuthKit to sign in
   const signInUrl = await getSignInUrl();
 
-  return (
-    <div>
-      {user ? (
-        <div>
-          <p>Welcome back {user?.firstName && `, ${user?.firstName}`}</p>
-          <form
-            action={async () => {
-              'use server';
-              await signOut();
-            }}
-          >
-            <button type="submit">Sign out</button>
-          </form>
-        </div>
-      ) : (
-        <Link href={signInUrl}>Sign in</Link>
-      )}
-    </div>
+  return user ? (
+    <form
+      action={async () => {
+        'use server';
+        await signOut();
+      }}
+    >
+      <p>Welcome back {user?.firstName && `, ${user?.firstName}`}</p>
+      <button type="submit">Sign out</button>
+    </form>
+  ) : (
+    <Link href={signInUrl}>Sign in</Link>
   );
 }
 ```
@@ -116,8 +110,8 @@ Use the `signOut` method to sign out the current logged in user and redirect to 
 
 ### Visualizing an impersonation
 
-Render the `Impersonation` component in your app so that it is clear when someone is impersonating a user.
-The component will display a frame with some information about the impersonated user, as well as a button to stop it.
+Render the `Impersonation` component in your app so that it is clear when someone is [impersonating a user](https://workos.com/docs/user-management/impersonation).
+The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
 ```jsx
 import { Impersonation } from '@workos-inc/nextjs';
