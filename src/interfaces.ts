@@ -1,5 +1,9 @@
 import { User } from '@workos-inc/node';
 
+export interface HandleAuthOptions {
+  returnPathname?: string;
+}
+
 export interface Impersonator {
   email: string;
   reason: string | null;

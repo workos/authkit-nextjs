@@ -42,10 +42,18 @@ To use the `signOut` method, you'll need to set your app's homepage in your Work
 WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, [expose an API route](https://nextjs.org/docs/app/building-your-application/routing/route-handlers) and add the following.
 
 ```ts
-export { authkitCallbackRoute as GET } from '@workos-inc/nextjs';
+import { handleAuth } from '@workos-inc/nextjs';
+
+export const GET = handleAuth();
 ```
 
 Make sure this route matches the `WORKOS_REDIRECT_URI` variable and the configured redirect URI in your WorkOS dashboard. For instance if your redirect URI is `http://localhost:3000/auth/callback` then you'd put the above code in `/app/auth/callback/route.ts`.
+
+You can also control the pathname the user will be sent to after signing-in by passing a `returnPathname` option to `handleAuth` like so:
+
+```ts
+export const GET = handleAuth({ returnPathname: '/dashboard' });
+```
 
 ### Middleware
 

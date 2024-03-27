@@ -83,7 +83,8 @@ async function getUser({ ensureSignedIn = false } = {}) {
   const session = await getSessionFromHeader();
   if (!session) {
     if (ensureSignedIn) {
-      redirect(await getAuthorizationUrl());
+      const returnPathname = headers().get('next-url') ?? undefined;
+      redirect(await getAuthorizationUrl(returnPathname));
     }
     return { user: null };
   }
