@@ -4,10 +4,7 @@ import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { encryptSession } from './session.js';
 import { cookieName, cookieOptions } from './cookie.js';
-
-interface HandleAuthOptions {
-  returnPathname?: string;
-}
+import { HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
   const { returnPathname: returnPathnameOption = '/' } = options;
@@ -32,7 +29,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         url.searchParams.delete('state');
 
         // Redirect to the requested path and store the session
-        url.pathname = returnPathname ? returnPathname : returnPathnameOption;
+        url.pathname = returnPathname ?? returnPathnameOption;
 
         const response = NextResponse.redirect(url);
 
