@@ -1,7 +1,7 @@
 {
-  "name": "@workos-inc/nextjs",
+  "name": "@workos-inc/authkit-nextjs",
   "version": "0.3.0",
-  "description": "Authentication and session helpers for using WorkOS & AuthKit with NextJS",
+  "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
   "sideEffects": false,
   "type": "commonjs",
   "main": "./dist/cjs/index.js",
@@ -45,12 +45,12 @@
     "typescript-eslint": "^7.2.0"
   },
   "license": "MIT",
-  "homepage": "https://github.com/workos/workos-nextjs#readme",
+  "homepage": "https://github.com/workos/authkit-nextjs#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/workos/workos-nextjs.git"
+    "url": "git+https://github.com/workos/authkit-nextjs.git"
   },
   "bugs": {
-    "url": "https://github.com/workos/workos-nextjs/issues"
+    "url": "https://github.com/workos/authkit-nextjs/issues"
   }
 }

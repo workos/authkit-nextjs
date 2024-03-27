@@ -1,19 +1,19 @@
-# WorkOS NextJS Library
+# AuthKit Next.js Library
 
-The WorkOS library for Next.js provides convenient helpers for authentication and session management using WorkOS & AuthKit with Next.js.
+The AuthKit library for Next.js provides convenient helpers for authentication and session management using WorkOS & AuthKit with Next.js.
 
 ## Installation
 
 Install the package with:
 
 ```
-npm i @workos-inc/nextjs
+npm i @workos-inc/authkit-nextjs
 ```
 
 or
 
 ```
-yarn add @workos-inc/nextjs
+yarn add @workos-inc/authkit-nextjs
 ```
 
 ## Pre-flight
@@ -42,7 +42,7 @@ To use the `signOut` method, you'll need to set your app's homepage in your Work
 WorkOS requires that you have a callback URL to redirect users back to after they've authenticated. In your Next.js app, [expose an API route](https://nextjs.org/docs/app/building-your-application/routing/route-handlers) and add the following.
 
 ```ts
-import { handleAuth } from '@workos-inc/nextjs';
+import { handleAuth } from '@workos-inc/authkit-nextjs';
 
 export const GET = handleAuth();
 ```
@@ -60,7 +60,7 @@ export const GET = handleAuth({ returnPathname: '/dashboard' });
 This library relies on [Next.js middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware) to provide session management for routes. Put the following in your `middleware.ts` file in the root of your project:
 
 ```ts
-import { authkitMiddleware } from '@workos-inc/nextjs';
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware();
 
@@ -77,7 +77,7 @@ For pages where you want to display a signed-in and signed-out view, use `getUse
 
 ```jsx
 import Link from 'next/link';
-import { getSignInUrl, getUser, signOut } from '@workos-inc/nextjs';
+import { getSignInUrl, getUser, signOut } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {
   // Retrieves the user from the session or returns `null` if no user is signed in
@@ -122,7 +122,7 @@ Render the `Impersonation` component in your app so that it is clear when someon
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
 ```jsx
-import { Impersonation } from '@workos-inc/nextjs';
+import { Impersonation } from '@workos-inc/authkit-nextjs';
 
 export default function App() {
   return (
@@ -139,7 +139,7 @@ export default function App() {
 To enable debug logs, initialize the middleware with the debug flag enabled.
 
 ```js
-import { authkitMiddleware } from '@workos-inc/nextjs';
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({ debug: true });
 ```
