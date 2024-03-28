@@ -10,6 +10,7 @@ import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 const sessionHeaderName = 'x-workos-session';
+const middlewareHeaderName = 'x-workos-middleware';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
@@ -25,6 +26,9 @@ async function updateSession(request: NextRequest, debug: boolean) {
   // This is because on hard navigations we don't have access to `next-url` but need to get the current
   // `pathname` to be able to return the users where they came from before sign-in
   newRequestHeaders.set('x-url', request.url);
+
+  // Record that the request was routed through the middleware so we can check later for DX purposes
+  newRequestHeaders.set(middlewareHeaderName, 'true');
 
   // If no session, just continue
   if (!session) {
@@ -84,6 +88,14 @@ async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
 
 async function getUser({ ensureSignedIn = false } = {}) {
+  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
+
+  if (!hasMiddleware) {
+    throw new Error(
+      'You are calling `getUser` on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `getUser` from by updating your middleware config in `middleware.(js|ts)`.',
+    );
+  }
+
   const session = await getSessionFromHeader();
   if (!session) {
     if (ensureSignedIn) {
