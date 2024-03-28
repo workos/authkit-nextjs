@@ -30,6 +30,8 @@ async function updateSession(request: NextRequest, debug: boolean) {
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
 
+  newRequestHeaders.delete(sessionHeaderName);
+
   // If no session, just continue
   if (!session) {
     return NextResponse.next({
@@ -77,7 +79,9 @@ async function updateSession(request: NextRequest, debug: boolean) {
     return response;
   } catch (e) {
     console.warn('Failed to refresh', e);
-    const response = NextResponse.next();
+    const response = NextResponse.next({
+      request: { headers: newRequestHeaders },
+    });
     response.cookies.delete(cookieName);
     return response;
   }
