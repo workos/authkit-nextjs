@@ -19,22 +19,28 @@ async function encryptSession(session: Session) {
 
 async function updateSession(request: NextRequest, debug: boolean) {
   const session = await getSessionFromCookie();
+  const newRequestHeaders = new Headers(request.headers);
+
+  // We store the current request url in a custom header, so we can always have access to it
+  // This is because on hard navigations we don't have access to `next-url` but need to get the current
+  // `pathname` to be able to return the users where they came from before sign-in
+  newRequestHeaders.set('x-url', request.url);
 
   // If no session, just continue
   if (!session) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: { headers: newRequestHeaders },
+    });
   }
 
   const hasValidSession = await verifyAccessToken(session.accessToken);
-
-  const newRequestHeaders = new Headers(request.headers);
 
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
     newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
     return NextResponse.next({
-      headers: newRequestHeaders,
+      request: { headers: newRequestHeaders },
     });
   }
 
@@ -60,9 +66,7 @@ async function updateSession(request: NextRequest, debug: boolean) {
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     const response = NextResponse.next({
-      request: {
-        headers: newRequestHeaders,
-      },
+      request: { headers: newRequestHeaders },
     });
     // update the cookie
     response.cookies.set(cookieName, encryptedSession, cookieOptions);
@@ -83,7 +87,8 @@ async function getUser({ ensureSignedIn = false } = {}) {
   const session = await getSessionFromHeader();
   if (!session) {
     if (ensureSignedIn) {
-      const returnPathname = headers().get('next-url') ?? undefined;
+      const url = headers().get('x-url');
+      const returnPathname = url ? new URL(url).pathname : undefined;
       redirect(await getAuthorizationUrl(returnPathname));
     }
     return { user: null };
