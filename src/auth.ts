@@ -4,7 +4,11 @@ import { cookieName } from './cookie.js';
 import { terminateSession } from './session.js';
 
 async function getSignInUrl() {
-  return getAuthorizationUrl();
+  return getAuthorizationUrl({ screenHint: 'sign-in' });
+}
+
+async function getSignUpUrl() {
+  return getAuthorizationUrl({ screenHint: 'sign-up' });
 }
 
 async function signOut() {
@@ -12,4 +16,4 @@ async function signOut() {
   await terminateSession();
 }
 
-export { getSignInUrl, signOut };
+export { getSignInUrl, getSignUpUrl, signOut };

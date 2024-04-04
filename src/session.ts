@@ -105,7 +105,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
     if (ensureSignedIn) {
       const url = headers().get('x-url');
       const returnPathname = url ? new URL(url).pathname : undefined;
-      redirect(await getAuthorizationUrl(returnPathname));
+      redirect(await getAuthorizationUrl({ returnPathname }));
     }
     return { user: null };
   }
