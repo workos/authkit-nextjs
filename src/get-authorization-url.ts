@@ -10,7 +10,7 @@ async function getAuthorizationUrl(options: GetAuthURLOptions) {
     clientId: WORKOS_CLIENT_ID,
     redirectUri: WORKOS_REDIRECT_URI,
     state: returnPathname ? btoa(JSON.stringify({ returnPathname })) : undefined,
-    screenHint: screenHint || undefined,
+    screenHint,
   });
 }
 
