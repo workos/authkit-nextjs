@@ -35,3 +35,8 @@ export interface AccessToken {
   org_id?: string;
   role?: string;
 }
+
+export interface GetAuthURLOptions {
+  screenHint?: 'sign-up' | 'sign-in';
+  returnPathname?: string;
+}
