@@ -77,16 +77,28 @@ For pages where you want to display a signed-in and signed-out view, use `getUse
 
 ```jsx
 import Link from 'next/link';
-import { getSignInUrl, getUser, signOut } from '@workos-inc/authkit-nextjs';
+import { getSignInUrl, getSignUpUrl, getUser, signOut } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {
   // Retrieves the user from the session or returns `null` if no user is signed in
   const { user } = await getUser();
 
-  // Get the URL to redirect the user to AuthKit to sign in
-  const signInUrl = await getSignInUrl();
+  if (!user) {
+    // Get the URL to redirect the user to AuthKit to sign in
+    const signInUrl = await getSignInUrl();
 
-  return user ? (
+    // Get the URL to redirect the user to AuthKit to sign up
+    const signUpUrl = await getSignUpUrl();
+
+    return (
+      <>
+        <Link href={signInUrl}>Log in</Link>
+        <Link href={signUpUrl}>Sign Up</Link>
+      </>
+    );
+  }
+
+  return (
     <form
       action={async () => {
         'use server';
@@ -96,8 +108,6 @@ export default async function HomePage() {
       <p>Welcome back {user?.firstName && `, ${user?.firstName}`}</p>
       <button type="submit">Sign out</button>
     </form>
-  ) : (
-    <Link href={signInUrl}>Sign in</Link>
   );
 }
 ```
