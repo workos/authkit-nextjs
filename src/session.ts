@@ -112,7 +112,7 @@ function parseRoute(route: string): string {
 
     const tokens = parse(parsedPath);
     regex = tokensToRegexp(tokens).source;
-  } catch (err: any) {
+  } catch (err) {
     throw new Error(`Error parsing routes for middleware auth. Reason:${err.message}`);
   }
 

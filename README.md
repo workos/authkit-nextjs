@@ -138,10 +138,12 @@ export default authkitMiddleware({
 
 // Match against pages that require auth
 // Leave this out if you want auth on every resource (including images, css etc.)
-export const config = { matcher: ['/', '/admin', '/about'] };
+export const config = { matcher: ['/', '/admin/:path*', '/about'] };
 ```
 
 In the above example the `/admin` page will require a user to be signed in, whereas `/` and `/about` can be accessed without signing in.
+
+`unauthenticatedPaths` uses the same glob logic as the [Next.js matcher](https://nextjs.org/docs/pages/building-your-application/routing/middleware#matcher).
 
 ### Signing out
 
