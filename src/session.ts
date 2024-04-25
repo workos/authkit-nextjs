@@ -7,7 +7,11 @@ import { cookieName, cookieOptions } from './cookie.js';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { AccessToken, NoUserInfo, Session, UserInfo } from './interfaces.js';
+import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
+
+import { parse, tokensToRegexp } from 'path-to-regexp';
+// import { parse, tokensToRegexp } from 'next/dist/compiled/path-to-regexp';
+import { parse as parseURL } from 'url';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -18,7 +22,7 @@ async function encryptSession(session: Session) {
   return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-async function updateSession(request: NextRequest, debug: boolean) {
+async function updateSession(request: NextRequest, debug: boolean, middlewareAuth: AuthkitMiddlewareAuth) {
   const session = await getSessionFromCookie();
   const newRequestHeaders = new Headers(request.headers);
 
@@ -32,6 +36,19 @@ async function updateSession(request: NextRequest, debug: boolean) {
 
   newRequestHeaders.delete(sessionHeaderName);
 
+  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((route) => {
+    const routeRegexStr: string = parseRoute(route);
+    const regex: RegExp = new RegExp(routeRegexStr);
+
+    return regex.exec(request.nextUrl.pathname);
+  });
+
+  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
+  if (matchedPaths.length === 0 && !session) {
+    if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
+    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
+  }
+
   // If no session, just continue
   if (!session) {
     return NextResponse.next({
@@ -39,7 +56,7 @@ async function updateSession(request: NextRequest, debug: boolean) {
     });
   }
 
-  const hasValidSession = await verifyAccessToken(session.accessToken);
+  const hasValidSession: boolean = await verifyAccessToken(session.accessToken);
 
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
@@ -87,12 +104,28 @@ async function updateSession(request: NextRequest, debug: boolean) {
   }
 }
 
+function parseRoute(route: string): string {
+  let regex: string;
+
+  try {
+    const parsed = parseURL(route, true);
+    const parsedPath = `${parsed.pathname!}${parsed.hash || ''}`;
+
+    const tokens = parse(parsedPath);
+    regex = tokensToRegexp(tokens).source;
+  } catch (err: any) {
+    throw new Error(`Error parsing routes for middleware auth. Reason:${err.message}`);
+  }
+
+  return regex;
+}
+
 async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
 
 async function getUser({ ensureSignedIn = false } = {}) {
-  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
+  const hasMiddleware: boolean = Boolean(headers().get(middlewareHeaderName));
 
   if (!hasMiddleware) {
     throw new Error(

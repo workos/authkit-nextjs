@@ -40,3 +40,12 @@ export interface GetAuthURLOptions {
   screenHint?: 'sign-up' | 'sign-in';
   returnPathname?: string;
 }
+
+export interface AuthkitMiddlewareAuth {
+  unauthenticatedPaths: string[];
+}
+
+export interface AuthkitMiddlewareOptions {
+  debug?: boolean;
+  middlewareAuth?: AuthkitMiddlewareAuth;
+}
