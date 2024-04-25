@@ -13,10 +13,6 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "alwaysStrict": true,
-    "skipLibCheck": true,
-    "baseUrl": "./",
-    "paths": {
-      "path-to-regexp": ["node_modules/path-to-regexp/dist/index"]
-    }
+    "skipLibCheck": true
   }
 }

@@ -10,7 +10,6 @@ import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
-// import { parse, tokensToRegexp } from 'next/dist/compiled/path-to-regexp';
 import { parse as parseURL } from 'url';
 
 const sessionHeaderName = 'x-workos-session';
@@ -44,7 +43,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
-  if (matchedPaths.length === 0 && !session) {
+  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
     return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
   }

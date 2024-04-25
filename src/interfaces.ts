@@ -42,6 +42,7 @@ export interface GetAuthURLOptions {
 }
 
 export interface AuthkitMiddlewareAuth {
+  enabled: boolean;
   unauthenticatedPaths: string[];
 }
 

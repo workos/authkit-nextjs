@@ -65,8 +65,8 @@ import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 export default authkitMiddleware();
 
 // Match against pages that require auth
-// Leave this out if you want auth on every page in your application
-export const config = { matcher: ['/admin'] };
+// Leave this out if you want auth on every resource (including images, css etc.)
+export const config = { matcher: ['/', '/admin'] };
 ```
 
 ## Usage
@@ -122,6 +122,27 @@ const { user } = await getUser({ ensureSignedIn: true });
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
 
+### Middleware auth
+
+The default behavior of this library is to request authentication via the `getUser` method on a per-page basis. There are some use cases where you don't want to call `getUser` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you an opt to use middleware auth instead:
+
+```ts
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+
+export default authkitMiddleware({
+  middlewareAuth: {
+    enabled: true,
+    unauthenticatedPaths: ['/', '/about'],
+  },
+});
+
+// Match against pages that require auth
+// Leave this out if you want auth on every resource (including images, css etc.)
+export const config = { matcher: ['/', '/admin', '/about'] };
+```
+
+In the above example the `/admin` page will require a user to be signed in, whereas `/` and `/about` can be accessed without signing in.
+
 ### Signing out
 
 Use the `signOut` method to sign out the current logged in user and redirect to your app's homepage. The homepage redirect is set in your WorkOS dashboard settings under "Redirect".
@@ -153,3 +174,9 @@ import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({ debug: true });
 ```
+
+### Troubleshooting
+
+#### NEXT_REDIRECT error when using try/catch blocks
+
+Wrapping a `getUser({ ensureSignedIn })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `getUser` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
