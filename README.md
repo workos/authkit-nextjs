@@ -181,4 +181,4 @@ export default authkitMiddleware({ debug: true });
 
 #### NEXT_REDIRECT error when using try/catch blocks
 
-Wrapping a `getUser({ ensureSignedIn })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `getUser` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
+Wrapping a `getUser({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `getUser` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
