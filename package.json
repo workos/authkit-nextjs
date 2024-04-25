@@ -6,7 +6,6 @@
   "type": "commonjs",
   "main": "./dist/cjs/index.js",
   "types": "./dist/cjs/index.d.ts",
-  "exports": "./dist/cjs/index.js",
   "files": [
     "dist",
     "src",
