@@ -124,7 +124,7 @@ async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
 
 async function getUser({ ensureSignedIn = false } = {}) {
-  const hasMiddleware: boolean = Boolean(headers().get(middlewareHeaderName));
+  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
 
   if (!hasMiddleware) {
     throw new Error(
