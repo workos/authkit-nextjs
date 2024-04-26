@@ -34,10 +34,10 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
 
   newRequestHeaders.delete(sessionHeaderName);
 
-  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((route) => {
-    const routeRegex: RegExp = getMiddlewareAuthPathRegex(route);
+  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((pathGlob) => {
+    const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
 
-    return routeRegex.exec(request.nextUrl.pathname);
+    return pathRegex.exec(request.nextUrl.pathname);
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
