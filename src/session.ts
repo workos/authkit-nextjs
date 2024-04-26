@@ -101,15 +101,15 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   }
 }
 
-function getMiddlewareAuthPathRegex(route: string): RegExp {
+function getMiddlewareAuthPathRegex(pathGlob: string) {
   let regex: string;
 
   try {
     // Redirect URI is only used to construct the URL
-    const parsed = new URL(route, WORKOS_REDIRECT_URI);
-    const parsedPath = `${parsed.pathname!}${parsed.hash || ''}`;
+    const url = new URL(pathGlob, WORKOS_REDIRECT_URI);
+    const path = `${url.pathname!}${url.hash || ''}`;
 
-    const tokens = parse(parsedPath);
+    const tokens = parse(path);
     regex = tokensToRegexp(tokens).source;
 
     return new RegExp(regex);
