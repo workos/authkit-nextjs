@@ -124,7 +124,7 @@ Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to acce
 
 ### Middleware auth
 
-The default behavior of this library is to request authentication via the `getUser` method on a per-page basis. There are some use cases where you don't want to call `getUser` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you an opt to use middleware auth instead:
+The default behavior of this library is to request authentication via the `getUser` method on a per-page basis. There are some use cases where you don't want to call `getUser` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
