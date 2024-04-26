@@ -5,12 +5,11 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
 import { cookieName, cookieOptions } from './cookie.js';
 import { workos } from './workos.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { parse as parseURL } from 'url';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -36,10 +35,9 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   newRequestHeaders.delete(sessionHeaderName);
 
   const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((route) => {
-    const routeRegexStr: string = parseRoute(route);
-    const regex: RegExp = new RegExp(routeRegexStr);
+    const routeRegex: RegExp = getMiddlewareAuthPathRegex(route);
 
-    return regex.exec(request.nextUrl.pathname);
+    return routeRegex.exec(request.nextUrl.pathname);
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
@@ -55,7 +53,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     });
   }
 
-  const hasValidSession: boolean = await verifyAccessToken(session.accessToken);
+  const hasValidSession = await verifyAccessToken(session.accessToken);
 
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
@@ -103,20 +101,21 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   }
 }
 
-function parseRoute(route: string): string {
+function getMiddlewareAuthPathRegex(route: string): RegExp {
   let regex: string;
 
   try {
-    const parsed = parseURL(route, true);
+    // Redirect URI is only used to construct the URL
+    const parsed = new URL(route, WORKOS_REDIRECT_URI);
     const parsedPath = `${parsed.pathname!}${parsed.hash || ''}`;
 
     const tokens = parse(parsedPath);
     regex = tokensToRegexp(tokens).source;
+
+    return new RegExp(regex);
   } catch (err) {
     throw new Error(`Error parsing routes for middleware auth. Reason:${err.message}`);
   }
-
-  return regex;
 }
 
 async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
