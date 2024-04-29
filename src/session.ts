@@ -114,7 +114,9 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 
     return new RegExp(regex);
   } catch (err) {
-    throw new Error(`Error parsing routes for middleware auth. Reason: ${err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+
+    throw new Error(`Error parsing routes for middleware auth. Reason: ${message}`);
   }
 }
 
