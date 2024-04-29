@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/authkit-nextjs",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
   "sideEffects": false,
   "type": "commonjs",
@@ -16,8 +16,6 @@
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
     "build": "tsc --project tsconfig-cjs.json",
-    "preversion": "npm run build",
-    "postversion": "git push --follow-tags",
     "prepublishOnly": "npm run lint",
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "echo \"Error: no test specified\" && exit 1"
