@@ -26,6 +26,10 @@ jobs:
         run: |
           npm install
 
+      - name: Build project
+        run: |
+          npm run build
+
       - name: Push Release
         if: ${{ !github.event.release.prerelease }}
         env:
