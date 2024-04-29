@@ -1,12 +1,12 @@
 import { NextMiddleware } from 'next/server';
 import { updateSession } from './session.js';
+import { AuthkitMiddlewareOptions } from './interfaces.js';
 
-interface AuthkitMiddlewareOptions {
-  debug?: boolean;
-}
-
-export function authkitMiddleware({ debug = false }: AuthkitMiddlewareOptions = {}): NextMiddleware {
+export function authkitMiddleware({
+  debug = false,
+  middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
+}: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
-    return updateSession(request, debug);
+    return updateSession(request, debug, middlewareAuth);
   };
 }

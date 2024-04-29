@@ -5,9 +5,11 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
 import { cookieName, cookieOptions } from './cookie.js';
 import { workos } from './workos.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { AccessToken, NoUserInfo, Session, UserInfo } from './interfaces.js';
+import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
+
+import { parse, tokensToRegexp } from 'path-to-regexp';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -18,7 +20,7 @@ async function encryptSession(session: Session) {
   return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-async function updateSession(request: NextRequest, debug: boolean) {
+async function updateSession(request: NextRequest, debug: boolean, middlewareAuth: AuthkitMiddlewareAuth) {
   const session = await getSessionFromCookie();
   const newRequestHeaders = new Headers(request.headers);
 
@@ -31,6 +33,18 @@ async function updateSession(request: NextRequest, debug: boolean) {
   newRequestHeaders.set(middlewareHeaderName, 'true');
 
   newRequestHeaders.delete(sessionHeaderName);
+
+  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((pathGlob) => {
+    const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
+
+    return pathRegex.exec(request.nextUrl.pathname);
+  });
+
+  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
+  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
+    if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
+    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
+  }
 
   // If no session, just continue
   if (!session) {
@@ -84,6 +98,23 @@ async function updateSession(request: NextRequest, debug: boolean) {
     });
     response.cookies.delete(cookieName);
     return response;
+  }
+}
+
+function getMiddlewareAuthPathRegex(pathGlob: string) {
+  let regex: string;
+
+  try {
+    // Redirect URI is only used to construct the URL
+    const url = new URL(pathGlob, WORKOS_REDIRECT_URI);
+    const path = `${url.pathname!}${url.hash || ''}`;
+
+    const tokens = parse(path);
+    regex = tokensToRegexp(tokens).source;
+
+    return new RegExp(regex);
+  } catch (err) {
+    throw new Error(`Error parsing routes for middleware auth. Reason: ${err.message}`);
   }
 }
 
