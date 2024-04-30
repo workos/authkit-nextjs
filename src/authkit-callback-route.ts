@@ -22,16 +22,8 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           code,
         });
 
-        const url = request.nextUrl.clone();
-
-        // Cleanup params
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-
         // Redirect to the requested path and store the session
-        url.pathname = returnPathname ?? returnPathnameOption;
-
-        const response = NextResponse.redirect(url);
+        const response = NextResponse.redirect(returnPathname ?? returnPathnameOption);
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
