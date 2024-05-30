@@ -9,7 +9,8 @@ const cookieOptions = {
   httpOnly: true,
   secure: isSecureProtocol,
   sameSite: 'lax' as const,
-  maxAge: parseInt(WORKOS_COOKIE_MAX_AGE ?? '600', 10),
+  // Defaults to 31 days
+  maxAge: WORKOS_COOKIE_MAX_AGE ? parseInt(WORKOS_COOKIE_MAX_AGE, 10) : 60 * 60 * 24 * 31,
 };
 
 export { cookieName, cookieOptions };
