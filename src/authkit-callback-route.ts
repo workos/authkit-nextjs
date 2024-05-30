@@ -23,10 +23,14 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         });
 
         const url = request.nextUrl.clone();
-        url.pathname = returnPathname ?? returnPathnameOption;
-        url.search = '';
+
+        // Cleanup params
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
 
         // Redirect to the requested path and store the session
+        url.pathname = returnPathname ?? returnPathnameOption;
+
         const response = NextResponse.redirect(url);
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
