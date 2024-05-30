@@ -1,4 +1,4 @@
-import { WORKOS_REDIRECT_URI } from './env-variables.js';
+import { WORKOS_REDIRECT_URI, WORKOS_COOKIE_MAX_AGE } from './env-variables.js';
 
 const redirectUrl = new URL(WORKOS_REDIRECT_URI);
 const isSecureProtocol = redirectUrl.protocol === 'https:';
@@ -9,7 +9,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: isSecureProtocol,
   sameSite: 'lax' as const,
-  maxAge: 600,
+  maxAge: parseInt(WORKOS_COOKIE_MAX_AGE ?? '600', 10),
 };
 
 export { cookieName, cookieOptions };
