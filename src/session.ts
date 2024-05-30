@@ -92,7 +92,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     response.cookies.set(cookieName, encryptedSession, cookieOptions);
     return response;
   } catch (e) {
-    console.warn('Failed to refresh', e);
+    if (debug) console.log('Failed to refresh. Deleting cookie and redirecting.', e);
     const response = NextResponse.next({
       request: { headers: newRequestHeaders },
     });
