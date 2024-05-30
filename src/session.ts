@@ -167,7 +167,6 @@ async function verifyAccessToken(accessToken: string) {
     await jwtVerify(accessToken, JWKS);
     return true;
   } catch (e) {
-    console.warn('Failed to verify session:', e);
     return false;
   }
 }
