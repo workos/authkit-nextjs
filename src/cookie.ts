@@ -9,6 +9,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: isSecureProtocol,
   sameSite: 'lax' as const,
+  maxAge: 600,
 };
 
 export { cookieName, cookieOptions };
