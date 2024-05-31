@@ -21,6 +21,7 @@ export interface UserInfo {
   organizationId?: string;
   role?: string;
   impersonator?: Impersonator;
+  accessToken: string;
 }
 export interface NoUserInfo {
   user: null;

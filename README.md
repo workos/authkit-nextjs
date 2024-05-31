@@ -169,13 +169,13 @@ export default function App() {
 
 ### Get the access token
 
-Sometimes it is useful to obtain the access token directly (e.g. to make API requests to another service).
+Sometimes it is useful to obtain the access token directly, for instance to make API requests to another service.
 
 ```jsx
-import { getAccessToken } from '@workos-inc/authkit-nextjs';
+import { getUser } from '@workos-inc/authkit-nextjs';
 
-export default async function CoolComponent() {
-  const accessToken = await getAccessToken();
+export default async function HomePage() {
+  const { accessToken } = await getUser();
 
   if (!accessToken) {
     return <div>Not signed in</div>;

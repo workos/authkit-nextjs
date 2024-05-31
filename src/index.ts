@@ -1,6 +1,6 @@
 import { handleAuth } from './authkit-callback-route.js';
 import { authkitMiddleware } from './middleware.js';
-import { getAccessToken, getUser } from './session.js';
+import { getUser } from './session.js';
 import { getSignInUrl, getSignUpUrl, signOut } from './auth.js';
 import { Impersonation } from './impersonation.js';
 
@@ -11,7 +11,6 @@ export {
   //
   getSignInUrl,
   getSignUpUrl,
-  getAccessToken,
   getUser,
   signOut,
   //

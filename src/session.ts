@@ -120,11 +120,6 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
   }
 }
 
-export async function getAccessToken() {
-  const session = await getSessionFromHeader('getAccessToken');
-  return session?.accessToken;
-}
-
 async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
@@ -148,6 +143,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
     organizationId,
     role,
     impersonator: session.impersonator,
+    accessToken: session.accessToken,
   };
 }
 
