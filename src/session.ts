@@ -34,12 +34,6 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
 
   newRequestHeaders.delete(sessionHeaderName);
 
-  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((pathGlob) => {
-    const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
-
-    return pathRegex.exec(request.nextUrl.pathname);
-  });
-
   const url = new URL(WORKOS_REDIRECT_URI);
 
   if (
@@ -47,10 +41,21 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     url.pathname === request.nextUrl.pathname &&
     !middlewareAuth.unauthenticatedPaths.includes(url.pathname)
   ) {
-    throw new Error(
-      `Mismatch detected: WorkOS redirect URI '${url.pathname}' found in middleware matcher but is not included in 'unauthenticatedPaths' array. This will cause a log in loop. Add '${url.pathname}' to 'unauthenticatedPaths' config to resolve.`,
-    );
+    // In the case where:
+    // - We're using middleware auth mode
+    // - The redirect URI is in the middleware matcher
+    // - The redirect URI isn't in the unauthenticatedPaths array
+    //
+    // then we would get stuck in a login loop due to the redirect happening before the session is set.
+    // It's likely that the user accidentally forgot to add the path to unauthenticatedPaths, so we add it here.
+    middlewareAuth.unauthenticatedPaths.push(url.pathname);
   }
+
+  const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((pathGlob) => {
+    const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
+
+    return pathRegex.exec(request.nextUrl.pathname);
+  });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
