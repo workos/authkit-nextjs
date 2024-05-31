@@ -34,6 +34,23 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
 
   newRequestHeaders.delete(sessionHeaderName);
 
+  const url = new URL(WORKOS_REDIRECT_URI);
+
+  if (
+    middlewareAuth.enabled &&
+    url.pathname === request.nextUrl.pathname &&
+    !middlewareAuth.unauthenticatedPaths.includes(url.pathname)
+  ) {
+    // In the case where:
+    // - We're using middleware auth mode
+    // - The redirect URI is in the middleware matcher
+    // - The redirect URI isn't in the unauthenticatedPaths array
+    //
+    // then we would get stuck in a login loop due to the redirect happening before the session is set.
+    // It's likely that the user accidentally forgot to add the path to unauthenticatedPaths, so we add it here.
+    middlewareAuth.unauthenticatedPaths.push(url.pathname);
+  }
+
   const matchedPaths: string[] = middlewareAuth.unauthenticatedPaths.filter((pathGlob) => {
     const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
 
