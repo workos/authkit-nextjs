@@ -40,6 +40,18 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     return pathRegex.exec(request.nextUrl.pathname);
   });
 
+  const url = new URL(WORKOS_REDIRECT_URI);
+
+  if (
+    middlewareAuth.enabled &&
+    url.pathname === request.nextUrl.pathname &&
+    !middlewareAuth.unauthenticatedPaths.includes(url.pathname)
+  ) {
+    throw new Error(
+      `Mismatch detected: WorkOS redirect URI '${url.pathname}' found in middleware matcher but is not included in 'unauthenticatedPaths' array. This will cause a log in loop. Add '${url.pathname}' to 'unauthenticatedPaths' config to resolve.`,
+    );
+  }
+
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
