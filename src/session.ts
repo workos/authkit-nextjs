@@ -125,15 +125,7 @@ async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | 
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
 
 async function getUser({ ensureSignedIn = false } = {}) {
-  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
-
-  if (!hasMiddleware) {
-    throw new Error(
-      'You are calling `getUser` on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `getUser` from by updating your middleware config in `middleware.(js|ts)`.',
-    );
-  }
-
-  const session = await getSessionFromHeader();
+  const session = await getSessionFromHeader('getUser');
   if (!session) {
     if (ensureSignedIn) {
       const url = headers().get('x-url');
@@ -151,6 +143,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
     organizationId,
     role,
     impersonator: session.impersonator,
+    accessToken: session.accessToken,
   };
 }
 
@@ -180,7 +173,15 @@ async function getSessionFromCookie() {
   }
 }
 
-async function getSessionFromHeader(): Promise<Session | undefined> {
+async function getSessionFromHeader(caller: string): Promise<Session | undefined> {
+  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
+
+  if (!hasMiddleware) {
+    throw new Error(
+      `You are calling \`${caller}\` on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling \`${caller}\` from by updating your middleware config in \`middleware.(js|ts)\`.`,
+    );
+  }
+
   const authHeader = headers().get(sessionHeaderName);
   if (!authHeader) return;
 

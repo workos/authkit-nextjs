@@ -178,6 +178,30 @@ export default function App() {
 }
 ```
 
+### Get the access token
+
+Sometimes it is useful to obtain the access token directly, for instance to make API requests to another service.
+
+```jsx
+import { getUser } from '@workos-inc/authkit-nextjs';
+
+export default async function HomePage() {
+  const { accessToken } = await getUser();
+
+  if (!accessToken) {
+    return <div>Not signed in</div>;
+  }
+
+  const serviceData = await fetch('/api/path', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return <div>{serviceData}</div>;
+}
+```
+
 ### Debugging
 
 To enable debug logs, initialize the middleware with the debug flag enabled.
