@@ -29,6 +29,7 @@ export interface NoUserInfo {
   organizationId?: undefined;
   role?: undefined;
   impersonator?: undefined;
+  accessToken?: undefined;
 }
 
 export interface AccessToken {
