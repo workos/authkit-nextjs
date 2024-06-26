@@ -20,6 +20,7 @@ export interface UserInfo {
   sessionId: string;
   organizationId?: string;
   role?: string;
+  permissions?: string[];
   impersonator?: Impersonator;
   accessToken: string;
 }
