@@ -1,15 +1,16 @@
-import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookieName, cookieOptions } from './cookie.js';
-import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
+import { workos } from './workos.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
+import { useCallback } from 'react';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -154,6 +155,17 @@ async function getUser({ ensureSignedIn = false } = {}) {
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
 
+  const hasPermission = useCallback(
+    (permission: string) => {
+      if (!Array.isArray(permissions)) {
+        throw new Error('Permission claim is invalid.');
+      }
+
+      return permissions.includes(permission);
+    },
+    [permissions],
+  );
+
   return {
     sessionId,
     user: session.user,
@@ -162,6 +174,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
     permissions,
     impersonator: session.impersonator,
     accessToken: session.accessToken,
+    hasPermission,
   };
 }
 
@@ -206,4 +219,4 @@ async function getSessionFromHeader(caller: string): Promise<Session | undefined
   return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-export { encryptSession, updateSession, getUser, terminateSession };
+export { encryptSession, getUser, terminateSession, updateSession };
