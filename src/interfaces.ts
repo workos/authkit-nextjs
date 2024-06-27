@@ -37,6 +37,7 @@ export interface AccessToken {
   sid: string;
   org_id?: string;
   role?: string;
+  permissions?: string[];
 }
 
 export interface GetAuthURLOptions {
