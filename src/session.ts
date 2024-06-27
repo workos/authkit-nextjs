@@ -10,7 +10,6 @@ import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } fro
 import { workos } from './workos.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { useCallback } from 'react';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -155,16 +154,13 @@ async function getUser({ ensureSignedIn = false } = {}) {
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
 
-  const hasPermission = useCallback(
-    (permission: string) => {
-      if (!Array.isArray(permissions)) {
-        throw new Error('Permission claim is invalid.');
-      }
+  const hasPermission = (permission: string) => {
+    if (!Array.isArray(permissions)) {
+      throw new Error('Permission claim is invalid.');
+    }
 
-      return permissions.includes(permission);
-    },
-    [permissions],
-  );
+    return permissions.includes(permission);
+  };
 
   return {
     sessionId,
