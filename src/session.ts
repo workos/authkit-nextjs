@@ -5,14 +5,14 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
 import { cookieName, cookieOptions } from './cookie.js';
 import { workos } from './workos.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
 
-const sessionHeaderName = 'x-workos-session';
-const middlewareHeaderName = 'x-workos-middleware';
+const sessionHeaderName = !!WORKOS_COOKIE_NAME ? `x-${WORKOS_COOKIE_NAME}` : 'x-workos-session';
+const middlewareHeaderName = !!WORKOS_COOKIE_NAME ? `x-${WORKOS_COOKIE_NAME}-middleware` : 'x-workos-middleware';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 

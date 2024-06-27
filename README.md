@@ -41,6 +41,7 @@ Certain environment variables are optional and can be used to debug or configure
 
 ```sh
 WORKOS_COOKIE_MAX_AGE='600' # maximum age of the cookie in seconds. Defaults to 31 days
+WORKOS_COOKIE_NAME='wos-session' # customize the cookieName used. Defaults to 'wos-session'
 WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
