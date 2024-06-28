@@ -1,11 +1,14 @@
-import WorkOS from '@workos-inc/node';
+import { WorkOS } from '@workos-inc/node';
 import { WORKOS_API_HOSTNAME, WORKOS_API_HTTPS, WORKOS_API_KEY, WORKOS_API_PORT } from './env-variables.js';
-
 
 const options = {
   apiHostname: WORKOS_API_HOSTNAME,
   https: WORKOS_API_HTTPS ? WORKOS_API_HTTPS === 'true' : true,
   port: WORKOS_API_PORT ? parseInt(WORKOS_API_PORT) : undefined,
+  appInfo: {
+    name: 'authkit-nextjs',
+    version: '1.0.0',
+  },
 };
 
 // Initialize the WorkOS client
