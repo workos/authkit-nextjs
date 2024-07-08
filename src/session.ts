@@ -11,8 +11,8 @@ import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } fro
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
 
-const sessionHeaderName = !!WORKOS_COOKIE_NAME ? `x-${WORKOS_COOKIE_NAME}` : 'x-workos-session';
-const middlewareHeaderName = !!WORKOS_COOKIE_NAME ? `x-${WORKOS_COOKIE_NAME}-middleware` : 'x-workos-middleware';
+const sessionHeaderName = 'x-workos-session';
+const middlewareHeaderName = 'x-workos-middleware';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
