@@ -155,6 +155,10 @@ async function getUser({ ensureSignedIn = false } = {}) {
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
 
   const hasPermission = (permission: string) => {
+    if (!permissions) {
+      return false;
+    }
+
     if (!Array.isArray(permissions)) {
       throw new Error('Permission claim is invalid.');
     }
