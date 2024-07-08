@@ -85,7 +85,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     if (debug) console.log('Session invalid. Attempting refresh', session.refreshToken);
 
     // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
-    const { accessToken, refreshToken } = await workos.userManagement.authenticateWithRefreshToken({
+    const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
       clientId: WORKOS_CLIENT_ID,
       refreshToken: session.refreshToken,
     });
@@ -96,8 +96,8 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     const encryptedSession = await encryptSession({
       accessToken,
       refreshToken,
-      user: session.user,
-      impersonator: session.impersonator,
+      user,
+      impersonator,
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);

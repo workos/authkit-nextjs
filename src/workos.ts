@@ -1,4 +1,4 @@
-import WorkOS from '@workos-inc/node';
+import { WorkOS } from '@workos-inc/node';
 import { WORKOS_API_HOSTNAME, WORKOS_API_HTTPS, WORKOS_API_KEY, WORKOS_API_PORT } from './env-variables.js';
 
 
