@@ -60,6 +60,14 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
+
+    // If the request is a POST, then we're likely to run afoul of CORS protections
+    // as the request might have come from the client as a server function.
+    // In that case we return an error response instead of redirecting.
+    if (request.method === 'POST') {
+      return new NextResponse('Not authorized', { status: 403 });
+    }
+
     return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
   }
 
