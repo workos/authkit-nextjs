@@ -23,7 +23,6 @@ export interface UserInfo {
   permissions?: string[];
   impersonator?: Impersonator;
   accessToken: string;
-  hasPermission: (permission: string) => boolean;
 }
 export interface NoUserInfo {
   user: null;

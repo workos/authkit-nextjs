@@ -1,13 +1,13 @@
-import { sealData, unsealData } from 'iron-session';
-import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
-import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
+import { sealData, unsealData } from 'iron-session';
 import { cookieName, cookieOptions } from './cookie.js';
+import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
-import { workos } from './workos.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
 
@@ -154,18 +154,6 @@ async function getUser({ ensureSignedIn = false } = {}) {
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
 
-  const hasPermission = (permission: string) => {
-    if (!permissions) {
-      return false;
-    }
-
-    if (!Array.isArray(permissions)) {
-      throw new Error('Permission claim is invalid.');
-    }
-
-    return permissions.includes(permission);
-  };
-
   return {
     sessionId,
     user: session.user,
@@ -174,7 +162,6 @@ async function getUser({ ensureSignedIn = false } = {}) {
     permissions,
     impersonator: session.impersonator,
     accessToken: session.accessToken,
-    hasPermission,
   };
 }
 
