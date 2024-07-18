@@ -61,11 +61,17 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
 
-    // If the request is a POST, then we're likely to run afoul of CORS protections
+    const serverAction = request.headers.get('next-action');
+
+    // If the request is a server action, then we're likely to run afoul of CORS protections
     // as the request might have come from the client as a server function.
-    // In that case we return an error response instead of redirecting.
-    if (request.method === 'POST') {
-      return new NextResponse('Not authorized', { status: 403 });
+    // In that case we warn the user and continue.
+    if (serverAction !== null) {
+      if (debug)
+        console.warn(`
+          POST detected to a protected route without a session. If this came from a server action,
+          make sure you catch the CORS error and either redirect or handle the error gracefully.
+          `);
     }
 
     return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
