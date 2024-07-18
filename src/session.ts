@@ -68,10 +68,10 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     // In that case we warn the user and continue.
     if (serverAction !== null) {
       if (debug)
-        console.warn(`
-          POST detected to a protected route without a session. If this came from a server action,
-          make sure you catch the CORS error and either redirect or handle the error gracefully.
-          `);
+        console.warn(
+          `Server action detected without a valid session in middleware auth mode.
+          Make sure you catch the CORS error and either redirect or handle the error gracefully.`,
+        );
     }
 
     return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
