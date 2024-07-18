@@ -20,6 +20,7 @@ export interface UserInfo {
   sessionId: string;
   organizationId?: string;
   role?: string;
+  permissions?: string[];
   impersonator?: Impersonator;
   accessToken: string;
 }
@@ -36,6 +37,7 @@ export interface AccessToken {
   sid: string;
   org_id?: string;
   role?: string;
+  permissions?: string[];
 }
 
 export interface GetAuthURLOptions {
