@@ -156,6 +156,42 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 `unauthenticatedPaths` uses the same glob logic as the [Next.js matcher](https://nextjs.org/docs/pages/building-your-application/routing/middleware#matcher).
 
+### Middleware auth and server actions
+
+Using [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) with middleware auth mode can result in unexpected CORS errors if you don't wrap your server action call in a try/catch block. This is because a call to a server action without an existing session will be intercepted by the middleware and a redirect to AuthKit will be attempted, which will trigger a CORS error.
+
+Wrapping your server action call in a try/catch block will allow you to either display an error or redirect the user:
+
+```jsx
+'use client';
+
+import { serverFunction } from '../../server-function';
+import { useRouter } from 'next/navigation';
+
+export default function TestPage() {
+  const router = useRouter();
+
+  const handleClick = async () => {
+    try {
+      const data = await serverFunction();
+
+      // Do something with data
+    } catch (e) {
+      // In the case of a CORS error, redirect user to login page
+      router.push('/login');
+    }
+  };
+
+  return (
+    <>
+      <button type="button" onClick={handleClick}>
+        Trigger server function
+      </button>
+    </>
+  );
+}
+```
+
 ### Signing out
 
 Use the `signOut` method to sign out the current logged in user and redirect to your app's homepage. The homepage redirect is set in your WorkOS dashboard settings under "Redirect".

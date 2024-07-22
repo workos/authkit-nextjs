@@ -65,12 +65,11 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
 
     // If the request is a server action, then we're likely to run afoul of CORS protections
     // as the request might have come from the client as a server function.
-    // In that case we warn the user and continue.
+    // In that case we warn the user and continue, which will likely result in a CORS error.
     if (serverAction !== null) {
       if (debug)
         console.warn(
-          `Server action detected without a valid session in middleware auth mode.
-          Make sure you catch the CORS error and either redirect or handle the error gracefully.`,
+          `Server action detected without a valid session in middleware auth mode. Make sure you catch the CORS error and either redirect or handle the error gracefully.`,
         );
     }
 
