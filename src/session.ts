@@ -60,7 +60,10 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
-    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
+
+    const returnPathname = getReturnPathname(request.url);
+
+    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname }));
   }
 
   // If no session, just continue
@@ -204,6 +207,12 @@ async function getSessionFromHeader(caller: string): Promise<Session | undefined
   if (!authHeader) return;
 
   return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
+}
+
+function getReturnPathname(url: string): string {
+  const newUrl = new URL(url);
+
+  return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
 export { encryptSession, getUser, terminateSession, updateSession };
