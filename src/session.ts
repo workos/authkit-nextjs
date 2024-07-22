@@ -61,9 +61,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
 
-    const returnPathname = getReturnPathname(request.url);
-
-    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname }));
+    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: getReturnPathname(request.url) }));
   }
 
   // If no session, just continue
@@ -149,7 +147,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
   if (!session) {
     if (ensureSignedIn) {
       const url = headers().get('x-url');
-      const returnPathname = url ? new URL(url).pathname : undefined;
+      const returnPathname = url ? getReturnPathname(url) : undefined;
       redirect(await getAuthorizationUrl({ returnPathname }));
     }
     return { user: null };
