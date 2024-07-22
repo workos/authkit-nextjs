@@ -33,12 +33,12 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         // Extract the search params if they are present
         if (returnPathname.includes('?')) {
-          const [pathname, search] = returnPathname.split('?');
-          url.pathname = pathname;
-          search.split('&').forEach((param: string) => {
-            const [key, value] = param.split('=');
+          const newUrl = new URL(returnPathname, 'https://example.com');
+          url.pathname = newUrl.pathname;
+
+          for (const [key, value] of newUrl.searchParams) {
             url.searchParams.append(key, value);
-          });
+          }
         } else {
           url.pathname = returnPathname;
         }
