@@ -158,9 +158,9 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 ### Middleware auth and server actions
 
-Using [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) with middleware auth mode can result in unexpected CORS errors if you don't wrap your server action call in a try/catch block. This is because a call to a server action without an existing session will be intercepted by the middleware and a redirect to AuthKit will be attempted, which will trigger a CORS error.
+Using [server actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations) with middleware auth mode can result in unexpected CORS errors if you don't wrap your server action call in a `try/catch` block. This is because a call to a server action without an existing session will be intercepted by the middleware and a redirect to AuthKit will be attempted, triggering a CORS error.
 
-Wrapping your server action call in a try/catch block will allow you to either display an error or redirect the user:
+Wrapping your server action call in a `try/catch` block will allow you to either display an error or redirect the user:
 
 ```jsx
 'use client';
@@ -191,6 +191,8 @@ export default function TestPage() {
   );
 }
 ```
+
+For handling errors from the server action itself, refer to the [Next.js documentation](https://nextjs.org/docs/app/building-your-application/routing/error-handling).
 
 ### Signing out
 
