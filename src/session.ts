@@ -69,7 +69,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     if (serverAction !== null) {
       if (debug)
         console.warn(
-          `Server action detected without a valid session in middleware auth mode. Make sure you catch the CORS error and either redirect or handle the error gracefully.`,
+          `🚫 Server action detected without a valid session in middleware auth mode. Make sure you catch the CORS error and either redirect or handle the error gracefully. See the authkit-nextjs readme for more information: https://github.com/workos/authkit-nextjs`,
         );
     }
 
