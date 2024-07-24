@@ -18,6 +18,7 @@ const WORKOS_API_HOSTNAME = getOptionalEnvVariable('WORKOS_API_HOSTNAME');
 const WORKOS_API_HTTPS = getOptionalEnvVariable('WORKOS_API_HTTPS');
 const WORKOS_API_PORT = getOptionalEnvVariable('WORKOS_API_PORT');
 const WORKOS_COOKIE_MAX_AGE = getOptionalEnvVariable('WORKOS_COOKIE_MAX_AGE');
+const WORKOS_COOKIE_NAME = getOptionalEnvVariable('WORKOS_COOKIE_NAME');
 
 if (WORKOS_COOKIE_PASSWORD.length < 32) {
   throw new Error('WORKOS_COOKIE_PASSWORD must be at least 32 characters long');
@@ -32,4 +33,5 @@ export {
   WORKOS_API_HTTPS,
   WORKOS_API_PORT,
   WORKOS_COOKIE_MAX_AGE,
+  WORKOS_COOKIE_NAME,
 };
