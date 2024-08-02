@@ -50,6 +50,9 @@ WORKOS_COOKIE_MAX_AGE='600' # maximum age of the cookie in seconds. Defaults to 
 WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
+# the domain (and subdomains) that the session cookie will be available on.
+# (normally not needed).
+WORKOS_COOKIE_DOMAIN='example.com'
 ```
 
 ## Setup
