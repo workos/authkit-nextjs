@@ -43,6 +43,7 @@ export interface AccessToken {
 export interface GetAuthURLOptions {
   screenHint?: 'sign-up' | 'sign-in';
   returnPathname?: string;
+  organizationId?: string;
 }
 
 export interface AuthkitMiddlewareAuth {
