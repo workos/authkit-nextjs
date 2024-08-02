@@ -85,10 +85,13 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   try {
     if (debug) console.log('Session invalid. Attempting refresh', session.refreshToken);
 
+    const { org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
+
     // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
     const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
       clientId: WORKOS_CLIENT_ID,
       refreshToken: session.refreshToken,
+      organizationId,
     });
 
     if (debug) console.log('Refresh successful:', refreshToken);
