@@ -52,6 +52,10 @@ WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
 ```
 
+`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains.
+Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains.
+Not needed for most use cases.
+
 ## Setup
 
 ### Callback route
