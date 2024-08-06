@@ -3,6 +3,7 @@ import { authkitMiddleware } from './middleware.js';
 import { getUser } from './session.js';
 import { getSignInUrl, getSignUpUrl, signOut } from './auth.js';
 import { Impersonation } from './impersonation.js';
+import { Provider } from './provider.js';
 
 export {
   handleAuth,
@@ -15,4 +16,5 @@ export {
   signOut,
   //
   Impersonation,
+  Provider,
 };
