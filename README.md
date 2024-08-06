@@ -208,6 +208,12 @@ export default async function HomePage() {
 }
 ```
 
+### Refreshing the session
+
+Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
+
+The `organizationId` parameter can be passed to `refreshSession` in order to "switch" to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
+
 ### Debugging
 
 To enable debug logs, initialize the middleware with the debug flag enabled.
