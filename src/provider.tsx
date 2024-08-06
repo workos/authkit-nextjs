@@ -4,7 +4,7 @@ import * as React from 'react';
 import { checkSessionAction } from './actions.js';
 
 export const Provider = ({ children }: React.PropsWithChildren) => {
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
         try {
