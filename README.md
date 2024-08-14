@@ -16,6 +16,12 @@ or
 yarn add @workos-inc/authkit-nextjs
 ```
 
+## Video tutorial
+
+<a href="https://youtu.be/gMkHOotg0xc?feature=shared" target="_blank">
+  <img src="https://github.com/user-attachments/assets/ed67129b-3b27-4745-8960-64db4c8ab393" alt="YouTube tutorial: Next.js App Router Authentication with AuthKit" style="display: block; width: 100%; max-width: 720px; height: auto; aspect-ratio: 16/9; object-fit: cover; object-position: center; margin: 1em auto;" onerror="this.onerror=null; this.src='https://img.youtube.com/vi/gMkHOotg0xc/0.jpg'" />
+</a>
+
 ## Pre-flight
 
 Make sure the following values are present in your `.env.local` environment variables file. The client ID and API key can be found in the [WorkOS dashboard](https://dashboard.workos.com), and the redirect URI can also be configured there.
@@ -46,6 +52,10 @@ WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
 ```
+
+`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains.
+Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains.
+Not needed for most use cases.
 
 ## Setup
 
@@ -202,6 +212,12 @@ export default async function HomePage() {
   return <div>{serviceData}</div>;
 }
 ```
+
+### Refreshing the session
+
+Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
+
+The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
 
 ### Debugging
 

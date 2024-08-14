@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import { cookieName } from './cookie.js';
 import { terminateSession } from './session.js';
 
-async function getSignInUrl() {
-  return getAuthorizationUrl({ screenHint: 'sign-in' });
+async function getSignInUrl({ organizationId }: { organizationId?: string } = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in' });
 }
 
 async function getSignUpUrl() {

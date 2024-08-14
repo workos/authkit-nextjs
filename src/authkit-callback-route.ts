@@ -12,7 +12,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code');
     const state = request.nextUrl.searchParams.get('state');
-    const returnPathname = state ? JSON.parse(atob(state)).returnPathname : null;
+    let returnPathname = state ? JSON.parse(atob(state)).returnPathname : null;
 
     if (code) {
       try {
@@ -29,7 +29,19 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         url.searchParams.delete('state');
 
         // Redirect to the requested path and store the session
-        url.pathname = returnPathname ?? returnPathnameOption;
+        returnPathname = returnPathname ?? returnPathnameOption;
+
+        // Extract the search params if they are present
+        if (returnPathname.includes('?')) {
+          const newUrl = new URL(returnPathname, 'https://example.com');
+          url.pathname = newUrl.pathname;
+
+          for (const [key, value] of newUrl.searchParams) {
+            url.searchParams.append(key, value);
+          }
+        } else {
+          url.pathname = returnPathname;
+        }
 
         const response = NextResponse.redirect(url);
 

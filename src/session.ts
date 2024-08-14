@@ -60,7 +60,8 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
-    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: new URL(request.url).pathname }));
+
+    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: getReturnPathname(request.url) }));
   }
 
   // If no session, just continue
@@ -84,10 +85,13 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   try {
     if (debug) console.log('Session invalid. Attempting refresh', session.refreshToken);
 
+    const { org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
+
     // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
-    const { accessToken, refreshToken } = await workos.userManagement.authenticateWithRefreshToken({
+    const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
       clientId: WORKOS_CLIENT_ID,
       refreshToken: session.refreshToken,
+      organizationId,
     });
 
     if (debug) console.log('Refresh successful:', refreshToken);
@@ -96,8 +100,8 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     const encryptedSession = await encryptSession({
       accessToken,
       refreshToken,
-      user: session.user,
-      impersonator: session.impersonator,
+      user,
+      impersonator,
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
@@ -116,6 +120,57 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
     response.cookies.delete(cookieName);
     return response;
   }
+}
+
+async function refreshSession(options?: {
+  organizationId?: string;
+  ensureSignedIn: false;
+}): Promise<UserInfo | NoUserInfo>;
+async function refreshSession(options: { organizationId?: string; ensureSignedIn: true }): Promise<UserInfo>;
+async function refreshSession({
+  organizationId: nextOrganizationId,
+  ensureSignedIn = false,
+}: {
+  organizationId?: string;
+  ensureSignedIn?: boolean;
+} = {}) {
+  const session = await getSessionFromCookie();
+  if (!session) {
+    if (ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
+
+  const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
+
+  const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
+    clientId: WORKOS_CLIENT_ID,
+    refreshToken: session.refreshToken,
+    organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
+  });
+
+  // Encrypt session with new access and refresh tokens
+  const encryptedSession = await encryptSession({
+    accessToken,
+    refreshToken,
+    user,
+    impersonator,
+  });
+
+  cookies().set(cookieName, encryptedSession, cookieOptions);
+
+  const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
+
+  return {
+    sessionId,
+    user: session.user,
+    organizationId,
+    role,
+    permissions,
+    impersonator: session.impersonator,
+    accessToken: session.accessToken,
+  };
 }
 
 function getMiddlewareAuthPathRegex(pathGlob: string) {
@@ -137,28 +192,31 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
   }
 }
 
+async function redirectToSignIn() {
+  const url = headers().get('x-url');
+  const returnPathname = url ? getReturnPathname(url) : undefined;
+  redirect(await getAuthorizationUrl({ returnPathname }));
+}
+
 async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-
 async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
-
 async function getUser({ ensureSignedIn = false } = {}) {
   const session = await getSessionFromHeader('getUser');
   if (!session) {
     if (ensureSignedIn) {
-      const url = headers().get('x-url');
-      const returnPathname = url ? new URL(url).pathname : undefined;
-      redirect(await getAuthorizationUrl({ returnPathname }));
+      await redirectToSignIn();
     }
     return { user: null };
   }
 
-  const { sid: sessionId, org_id: organizationId, role } = decodeJwt<AccessToken>(session.accessToken);
+  const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
     sessionId,
     user: session.user,
     organizationId,
     role,
+    permissions,
     impersonator: session.impersonator,
     accessToken: session.accessToken,
   };
@@ -205,4 +263,10 @@ async function getSessionFromHeader(caller: string): Promise<Session | undefined
   return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-export { encryptSession, updateSession, getUser, terminateSession };
+function getReturnPathname(url: string): string {
+  const newUrl = new URL(url);
+
+  return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
+}
+
+export { encryptSession, getUser, refreshSession, terminateSession, updateSession };
