@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { checkSessionAction } from './actions.js';
 
-export const Provider = ({ children }: React.PropsWithChildren) => {
+export const AuthKitProvider = ({ children }: React.PropsWithChildren) => {
   React.useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
@@ -18,6 +18,9 @@ export const Provider = ({ children }: React.PropsWithChildren) => {
       }
     };
 
+    // In the case where we're using middleware auth mode, a user that has signed out in a different tab
+    // will run into an issue if they attempt to hit a server action in the original tab.
+    // This will force a refresh of the page in that case, which will redirect them to the sign-in page.
     window.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
