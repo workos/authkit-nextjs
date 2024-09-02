@@ -92,6 +92,24 @@ export const config = { matcher: ['/', '/admin'] };
 
 ## Usage
 
+### Wrap your app in `AuthKitProvider`
+
+Use `AuthKitProvider` to wrap your app layout, which adds some protections for auth edge cases.
+
+```jsx
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <AuthKitProvider>{children}</AuthKitProvider>
+      </body>
+    </html>
+  );
+}
+```
+
 ### Get the current user
 
 For pages where you want to display a signed-in and signed-out view, use `getUser` to retrieve the user profile from WorkOS.
