@@ -2,7 +2,7 @@
 
 The AuthKit library for Next.js provides convenient helpers for authentication and session management using WorkOS & AuthKit with Next.js.
 
-> Note: This library is only works with the Next.js App Router.
+> Note: This library is intended for use with the Next.js App Router.
 
 ## Installation
 
@@ -50,6 +50,7 @@ Certain environment variables are optional and can be used to debug or configure
 ```sh
 WORKOS_COOKIE_MAX_AGE='600' # maximum age of the cookie in seconds. Defaults to 400 days, the maximum allowed in Chrome
 WORKOS_COOKIE_DOMAIN='example.com'
+WORKOS_COOKIE_NAME='authkit-cookie'
 WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
@@ -92,6 +93,24 @@ export default authkitMiddleware();
 // Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
+
+#### Custom redirect URI
+
+In cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments), use the `redirectUri` option in `authkitMiddleware`:
+
+```ts
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+
+export default authkitMiddleware({
+  redirectUri: 'https://foo.example.com/callback',
+});
+
+// Match against pages that require auth
+// Leave this out if you want auth on every resource (including images, css etc.)
+export const config = { matcher: ['/', '/admin'] };
+```
+
+Custom redirect URIs will be used over a redirect URI configured in the environment variables.
 
 ## Usage
 
