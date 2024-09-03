@@ -54,4 +54,18 @@ export interface AuthkitMiddlewareAuth {
 export interface AuthkitMiddlewareOptions {
   debug?: boolean;
   middlewareAuth?: AuthkitMiddlewareAuth;
+  options?: AuthkitOptions;
+}
+
+export interface AuthkitOptions {
+  apiKey?: string;
+  clientId?: string;
+  cookieDomain?: string;
+  cookieMaxAge?: number;
+  cookieName?: string;
+  cookiePassword?: string;
+  hostname?: string;
+  https?: boolean;
+  port?: number;
+  redirectUri?: string;
 }

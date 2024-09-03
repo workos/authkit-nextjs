@@ -1,6 +1,6 @@
 import { handleAuth } from './authkit-callback-route.js';
 import { authkitMiddleware } from './middleware.js';
-import { getUser, refreshSession } from './session.js';
+import { withAuth, refreshSession } from './session.js';
 import { getSignInUrl, getSignUpUrl, signOut } from './auth.js';
 import { Impersonation } from './impersonation.js';
 import { AuthKitProvider } from './provider.js';
@@ -12,7 +12,7 @@ export {
   //
   getSignInUrl,
   getSignUpUrl,
-  getUser,
+  withAuth,
   refreshSession,
   signOut,
   //
