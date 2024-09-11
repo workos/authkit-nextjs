@@ -12,7 +12,7 @@ interface AuthKitProviderProps {
   onSessionExpired?: false | (() => void);
 }
 
-export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderProps) => {
+export const AuthKitProvider = ({ children, onSessionExpired = false }: AuthKitProviderProps) => {
   React.useEffect(() => {
     // Return early if the session expired checks are disabled.
     if (onSessionExpired === false) {
