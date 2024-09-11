@@ -1,3 +1,5 @@
+'use server';
+
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { cookies } from 'next/headers';
 import { cookieName } from './cookie.js';

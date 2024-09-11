@@ -34,10 +34,12 @@ export const AuthKitProvider = ({ children, onSessionExpired = false }: AuthKitP
 
         try {
           const hasSession = await checkSessionAction();
+          console.log('has session', hasSession);
           if (!hasSession) {
             throw new Error('Session expired');
           }
         } catch (error) {
+          console.log('no session', error);
           if (onSessionExpired) {
             onSessionExpired();
           } else {
