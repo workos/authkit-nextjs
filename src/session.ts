@@ -215,7 +215,7 @@ async function redirectToSignIn() {
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
 async function withAuth({ ensureSignedIn = false } = {}) {
-  const session = await getSessionFromHeader('withAuth');
+  const session = await getSessionFromHeader();
 
   if (!session) {
     if (ensureSignedIn) {
@@ -264,12 +264,12 @@ async function getSessionFromCookie() {
   }
 }
 
-async function getSessionFromHeader(caller: string): Promise<Session | undefined> {
+async function getSessionFromHeader(): Promise<Session | undefined> {
   const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
 
   if (!hasMiddleware) {
     throw new Error(
-      `You are calling \`${caller}\` on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling \`${caller}\` from by updating your middleware config in \`middleware.(js|ts)\`.`,
+      "You are calling 'getUser' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `${caller}` from by updating your middleware config in `middleware.(js|ts)`.",
     );
   }
 
