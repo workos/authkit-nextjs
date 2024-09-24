@@ -198,7 +198,7 @@ export default async function middleware(request: NextRequest) {
 
   const session = await getSession();
 
-  // If session is null, the user is not authenticated
+  // If session is undefined, the user is not authenticated
   console.log('session:', session);
 
   // ...add additional middleware logic here
