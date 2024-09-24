@@ -184,6 +184,32 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 `unauthenticatedPaths` uses the same glob logic as the [Next.js matcher](https://nextjs.org/docs/pages/building-your-application/routing/middleware#matcher).
 
+### Retrieve session in middleware
+
+Sometimes it's useful to check the user session if you want to compose custom middleware. The `getSession` helper method will retrieve the session from the cookie and verify the access token.
+
+```ts
+import { authkitMiddleware, getSession } from '@workos-inc/authkit-nextjs';
+import { NextRequest } from 'next/server';
+
+export default async function middleware(request: NextRequest) {
+  // authkitMiddleware will handle refreshing the session if the access token has expired
+  const response = await authkitMiddleware()(request);
+
+  const session = await getSession();
+
+  // If session is null, the user is not authenticated
+  console.log('session:', session);
+
+  // ...add additional middleware logic here
+
+  return response;
+}
+
+// Match against pages that require auth
+export const config = { matcher: ['/', '/account/:path*'] };
+```
+
 ### Signing out
 
 Use the `signOut` method to sign out the current logged in user and redirect to your app's homepage. The homepage redirect is set in your WorkOS dashboard settings under "Redirect".

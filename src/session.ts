@@ -248,6 +248,31 @@ async function getSessionFromCookie() {
   }
 }
 
+/**
+ * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `getUser` instead.
+ *
+ * @returns Session | undefined
+ */
+async function getSession() {
+  const session = await getSessionFromCookie();
+
+  if (!session) return;
+
+  if (await verifyAccessToken(session.accessToken)) {
+    const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
+
+    return {
+      sessionId,
+      user: session.user,
+      organizationId,
+      role,
+      permissions,
+      impersonator: session.impersonator,
+      accessToken: session.accessToken,
+    };
+  }
+}
+
 async function getSessionFromHeader(caller: string): Promise<Session | undefined> {
   const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
 
@@ -269,4 +294,4 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-export { encryptSession, getUser, refreshSession, terminateSession, updateSession };
+export { encryptSession, getUser, refreshSession, terminateSession, updateSession, getSession };
