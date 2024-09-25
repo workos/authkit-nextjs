@@ -239,8 +239,8 @@ async function verifyAccessToken(accessToken: string) {
   }
 }
 
-async function getSessionFromCookie() {
-  const cookie = cookies().get(cookieName);
+async function getSessionFromCookie(response?: NextResponse) {
+  const cookie = response ? response.cookies.get(cookieName) : cookies().get(cookieName);
   if (cookie) {
     return unsealData<Session>(cookie.value, {
       password: WORKOS_COOKIE_PASSWORD,
@@ -253,8 +253,8 @@ async function getSessionFromCookie() {
  *
  * @returns Session | undefined
  */
-async function getSession() {
-  const session = await getSessionFromCookie();
+async function getSession(response?: NextResponse) {
+  const session = await getSessionFromCookie(response);
 
   if (!session) return;
 

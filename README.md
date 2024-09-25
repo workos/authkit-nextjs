@@ -196,10 +196,8 @@ export default async function middleware(request: NextRequest) {
   // authkitMiddleware will handle refreshing the session if the access token has expired
   const response = await authkitMiddleware()(request);
 
-  const session = await getSession();
-
   // If session is undefined, the user is not authenticated
-  console.log('session:', session);
+  const session = await getSession(response);
 
   // ...add additional middleware logic here
 
