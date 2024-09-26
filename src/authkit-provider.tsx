@@ -12,7 +12,7 @@ interface AuthKitProviderProps {
   onSessionExpired?: false | (() => void);
 }
 
-export const AuthKitProvider = ({ children, onSessionExpired = false }: AuthKitProviderProps) => {
+export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderProps) => {
   React.useEffect(() => {
     // Return early if the session expired checks are disabled.
     if (onSessionExpired === false) {
@@ -38,10 +38,14 @@ export const AuthKitProvider = ({ children, onSessionExpired = false }: AuthKitP
             throw new Error('Session expired');
           }
         } catch (error) {
-          if (onSessionExpired) {
-            onSessionExpired();
-          } else {
-            window.location.reload();
+          // 'Failed to fetch' is the error we are looking for if the action fails
+          // If any other error happens, for other reasons, we should not reload the page
+          if (error instanceof Error && error.message.includes('Failed to fetch')) {
+            if (onSessionExpired) {
+              onSessionExpired();
+            } else {
+              window.location.reload();
+            }
           }
         } finally {
           visibilityChangedCalled = false;
