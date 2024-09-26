@@ -239,12 +239,37 @@ async function verifyAccessToken(accessToken: string) {
   }
 }
 
-async function getSessionFromCookie() {
-  const cookie = cookies().get(cookieName);
+async function getSessionFromCookie(response?: NextResponse) {
+  const cookie = response ? response.cookies.get(cookieName) : cookies().get(cookieName);
   if (cookie) {
     return unsealData<Session>(cookie.value, {
       password: WORKOS_COOKIE_PASSWORD,
     });
+  }
+}
+
+/**
+ * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `getUser` instead.
+ *
+ * @returns Session | undefined
+ */
+async function getSession(response?: NextResponse) {
+  const session = await getSessionFromCookie(response);
+
+  if (!session) return;
+
+  if (await verifyAccessToken(session.accessToken)) {
+    const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
+
+    return {
+      sessionId,
+      user: session.user,
+      organizationId,
+      role,
+      permissions,
+      impersonator: session.impersonator,
+      accessToken: session.accessToken,
+    };
   }
 }
 
@@ -269,4 +294,4 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-export { encryptSession, getUser, refreshSession, terminateSession, updateSession };
+export { encryptSession, getUser, refreshSession, terminateSession, updateSession, getSession };
