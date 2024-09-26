@@ -31,8 +31,8 @@ Make sure the following values are present in your `.env.local` environment vari
 ```sh
 WORKOS_CLIENT_ID="client_..." # retrieved from the WorkOS dashboard
 WORKOS_API_KEY="sk_test_..." # retrieved from the WorkOS dashboard
-WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
+NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 ```
 
 `WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the session cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:

@@ -269,7 +269,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
 
   if (!hasMiddleware) {
     throw new Error(
-      "You are calling 'getUser' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `${caller}` from by updating your middleware config in `middleware.(js|ts)`.",
+      "You are calling 'withAuth' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `${caller}` from by updating your middleware config in `middleware.(js|ts)`.",
     );
   }
 
