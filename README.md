@@ -2,6 +2,8 @@
 
 The AuthKit library for Next.js provides convenient helpers for authentication and session management using WorkOS & AuthKit with Next.js.
 
+> Note: This library is intended for use with the Next.js App Router.
+
 ## Installation
 
 Install the package with:
@@ -29,8 +31,8 @@ Make sure the following values are present in your `.env.local` environment vari
 ```sh
 WORKOS_CLIENT_ID="client_..." # retrieved from the WorkOS dashboard
 WORKOS_API_KEY="sk_test_..." # retrieved from the WorkOS dashboard
-WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
+NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 ```
 
 `WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the session cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
@@ -46,7 +48,9 @@ To use the `signOut` method, you'll need to set your app's homepage in your Work
 Certain environment variables are optional and can be used to debug or configure cookie settings.
 
 ```sh
-WORKOS_COOKIE_MAX_AGE='600' # maximum age of the cookie in seconds. Defaults to 31 days
+WORKOS_COOKIE_MAX_AGE='600' # maximum age of the cookie in seconds. Defaults to 400 days, the maximum allowed in Chrome
+WORKOS_COOKIE_DOMAIN='example.com'
+WORKOS_COOKIE_NAME='authkit-cookie'
 WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
@@ -90,6 +94,24 @@ export default authkitMiddleware();
 export const config = { matcher: ['/', '/admin'] };
 ```
 
+#### Custom redirect URI
+
+In cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments), use the `redirectUri` option in `authkitMiddleware`:
+
+```ts
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+
+export default authkitMiddleware({
+  redirectUri: 'https://foo.example.com/callback',
+});
+
+// Match against pages that require auth
+// Leave this out if you want auth on every resource (including images, css etc.)
+export const config = { matcher: ['/', '/admin'] };
+```
+
+Custom redirect URIs will be used over a redirect URI configured in the environment variables.
+
 ## Usage
 
 ### Wrap your app in `AuthKitProvider`
@@ -112,15 +134,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ### Get the current user
 
-For pages where you want to display a signed-in and signed-out view, use `getUser` to retrieve the user profile from WorkOS.
+For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user profile from WorkOS.
 
 ```jsx
 import Link from 'next/link';
-import { getSignInUrl, getSignUpUrl, getUser, signOut } from '@workos-inc/authkit-nextjs';
+import { getSignInUrl, getSignUpUrl, withAuth, signOut } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {
   // Retrieves the user from the session or returns `null` if no user is signed in
-  const { user } = await getUser();
+  const { user } = await withAuth();
 
   if (!user) {
     // Get the URL to redirect the user to AuthKit to sign in
@@ -156,14 +178,14 @@ export default async function HomePage() {
 For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` option:
 
 ```jsx
-const { user } = await getUser({ ensureSignedIn: true });
+const { user } = await withAuth({ ensureSignedIn: true });
 ```
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
 
 ### Middleware auth
 
-The default behavior of this library is to request authentication via the `getUser` method on a per-page basis. There are some use cases where you don't want to call `getUser` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
+The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -235,10 +257,10 @@ export default function App() {
 Sometimes it is useful to obtain the access token directly, for instance to make API requests to another service.
 
 ```jsx
-import { getUser } from '@workos-inc/authkit-nextjs';
+import { withAuth } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {
-  const { accessToken } = await getUser();
+  const { accessToken } = await withAuth();
 
   if (!accessToken) {
     return <div>Not signed in</div>;
@@ -274,4 +296,4 @@ export default authkitMiddleware({ debug: true });
 
 #### NEXT_REDIRECT error when using try/catch blocks
 
-Wrapping a `getUser({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `getUser` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
+Wrapping a `withAuth({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `withAuth` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).

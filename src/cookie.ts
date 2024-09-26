@@ -3,7 +3,6 @@ import { WORKOS_REDIRECT_URI, WORKOS_COOKIE_MAX_AGE, WORKOS_COOKIE_DOMAIN } from
 const redirectUrl = new URL(WORKOS_REDIRECT_URI);
 const isSecureProtocol = redirectUrl.protocol === 'https:';
 
-const cookieName = 'wos-session';
 const cookieOptions = {
   path: '/',
   httpOnly: true,
@@ -16,4 +15,4 @@ const cookieOptions = {
   domain: WORKOS_COOKIE_DOMAIN,
 };
 
-export { cookieName, cookieOptions };
+export { cookieOptions };

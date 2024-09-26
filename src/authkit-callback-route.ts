@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { workos } from './workos.js';
-import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { encryptSession } from './session.js';
-import { cookieName, cookieOptions } from './cookie.js';
+import { cookieOptions } from './cookie.js';
 import { HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
@@ -50,6 +50,8 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // The refreshToken should never be accesible publicly, hence why we encrypt it in the cookie session
         // Alternatively you could persist the refresh token in a backend database
         const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
+        const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+
         cookies().set(cookieName, session, cookieOptions);
 
         return response;

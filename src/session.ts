@@ -5,9 +5,9 @@ import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
-import { cookieName, cookieOptions } from './cookie.js';
+import { cookieOptions } from './cookie.js';
 import { workos } from './workos.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
@@ -15,6 +15,7 @@ import { parse, tokensToRegexp } from 'path-to-regexp';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
+const redirectUriHeaderName = 'x-redirect-uri';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
@@ -22,7 +23,12 @@ async function encryptSession(session: Session) {
   return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
 }
 
-async function updateSession(request: NextRequest, debug: boolean, middlewareAuth: AuthkitMiddlewareAuth) {
+async function updateSession(
+  request: NextRequest,
+  debug: boolean,
+  middlewareAuth: AuthkitMiddlewareAuth,
+  redirectUri: string,
+) {
   const session = await getSessionFromCookie();
   const newRequestHeaders = new Headers(request.headers);
 
@@ -33,6 +39,11 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
 
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
+
+  // If the redirect URI is set, store it in the headers so we can use it later
+  if (redirectUri) {
+    newRequestHeaders.set(redirectUriHeaderName, redirectUri);
+  }
 
   newRequestHeaders.delete(sessionHeaderName);
 
@@ -74,6 +85,7 @@ async function updateSession(request: NextRequest, debug: boolean, middlewareAut
   }
 
   const hasValidSession = await verifyAccessToken(session.accessToken);
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
@@ -160,6 +172,7 @@ async function refreshSession({
     impersonator,
   });
 
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   cookies().set(cookieName, encryptedSession, cookieOptions);
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
@@ -197,13 +210,15 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 async function redirectToSignIn() {
   const url = headers().get('x-url');
   const returnPathname = url ? getReturnPathname(url) : undefined;
+
   redirect(await getAuthorizationUrl({ returnPathname }));
 }
 
-async function getUser(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-async function getUser(options: { ensureSignedIn: true }): Promise<UserInfo>;
-async function getUser({ ensureSignedIn = false } = {}) {
-  const session = await getSessionFromHeader('getUser');
+async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
+async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
+async function withAuth({ ensureSignedIn = false } = {}) {
+  const session = await getSessionFromHeader();
+
   if (!session) {
     if (ensureSignedIn) {
       await redirectToSignIn();
@@ -225,7 +240,7 @@ async function getUser({ ensureSignedIn = false } = {}) {
 }
 
 async function terminateSession() {
-  const { sessionId } = await getUser();
+  const { sessionId } = await withAuth();
   if (sessionId) {
     redirect(workos.userManagement.getLogoutUrl({ sessionId }));
   }
@@ -242,7 +257,9 @@ async function verifyAccessToken(accessToken: string) {
 }
 
 async function getSessionFromCookie(response?: NextResponse) {
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   const cookie = response ? response.cookies.get(cookieName) : cookies().get(cookieName);
+
   if (cookie) {
     return unsealData<Session>(cookie.value, {
       password: WORKOS_COOKIE_PASSWORD,
@@ -275,12 +292,12 @@ async function getSession(response?: NextResponse) {
   }
 }
 
-async function getSessionFromHeader(caller: string): Promise<Session | undefined> {
+async function getSessionFromHeader(): Promise<Session | undefined> {
   const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
 
   if (!hasMiddleware) {
     throw new Error(
-      `You are calling \`${caller}\` on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling \`${caller}\` from by updating your middleware config in \`middleware.(js|ts)\`.`,
+      "You are calling 'withAuth' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `${caller}` from by updating your middleware config in `middleware.(js|ts)`.",
     );
   }
 
@@ -296,4 +313,4 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-export { encryptSession, getUser, refreshSession, terminateSession, updateSession, getSession };
+export { encryptSession, withAuth, refreshSession, terminateSession, updateSession, getSession };

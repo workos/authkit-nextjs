@@ -5,8 +5,9 @@ import { AuthkitMiddlewareOptions } from './interfaces.js';
 export function authkitMiddleware({
   debug = false,
   middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
+  redirectUri = '',
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
-    return updateSession(request, debug, middlewareAuth);
+    return updateSession(request, debug, middlewareAuth, redirectUri);
   };
 }

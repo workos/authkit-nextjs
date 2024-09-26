@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { getUser } from './session.js';
+import { withAuth } from './session.js';
 import { signOut } from './auth.js';
 import { workos } from './workos.js';
 import { Button } from './button.js';
@@ -10,7 +10,7 @@ interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
 }
 
 export async function Impersonation({ side = 'bottom', ...props }: ImpersonationProps) {
-  const { impersonator, user, organizationId } = await getUser();
+  const { impersonator, user, organizationId } = await withAuth();
 
   if (!impersonator) return null;
 
