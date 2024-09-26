@@ -268,7 +268,7 @@ async function getSessionFromCookie(response?: NextResponse) {
 }
 
 /**
- * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `getUser` instead.
+ * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `withAuth` instead.
  *
  * @returns Session | undefined
  */
