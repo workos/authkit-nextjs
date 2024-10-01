@@ -57,3 +57,12 @@ export interface AuthkitMiddlewareOptions {
   middlewareAuth?: AuthkitMiddlewareAuth;
   redirectUri?: string;
 }
+
+export interface CookieOptions {
+  path: '/';
+  httpOnly: true;
+  secure: boolean;
+  sameSite: 'lax';
+  maxAge: number;
+  domain: string | undefined;
+}

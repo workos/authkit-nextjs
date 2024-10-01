@@ -5,7 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
-import { cookieOptions } from './cookie.js';
+import { getCookieOptions } from './cookie.js';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
@@ -29,6 +29,10 @@ async function updateSession(
   middlewareAuth: AuthkitMiddlewareAuth,
   redirectUri: string,
 ) {
+  if (!redirectUri && !WORKOS_REDIRECT_URI) {
+    throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
+  }
+
   const session = await getSessionFromCookie();
   const newRequestHeaders = new Headers(request.headers);
 
@@ -40,14 +44,17 @@ async function updateSession(
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
 
+  let url;
+
   // If the redirect URI is set, store it in the headers so we can use it later
   if (redirectUri) {
     newRequestHeaders.set(redirectUriHeaderName, redirectUri);
+    url = new URL(redirectUri);
+  } else {
+    url = new URL(WORKOS_REDIRECT_URI);
   }
 
   newRequestHeaders.delete(sessionHeaderName);
-
-  const url = new URL(WORKOS_REDIRECT_URI);
 
   if (
     middlewareAuth.enabled &&
@@ -124,7 +131,7 @@ async function updateSession(
       request: { headers: newRequestHeaders },
     });
     // update the cookie
-    response.cookies.set(cookieName, encryptedSession, cookieOptions);
+    response.cookies.set(cookieName, encryptedSession, getCookieOptions(redirectUri));
     return response;
   } catch (e) {
     if (debug) console.log('Failed to refresh. Deleting cookie and redirecting.', e);
@@ -173,7 +180,9 @@ async function refreshSession({
   });
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  cookies().set(cookieName, encryptedSession, cookieOptions);
+  const url = headers().get('x-url');
+
+  cookies().set(cookieName, encryptedSession, getCookieOptions(url));
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
 
@@ -192,8 +201,7 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
   let regex: string;
 
   try {
-    // Redirect URI is only used to construct the URL
-    const url = new URL(pathGlob, WORKOS_REDIRECT_URI);
+    const url = new URL(pathGlob, 'https://example.com');
     const path = `${url.pathname!}${url.hash || ''}`;
 
     const tokens = parse(path);
@@ -297,7 +305,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
 
   if (!hasMiddleware) {
     throw new Error(
-      "You are calling 'withAuth' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling `${caller}` from by updating your middleware config in `middleware.(js|ts)`.",
+      "You are calling 'withAuth' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling withAuth from by updating your middleware config in `middleware.(js|ts)`.",
     );
   }
 
