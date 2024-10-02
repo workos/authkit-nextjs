@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { encryptSession } from './session.js';
-import { cookieOptions } from './cookie.js';
+import { getCookieOptions } from './cookie.js';
 import { HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
@@ -52,7 +52,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
-        cookies().set(cookieName, session, cookieOptions);
+        cookies().set(cookieName, session, getCookieOptions(request.url));
 
         return response;
       } catch (error) {
