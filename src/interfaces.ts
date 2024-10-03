@@ -29,6 +29,7 @@ export interface NoUserInfo {
   sessionId?: undefined;
   organizationId?: undefined;
   role?: undefined;
+  permissions?: undefined;
   impersonator?: undefined;
   accessToken?: undefined;
 }

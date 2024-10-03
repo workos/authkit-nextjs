@@ -188,12 +188,12 @@ async function refreshSession({
 
   return {
     sessionId,
-    user: session.user,
+    user,
     organizationId,
     role,
     permissions,
-    impersonator: session.impersonator,
-    accessToken: session.accessToken,
+    impersonator,
+    accessToken,
   };
 }
 
@@ -278,12 +278,12 @@ async function getSessionFromCookie(response?: NextResponse) {
 /**
  * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `withAuth` instead.
  *
- * @returns Session | undefined
+ * @returns UserInfo | NoUserInfo
  */
 async function getSession(response?: NextResponse) {
   const session = await getSessionFromCookie(response);
 
-  if (!session) return;
+  if (!session) return { user: null };
 
   if (await verifyAccessToken(session.accessToken)) {
     const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
