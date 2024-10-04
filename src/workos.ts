@@ -1,7 +1,7 @@
 import { WorkOS } from '@workos-inc/node';
 import { WORKOS_API_HOSTNAME, WORKOS_API_KEY, WORKOS_API_HTTPS, WORKOS_API_PORT } from './env-variables.js';
 
-export const VERSION = '0.12.0';
+export const VERSION = '0.12.1';
 
 const options = {
   apiHostname: WORKOS_API_HOSTNAME,
