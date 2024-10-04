@@ -4,9 +4,9 @@ import { GetAuthURLOptions } from './interfaces.js';
 import { headers } from 'next/headers';
 
 async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
-  const { returnPathname, screenHint, organizationId } = options;
+  const { returnPathname, screenHint, organizationId, redirectUri: redirectUriOptions } = options;
 
-  const redirectUri = headers().get('x-redirect-uri');
+  const redirectUri = redirectUriOptions ?? headers().get('x-redirect-uri');
 
   return workos.userManagement.getAuthorizationUrl({
     provider: 'authkit',

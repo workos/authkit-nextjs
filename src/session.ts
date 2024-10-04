@@ -81,7 +81,9 @@ async function updateSession(
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
 
-    return NextResponse.redirect(await getAuthorizationUrl({ returnPathname: getReturnPathname(request.url) }));
+    return NextResponse.redirect(
+      await getAuthorizationUrl({ returnPathname: getReturnPathname(request.url), redirectUri: redirectUri ?? '' }),
+    );
   }
 
   // If no session, just continue
