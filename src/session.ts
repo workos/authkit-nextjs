@@ -82,7 +82,10 @@ async function updateSession(
     if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
 
     return NextResponse.redirect(
-      await getAuthorizationUrl({ returnPathname: getReturnPathname(request.url), redirectUri: redirectUri ?? '' }),
+      await getAuthorizationUrl({
+        returnPathname: getReturnPathname(request.url),
+        redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
+      }),
     );
   }
 
