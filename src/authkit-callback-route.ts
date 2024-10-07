@@ -12,7 +12,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code');
     const state = request.nextUrl.searchParams.get('state');
-    let returnPathname = state ? JSON.parse(atob(state)).returnPathname : null;
+    let returnPathname = state && state !== 'null' ? JSON.parse(atob(state)).returnPathname : null;
 
     if (code) {
       try {
