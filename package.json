@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/authkit-nextjs",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
   "sideEffects": false,
   "type": "module",
@@ -21,7 +21,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@workos-inc/node": "7.27.4",
+    "@workos-inc/node": "^7.27.5",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3",
     "path-to-regexp": "^6.2.2"
