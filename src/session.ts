@@ -102,7 +102,7 @@ async function updateSession(
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
-    newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
+    newRequestHeaders.set(sessionHeaderName, await cookies().get(cookieName)!.value);
     return NextResponse.next({
       request: { headers: newRequestHeaders },
     });
@@ -187,7 +187,7 @@ async function refreshSession({
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   const url = headers().get('x-url');
 
-  cookies().set(cookieName, encryptedSession, getCookieOptions(url));
+  await cookies().set(cookieName, encryptedSession, getCookieOptions(url));
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
 
@@ -271,7 +271,7 @@ async function verifyAccessToken(accessToken: string) {
 
 async function getSessionFromCookie(response?: NextResponse) {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const cookie = response ? response.cookies.get(cookieName) : cookies().get(cookieName);
+  const cookie = response ? response.cookies.get(cookieName) : await cookies().get(cookieName);
 
   if (cookie) {
     return unsealData<Session>(cookie.value, {

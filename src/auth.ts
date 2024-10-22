@@ -18,7 +18,7 @@ async function signOut() {
     name: WORKOS_COOKIE_NAME || 'wos-session',
   };
   if (WORKOS_COOKIE_DOMAIN) cookie.domain = WORKOS_COOKIE_DOMAIN;
-  cookies().delete(cookie);
+  await cookies().delete(cookie);
   await terminateSession();
 }
 

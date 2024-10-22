@@ -52,7 +52,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
-        cookies().set(cookieName, session, getCookieOptions(request.url));
+        await cookies().set(cookieName, session, getCookieOptions(request.url));
 
         return response;
       } catch (error) {
