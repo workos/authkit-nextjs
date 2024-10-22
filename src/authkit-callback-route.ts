@@ -51,8 +51,9 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // Alternatively you could persist the refresh token in a backend database
         const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+        const nextCookies = await cookies();
 
-        cookies().set(cookieName, session, getCookieOptions(request.url));
+        nextCookies.set(cookieName, session, getCookieOptions(request.url));
 
         return response;
       } catch (error) {

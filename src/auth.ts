@@ -15,7 +15,8 @@ async function getSignUpUrl() {
 
 async function signOut() {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  cookies().delete(cookieName);
+  const nextCookies = await cookies();
+  nextCookies.delete(cookieName);
   await terminateSession();
 }
 
