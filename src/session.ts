@@ -79,7 +79,7 @@ async function updateSession(
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
-    if (debug) console.log('Unauthenticated user on protected route, redirecting to AuthKit');
+    if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
 
     return NextResponse.redirect(
       await getAuthorizationUrl({
@@ -99,10 +99,12 @@ async function updateSession(
   const hasValidSession = await verifyAccessToken(session.accessToken);
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
+  const nextCookies = await cookies();
+
   if (hasValidSession) {
     if (debug) console.log('Session is valid');
     // set the x-workos-session header according to the current cookie value
-    newRequestHeaders.set(sessionHeaderName, cookies().get(cookieName)!.value);
+    newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
     return NextResponse.next({
       request: { headers: newRequestHeaders },
     });
@@ -185,9 +187,12 @@ async function refreshSession({
   });
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const url = headers().get('x-url');
 
-  cookies().set(cookieName, encryptedSession, getCookieOptions(url));
+  const headersList = await headers();
+  const url = headersList.get('x-url');
+
+  const nextCookies = await cookies();
+  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 
   const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
 
@@ -221,7 +226,8 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 }
 
 async function redirectToSignIn() {
-  const url = headers().get('x-url');
+  const headersList = await headers();
+  const url = headersList.get('x-url');
   const returnPathname = url ? getReturnPathname(url) : undefined;
 
   redirect(await getAuthorizationUrl({ returnPathname }));
@@ -264,14 +270,15 @@ async function verifyAccessToken(accessToken: string) {
   try {
     await jwtVerify(accessToken, JWKS);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
 
 async function getSessionFromCookie(response?: NextResponse) {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const cookie = response ? response.cookies.get(cookieName) : cookies().get(cookieName);
+  const nextCookies = await cookies();
+  const cookie = response ? response.cookies.get(cookieName) : nextCookies.get(cookieName);
 
   if (cookie) {
     return unsealData<Session>(cookie.value, {
@@ -306,7 +313,8 @@ async function getSession(response?: NextResponse) {
 }
 
 async function getSessionFromHeader(): Promise<Session | undefined> {
-  const hasMiddleware = Boolean(headers().get(middlewareHeaderName));
+  const headersList = await headers();
+  const hasMiddleware = Boolean(headersList.get(middlewareHeaderName));
 
   if (!hasMiddleware) {
     throw new Error(
@@ -314,7 +322,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
     );
   }
 
-  const authHeader = headers().get(sessionHeaderName);
+  const authHeader = headersList.get(sessionHeaderName);
   if (!authHeader) return;
 
   return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
