@@ -81,12 +81,21 @@ async function updateSession(
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
 
-    return NextResponse.redirect(
-      await getAuthorizationUrl({
-        returnPathname: getReturnPathname(request.url),
-        redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
-      }),
-    );
+    const redirectTo = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
+    });
+
+    // Fall back to standard Response if NextResponse is not available.
+    // This is to support Next.js 13.
+    return NextResponse?.redirect
+      ? NextResponse.redirect(redirectTo)
+      : new Response(null, {
+          status: 302,
+          headers: {
+            Location: redirectTo,
+          },
+        });
   }
 
   // If no session, just continue
@@ -317,8 +326,9 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   const hasMiddleware = Boolean(headersList.get(middlewareHeaderName));
 
   if (!hasMiddleware) {
+    const url = headersList.get('x-url');
     throw new Error(
-      "You are calling 'withAuth' on a path that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling withAuth from by updating your middleware config in `middleware.(js|ts)`.",
+      `You are calling 'withAuth' on ${url} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
   }
 
