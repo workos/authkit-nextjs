@@ -282,6 +282,18 @@ Use the `refreshSession` method in a server action or route handler to fetch the
 
 The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
 
+### Sign up paths
+
+The `signUpPaths` option can be passed to `authkitMiddleware` to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit. This is useful for cases where you want a path that mandates authentication to be treated as a sign up page.
+
+```ts
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+
+export default authkitMiddleware({
+  signUpPaths: ['/account/sign-up'],
+});
+```
+
 ### Debugging
 
 To enable debug logs, initialize the middleware with the debug flag enabled.

@@ -57,6 +57,7 @@ export interface AuthkitMiddlewareOptions {
   debug?: boolean;
   middlewareAuth?: AuthkitMiddlewareAuth;
   redirectUri?: string;
+  signUpPaths?: string[];
 }
 
 export interface CookieOptions {

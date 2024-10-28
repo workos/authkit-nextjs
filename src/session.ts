@@ -16,6 +16,7 @@ import { parse, tokensToRegexp } from 'path-to-regexp';
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const redirectUriHeaderName = 'x-redirect-uri';
+const signUpPathsHeaderName = 'x-sign-up-paths';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
@@ -28,6 +29,7 @@ async function updateSession(
   debug: boolean,
   middlewareAuth: AuthkitMiddlewareAuth,
   redirectUri: string,
+  signUpPaths: string[],
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -43,6 +45,11 @@ async function updateSession(
 
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
+
+  // Record the sign up paths so we can use it later
+  if (signUpPaths.length > 0) {
+    newRequestHeaders.set(signUpPathsHeaderName, signUpPaths.join(','));
+  }
 
   let url;
 
@@ -77,6 +84,8 @@ async function updateSession(
     return pathRegex.exec(request.nextUrl.pathname);
   });
 
+  const screenHint = signUpPaths.includes(request.nextUrl.pathname) ? 'sign-up' : 'sign-in';
+
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
@@ -85,6 +94,7 @@ async function updateSession(
       await getAuthorizationUrl({
         returnPathname: getReturnPathname(request.url),
         redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
+        screenHint,
       }),
     );
   }
@@ -227,10 +237,17 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 
 async function redirectToSignIn() {
   const headersList = await headers();
-  const url = headersList.get('x-url');
-  const returnPathname = url ? getReturnPathname(url) : undefined;
+  const url = headersList.get('x-url') ?? '';
 
-  redirect(await getAuthorizationUrl({ returnPathname }));
+  // Determine if the current route is in the sign up paths
+  const signUpPaths = headersList.get(signUpPathsHeaderName)?.split(',');
+
+  const pathname = new URL(url).pathname;
+  const screenHint = signUpPaths?.includes(pathname) ? 'sign-up' : 'sign-in';
+
+  const returnPathname = url && getReturnPathname(url);
+
+  redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
