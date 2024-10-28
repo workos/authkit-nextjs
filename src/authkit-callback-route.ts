@@ -43,7 +43,16 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           url.pathname = returnPathname;
         }
 
-        const response = NextResponse.redirect(url);
+        // Fall back to standard Response if NextResponse is not available.
+        // This is to support Next.js 13.
+        const response = NextResponse?.redirect
+          ? NextResponse.redirect(url)
+          : new Response(null, {
+              status: 302,
+              headers: {
+                Location: url.toString(),
+              },
+            });
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
@@ -71,14 +80,20 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   };
 
   function errorResponse() {
-    return NextResponse.json(
-      {
-        error: {
-          message: 'Something went wrong',
-          description: 'Couldn’t sign in. If you are not sure what happened, please contact your organization admin.',
-        },
+    const errorBody = {
+      error: {
+        message: 'Something went wrong',
+        description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
       },
-      { status: 500 },
-    );
+    };
+
+    // Use NextResponse if available, fallback to standard Response
+    // This is to support Next.js 13.
+    return NextResponse?.json
+      ? NextResponse.json(errorBody, { status: 500 })
+      : new Response(JSON.stringify(errorBody), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
   }
 }
