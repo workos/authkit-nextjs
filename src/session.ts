@@ -120,7 +120,7 @@ async function updateSession(
   }
 
   try {
-    if (debug) console.log('Session invalid. Attempting refresh', session.refreshToken);
+    if (debug) console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
 
     const { org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
 
@@ -131,7 +131,7 @@ async function updateSession(
       organizationId,
     });
 
-    if (debug) console.log('Refresh successful:', refreshToken);
+    if (debug) console.log(`Refresh successful. New access token ends in ${accessToken.slice(-10)}`);
 
     // Encrypt session with new access and refresh tokens
     const encryptedSession = await encryptSession({
