@@ -7,7 +7,16 @@ import { getCookieOptions } from './cookie.js';
 import { HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
-  const { returnPathname: returnPathnameOption = '/' } = options;
+  const { returnPathname: returnPathnameOption = '/', baseURL } = options;
+
+  // Throw early if baseURL is provided but invalid
+  if (baseURL) {
+    try {
+      new URL(baseURL);
+    } catch (error) {
+      throw new Error(`Invalid baseURL: ${baseURL}`, { cause: error });
+    }
+  }
 
   return async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code');
@@ -22,7 +31,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           code,
         });
 
-        const url = request.nextUrl.clone();
+        // If baseURL is provided, use it instead of the hostname in nextURL
+        // This is useful if the app is being run in a container like docker where
+        // the hostname can be different from the one in the request
+        const url = baseURL ? new URL(baseURL) : request.nextUrl.clone();
 
         // Cleanup params
         url.searchParams.delete('code');
