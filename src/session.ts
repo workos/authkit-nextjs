@@ -84,8 +84,6 @@ async function updateSession(
     return pathRegex.exec(request.nextUrl.pathname);
   });
 
-  const screenHint = signUpPaths.includes(request.nextUrl.pathname) ? 'sign-up' : 'sign-in';
-
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
@@ -93,7 +91,7 @@ async function updateSession(
     const redirectTo = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
       redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
-      screenHint,
+      screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     });
 
     // Fall back to standard Response if NextResponse is not available.
@@ -252,7 +250,7 @@ async function redirectToSignIn() {
   const signUpPaths = headersList.get(signUpPathsHeaderName)?.split(',');
 
   const pathname = new URL(url).pathname;
-  const screenHint = signUpPaths?.includes(pathname) ? 'sign-up' : 'sign-in';
+  const screenHint = getScreenHint(signUpPaths, pathname);
 
   const returnPathname = url && getReturnPathname(url);
 
@@ -359,6 +357,21 @@ function getReturnPathname(url: string): string {
   const newUrl = new URL(url);
 
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
+}
+
+function getScreenHint(signUpPaths: string[] | string | undefined, pathname: string) {
+  if (!signUpPaths) return 'sign-in';
+
+  if (!Array.isArray(signUpPaths)) {
+    return signUpPaths.includes(pathname) ? 'sign-up' : 'sign-in';
+  }
+
+  const screenHintPaths: string[] = signUpPaths.filter((pathGlob) => {
+    const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
+    return pathRegex.exec(pathname);
+  });
+
+  return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
 }
 
 export { encryptSession, withAuth, refreshSession, terminateSession, updateSession, getSession };
