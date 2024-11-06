@@ -31,7 +31,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           code,
         });
 
-        // If baseURL is provided, use it instead of the hostname in nextURL
+        // If baseURL is provided, use it instead of request.nextUrl
         // This is useful if the app is being run in a container like docker where
         // the hostname can be different from the one in the request
         const url = baseURL ? new URL(baseURL) : request.nextUrl.clone();
