@@ -290,7 +290,7 @@ The `signUpPaths` option can be passed to `authkitMiddleware` to specify paths t
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({
-  signUpPaths: ['/account/sign-up'],
+  signUpPaths: ['/account/sign-up', '/dashboard/:path*'],
 });
 ```
 
