@@ -363,7 +363,8 @@ function getScreenHint(signUpPaths: string[] | string | undefined, pathname: str
   if (!signUpPaths) return 'sign-in';
 
   if (!Array.isArray(signUpPaths)) {
-    return signUpPaths.includes(pathname) ? 'sign-up' : 'sign-in';
+    const pathRegex = getMiddlewareAuthPathRegex(signUpPaths);
+    return pathRegex.exec(pathname) ? 'sign-up' : 'sign-in';
   }
 
   const screenHintPaths: string[] = signUpPaths.filter((pathGlob) => {
