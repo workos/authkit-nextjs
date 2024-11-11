@@ -108,6 +108,7 @@ The middleware can be configured with several options.
 | `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments) |
 | `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.   |
 | `debug`          | `false`     | Enables debug logs.                                                                                    |
+| `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.           |
 
 #### Custom redirect URI
 
