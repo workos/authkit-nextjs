@@ -212,11 +212,11 @@ Sometimes it's useful to check the user session if you want to compose custom mi
 
 ```ts
 import { authkitMiddleware, getSession } from '@workos-inc/authkit-nextjs';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextFetchEvent } from 'next/server';
 
-export default async function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest, event: NextFetchEvent) {
   // authkitMiddleware will handle refreshing the session if the access token has expired
-  const response = await authkitMiddleware()(request);
+  const response = await authkitMiddleware()(request, event);
 
   // If session is undefined, the user is not authenticated
   const session = await getSession(response);
