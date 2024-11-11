@@ -2,6 +2,7 @@ import { User } from '@workos-inc/node';
 
 export interface HandleAuthOptions {
   returnPathname?: string;
+  baseURL?: string;
 }
 
 export interface Impersonator {

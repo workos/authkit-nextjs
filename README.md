@@ -80,6 +80,13 @@ You can also control the pathname the user will be sent to after signing-in by p
 export const GET = handleAuth({ returnPathname: '/dashboard' });
 ```
 
+`handleAuth` can be used with several options.
+
+| Option           | Default     | Description                                                                                                                                                                                           |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `returnPathname` | `/`         | The pathname to redirect the user to after signing in                                                                                                                                                 |
+| `baseURL`        | `undefined` | The base URL to use for the redirect URI instead of the one in the request. Useful if the app is being run in a container like docker where the hostname can be different from the one in the request |
+
 ### Middleware
 
 This library relies on [Next.js middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware) to provide session management for routes. Put the following in your `middleware.ts` file in the root of your project:
@@ -93,6 +100,14 @@ export default authkitMiddleware();
 // Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
+
+The middleware can be configured with several options.
+
+| Option           | Default     | Description                                                                                            |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments) |
+| `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.   |
+| `debug`          | `false`     | Enables debug logs.                                                                                    |
 
 #### Custom redirect URI
 
@@ -212,11 +227,11 @@ Sometimes it's useful to check the user session if you want to compose custom mi
 
 ```ts
 import { authkitMiddleware, getSession } from '@workos-inc/authkit-nextjs';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextFetchEvent } from 'next/server';
 
-export default async function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest, event: NextFetchEvent) {
   // authkitMiddleware will handle refreshing the session if the access token has expired
-  const response = await authkitMiddleware()(request);
+  const response = await authkitMiddleware()(request, event);
 
   // If session is undefined, the user is not authenticated
   const session = await getSession(response);
