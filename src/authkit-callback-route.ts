@@ -26,7 +26,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     if (code) {
       try {
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
-        const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithCode({
+        const { accessToken, refreshToken, user, impersonator, oauthTokens } = await workos.userManagement.authenticateWithCode({
           clientId: WORKOS_CLIENT_ID,
           code,
         });
@@ -70,7 +70,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         // The refreshToken should never be accesible publicly, hence why we encrypt it in the cookie session
         // Alternatively you could persist the refresh token in a backend database
-        const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
+        const session = await encryptSession({ accessToken, refreshToken, user, impersonator, oauthTokens });
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
         const nextCookies = await cookies();
 

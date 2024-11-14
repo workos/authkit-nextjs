@@ -147,6 +147,7 @@ async function updateSession(
       refreshToken,
       user,
       impersonator,
+      oauthTokens: session.oauthTokens
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
@@ -258,6 +259,7 @@ async function redirectToSignIn() {
 }
 
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
+// @ts-expect-error - TS complains about the overload signature when we have more than 2 optional properties
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
 async function withAuth({ ensureSignedIn = false } = {}) {
   const session = await getSessionFromHeader();
@@ -278,6 +280,7 @@ async function withAuth({ ensureSignedIn = false } = {}) {
     role,
     permissions,
     impersonator: session.impersonator,
+    oauthTokens: session.oauthTokens,
     accessToken: session.accessToken,
   };
 }
