@@ -211,7 +211,13 @@ async function refreshSession({
   const nextCookies = await cookies();
   nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 
-  const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(accessToken);
+  const {
+    sid: sessionId,
+    org_id: organizationId,
+    role,
+    permissions,
+    entitlements,
+  } = decodeJwt<AccessToken>(accessToken);
 
   return {
     sessionId,
@@ -219,6 +225,7 @@ async function refreshSession({
     organizationId,
     role,
     permissions,
+    entitlements,
     impersonator,
     accessToken,
   };
@@ -269,7 +276,13 @@ async function withAuth({ ensureSignedIn = false } = {}) {
     return { user: null };
   }
 
-  const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
+  const {
+    sid: sessionId,
+    org_id: organizationId,
+    role,
+    permissions,
+    entitlements,
+  } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
     sessionId,
@@ -277,6 +290,7 @@ async function withAuth({ ensureSignedIn = false } = {}) {
     organizationId,
     role,
     permissions,
+    entitlements,
     impersonator: session.impersonator,
     accessToken: session.accessToken,
   };
@@ -322,7 +336,13 @@ async function getSession(response?: NextResponse) {
   if (!session) return { user: null };
 
   if (await verifyAccessToken(session.accessToken)) {
-    const { sid: sessionId, org_id: organizationId, role, permissions } = decodeJwt<AccessToken>(session.accessToken);
+    const {
+      sid: sessionId,
+      org_id: organizationId,
+      role,
+      permissions,
+      entitlements,
+    } = decodeJwt<AccessToken>(session.accessToken);
 
     return {
       sessionId,
@@ -330,6 +350,7 @@ async function getSession(response?: NextResponse) {
       organizationId,
       role,
       permissions,
+      entitlements,
       impersonator: session.impersonator,
       accessToken: session.accessToken,
     };

@@ -22,6 +22,7 @@ export interface UserInfo {
   organizationId?: string;
   role?: string;
   permissions?: string[];
+  entitlements?: string[];
   impersonator?: Impersonator;
   accessToken: string;
 }
@@ -40,6 +41,7 @@ export interface AccessToken {
   org_id?: string;
   role?: string;
   permissions?: string[];
+  entitlements?: string[];
 }
 
 export interface GetAuthURLOptions {
