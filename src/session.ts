@@ -147,6 +147,7 @@ async function updateSession(
       refreshToken,
       user,
       impersonator,
+      oauthTokens: session.oauthTokens
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
@@ -278,6 +279,7 @@ async function withAuth({ ensureSignedIn = false } = {}) {
     role,
     permissions,
     impersonator: session.impersonator,
+    oauthTokens: session.oauthTokens,
     accessToken: session.accessToken,
   };
 }
