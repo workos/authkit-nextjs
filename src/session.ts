@@ -170,8 +170,9 @@ async function updateSession(
 
 async function refreshSession(options?: {
   organizationId?: string;
-  ensureSignedIn?: boolean;
+  ensureSignedIn: false;
 }): Promise<UserInfo | NoUserInfo>;
+async function refreshSession(options?: { organizationId?: string; ensureSignedIn: true }): Promise<UserInfo>;
 async function refreshSession({
   organizationId: nextOrganizationId,
   ensureSignedIn = false,
