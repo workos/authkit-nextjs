@@ -171,7 +171,7 @@ async function updateSession(
   return NextResponse?.redirect
     ? NextResponse.redirect(request.url)
     : new Response(null, {
-        status: 302,
+        status: 307,
         headers: {
           Location: request.url,
         },
