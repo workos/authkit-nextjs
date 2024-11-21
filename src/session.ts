@@ -99,7 +99,7 @@ async function updateSession(
     return NextResponse?.redirect
       ? NextResponse.redirect(redirectTo)
       : new Response(null, {
-          status: 302,
+          status: 307,
           headers: {
             Location: redirectTo,
           },
@@ -160,12 +160,22 @@ async function updateSession(
     return response;
   } catch (e) {
     if (debug) console.log('Failed to refresh. Deleting cookie and redirecting.', e);
-    const response = NextResponse.next({
-      request: { headers: newRequestHeaders },
-    });
-    response.cookies.delete(cookieName);
-    return response;
+
+    nextCookies.delete(cookieName);
   }
+
+  // If we get here, the session is invalid and the user needs to sign in again.
+  // We redirect to the current URL which will trigger the middleware again.
+  // This is outside of the above block because you cannot redirect in Next.js
+  // from inside a try/catch block.
+  return NextResponse?.redirect
+    ? NextResponse.redirect(request.url)
+    : new Response(null, {
+        status: 307,
+        headers: {
+          Location: request.url,
+        },
+      });
 }
 
 async function refreshSession(options: {
