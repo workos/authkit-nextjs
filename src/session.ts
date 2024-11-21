@@ -99,7 +99,7 @@ async function updateSession(
     return NextResponse?.redirect
       ? NextResponse.redirect(redirectTo)
       : new Response(null, {
-          status: 307,
+          status: 302,
           headers: {
             Location: redirectTo,
           },
@@ -171,7 +171,7 @@ async function updateSession(
   return NextResponse?.redirect
     ? NextResponse.redirect(request.url)
     : new Response(null, {
-        status: 307,
+        status: 302,
         headers: {
           Location: request.url,
         },
