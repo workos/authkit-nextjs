@@ -14,5 +14,6 @@
     "outDir": "./dist/esm",
     "module": "ES2020",
     "moduleResolution": "Node"
-  }
+  },
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"]
 }
