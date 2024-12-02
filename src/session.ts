@@ -94,16 +94,7 @@ async function updateSession(
       screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     });
 
-    // Fall back to standard Response if NextResponse is not available.
-    // This is to support Next.js 13.
-    return NextResponse?.redirect
-      ? NextResponse.redirect(redirectTo)
-      : new Response(null, {
-          status: 302,
-          headers: {
-            Location: redirectTo,
-          },
-        });
+    return redirectWithFallback(redirectTo);
   }
 
   // If no session, just continue
@@ -168,14 +159,7 @@ async function updateSession(
   // We redirect to the current URL which will trigger the middleware again.
   // This is outside of the above block because you cannot redirect in Next.js
   // from inside a try/catch block.
-  return NextResponse?.redirect
-    ? NextResponse.redirect(request.url)
-    : new Response(null, {
-        status: 307,
-        headers: {
-          Location: request.url,
-        },
-      });
+  return redirectWithFallback(request.url);
 }
 
 async function refreshSession(options: {
@@ -242,14 +226,12 @@ async function refreshSession({
 }
 
 function getMiddlewareAuthPathRegex(pathGlob: string) {
-  let regex: string;
-
   try {
     const url = new URL(pathGlob, 'https://example.com');
     const path = `${url.pathname!}${url.hash || ''}`;
 
     const tokens = parse(path);
-    regex = tokensToRegexp(tokens).source;
+    const regex = tokensToRegexp(tokens).source;
 
     return new RegExp(regex);
   } catch (err) {
@@ -261,7 +243,11 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 
 async function redirectToSignIn() {
   const headersList = await headers();
-  const url = headersList.get('x-url') ?? '';
+  const url = headersList.get('x-url');
+
+  if (!url) {
+    throw new Error('No URL found in the headers');
+  }
 
   // Determine if the current route is in the sign up paths
   const signUpPaths = headersList.get(signUpPathsHeaderName)?.split(',');
@@ -269,7 +255,7 @@ async function redirectToSignIn() {
   const pathname = new URL(url).pathname;
   const screenHint = getScreenHint(signUpPaths, pathname);
 
-  const returnPathname = url && getReturnPathname(url);
+  const returnPathname = getReturnPathname(url);
 
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
@@ -312,8 +298,9 @@ async function terminateSession() {
   const { sessionId } = await withAuth();
   if (sessionId) {
     redirect(workos.userManagement.getLogoutUrl({ sessionId }));
+  } else {
+    redirect('/');
   }
-  redirect('/');
 }
 
 async function verifyAccessToken(accessToken: string) {
@@ -331,7 +318,7 @@ async function getSessionFromCookie(response?: NextResponse) {
   const cookie = response ? response.cookies.get(cookieName) : nextCookies.get(cookieName);
 
   if (cookie) {
-    return unsealData<Session>(cookie.value, {
+    return unsealData<Session>(cookie.value ?? cookie, {
       password: WORKOS_COOKIE_PASSWORD,
     });
   }
@@ -392,13 +379,8 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-function getScreenHint(signUpPaths: string[] | string | undefined, pathname: string) {
+function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   if (!signUpPaths) return 'sign-in';
-
-  if (!Array.isArray(signUpPaths)) {
-    const pathRegex = getMiddlewareAuthPathRegex(signUpPaths);
-    return pathRegex.exec(pathname) ? 'sign-up' : 'sign-in';
-  }
 
   const screenHintPaths: string[] = signUpPaths.filter((pathGlob) => {
     const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
@@ -406,6 +388,14 @@ function getScreenHint(signUpPaths: string[] | string | undefined, pathname: str
   });
 
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
+}
+
+function redirectWithFallback(redirectUri: string) {
+  // Fall back to standard Response if NextResponse is not available.
+  // This is to support Next.js 13.
+  return NextResponse?.redirect
+    ? NextResponse.redirect(redirectUri)
+    : new Response(null, { status: 307, headers: { Location: redirectUri } });
 }
 
 export { encryptSession, withAuth, refreshSession, terminateSession, updateSession, getSession };

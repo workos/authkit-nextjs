@@ -16,184 +16,207 @@ jest.mock('../src/workos', () => ({
 }));
 
 describe('authkit-callback-route', () => {
-  let request: NextRequest;
+  describe('handleAuth', () => {
+    let request: NextRequest;
 
-  beforeEach(async () => {
-    // Reset all mocks
-    jest.clearAllMocks();
-
-    // Create a new request with searchParams
-    request = new NextRequest(new URL('http://example.com/callback'));
-
-    // Reset the cookie store
-    const nextCookies = await cookies();
-    // @ts-expect-error - _reset is part of the mock
-    nextCookies._reset();
-
-    const nextHeaders = await headers();
-    // @ts-expect-error - _reset is part of the mock
-    nextHeaders._reset();
-  });
-
-  it('should handle successful authentication', async () => {
-    // Mock successful authentication response
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user_123' },
-    };
-
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
-
-    // Set up request with code
-    request.nextUrl.searchParams.set('code', 'test-code');
-
-    const handler = handleAuth();
-    const response = await handler(request);
-
-    expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith({
-      clientId: process.env.WORKOS_CLIENT_ID,
-      code: 'test-code',
+    beforeAll(() => {
+      // Silence console.error during tests
+      jest.spyOn(console, 'error').mockImplementation(() => {});
     });
-    expect(response).toBeInstanceOf(NextResponse);
-  });
 
-  it('should handle authentication failure', async () => {
-    // Mock authentication failure
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue(new Error('Auth failed'));
+    beforeEach(async () => {
+      // Reset all mocks
+      jest.clearAllMocks();
 
-    request.nextUrl.searchParams.set('code', 'invalid-code');
+      // Create a new request with searchParams
+      request = new NextRequest(new URL('http://example.com/callback'));
 
-    const handler = handleAuth();
-    const response = await handler(request);
+      // Reset the cookie store
+      const nextCookies = await cookies();
+      // @ts-expect-error - _reset is part of the mock
+      nextCookies._reset();
 
-    expect(response.status).toBe(500);
-    const data = await response.json();
-    expect(data.error.message).toBe('Something went wrong');
-  });
+      const nextHeaders = await headers();
+      // @ts-expect-error - _reset is part of the mock
+      nextHeaders._reset();
+    });
 
-  it('should handle missing code parameter', async () => {
-    const handler = handleAuth();
-    const response = await handler(request);
+    it('should handle successful authentication', async () => {
+      // Mock successful authentication response
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user_123' },
+      };
 
-    expect(response.status).toBe(500);
-    const data = await response.json();
-    expect(data.error.message).toBe('Something went wrong');
-  });
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
 
-  it('should respect custom returnPathname', async () => {
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user1' },
-    };
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
 
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    request.nextUrl.searchParams.set('code', 'test-code');
+      expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith({
+        clientId: process.env.WORKOS_CLIENT_ID,
+        code: 'test-code',
+      });
+      expect(response).toBeInstanceOf(NextResponse);
+    });
 
-    const handler = handleAuth({ returnPathname: '/dashboard' });
-    const response = await handler(request);
+    it('should handle authentication failure', async () => {
+      // Mock authentication failure
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue(new Error('Auth failed'));
 
-    expect(response.headers.get('Location')).toContain('/dashboard');
-  });
+      request.nextUrl.searchParams.set('code', 'invalid-code');
 
-  it('should handle state parameter with returnPathname', async () => {
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user1' },
-    };
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error.message).toBe('Something went wrong');
+    });
 
-    const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
-    request.nextUrl.searchParams.set('code', 'test-code');
-    request.nextUrl.searchParams.set('state', state);
+    it('should handle missing code parameter', async () => {
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    const handler = handleAuth();
-    const response = await handler(request);
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error.message).toBe('Something went wrong');
+    });
 
-    expect(response.headers.get('Location')).toContain('/custom-path');
-  });
+    it('should respect custom returnPathname', async () => {
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user1' },
+      };
 
-  it('should extract custom search params from returnPathname', async () => {
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user1' },
-    };
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
 
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      request.nextUrl.searchParams.set('code', 'test-code');
 
-    const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
-    request.nextUrl.searchParams.set('code', 'test-code');
-    request.nextUrl.searchParams.set('state', state);
+      const handler = handleAuth({ returnPathname: '/dashboard' });
+      const response = await handler(request);
 
-    const handler = handleAuth();
-    const response = await handler(request);
+      expect(response.headers.get('Location')).toContain('/dashboard');
+    });
 
-    expect(response.headers.get('Location')).toContain('/custom-path?foo=bar&baz=qux');
-  });
+    it('should handle state parameter with returnPathname', async () => {
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user1' },
+      };
 
-  it('should use Response if NextResponse.redirect is not available', async () => {
-    const originalRedirect = NextResponse.redirect;
-    (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
 
-    // Mock successful authentication response
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user_123' },
-    };
+      const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
 
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    // Set up request with code
-    request.nextUrl.searchParams.set('code', 'test-code');
+      expect(response.headers.get('Location')).toContain('/custom-path');
+    });
 
-    const handler = handleAuth();
-    const response = await handler(request);
+    it('should extract custom search params from returnPathname', async () => {
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user1' },
+      };
 
-    expect(response).toBeInstanceOf(Response);
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
 
-    // Restore the original redirect method
-    (NextResponse as Partial<typeof NextResponse>).redirect = originalRedirect;
-  });
+      const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
 
-  it('should use Response if NextResponse.json is not available', async () => {
-    const originalJson = NextResponse.json;
-    (NextResponse as Partial<typeof NextResponse>).json = undefined;
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    const handler = handleAuth();
-    const response = await handler(request);
+      expect(response.headers.get('Location')).toContain('/custom-path?foo=bar&baz=qux');
+    });
 
-    expect(response).toBeInstanceOf(Response);
+    it('should use Response if NextResponse.redirect is not available', async () => {
+      const originalRedirect = NextResponse.redirect;
+      (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
 
-    // Restore the original json method
-    (NextResponse as Partial<typeof NextResponse>).json = originalJson;
-  });
+      // Mock successful authentication response
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user_123' },
+      };
 
-  it('should throw an error if baseURL is provided but invalid', async () => {
-    expect(() => handleAuth({ baseURL: 'invalid-url' })).toThrow('Invalid baseURL: invalid-url');
-  });
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
 
-  it('should use baseURL if provided', async () => {
-    // Mock successful authentication response
-    const mockAuthResponse = {
-      accessToken: 'access123',
-      refreshToken: 'refresh123',
-      user: { id: 'user_123' },
-    };
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
 
-    (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      const handler = handleAuth();
+      const response = await handler(request);
 
-    // Set up request with code
-    request.nextUrl.searchParams.set('code', 'test-code');
+      expect(response).toBeInstanceOf(Response);
 
-    const handler = handleAuth({ baseURL: 'https://base.com' });
-    const response = await handler(request);
+      // Restore the original redirect method
+      (NextResponse as Partial<typeof NextResponse>).redirect = originalRedirect;
+    });
 
-    expect(response.headers.get('Location')).toContain('https://base.com');
+    it('should use Response if NextResponse.json is not available', async () => {
+      const originalJson = NextResponse.json;
+      (NextResponse as Partial<typeof NextResponse>).json = undefined;
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      expect(response).toBeInstanceOf(Response);
+
+      // Restore the original json method
+      (NextResponse as Partial<typeof NextResponse>).json = originalJson;
+    });
+
+    it('should throw an error if baseURL is provided but invalid', async () => {
+      expect(() => handleAuth({ baseURL: 'invalid-url' })).toThrow('Invalid baseURL: invalid-url');
+    });
+
+    it('should use baseURL if provided', async () => {
+      // Mock successful authentication response
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user_123' },
+      };
+
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const handler = handleAuth({ baseURL: 'https://base.com' });
+      const response = await handler(request);
+
+      expect(response.headers.get('Location')).toContain('https://base.com');
+    });
+
+    it('should throw an error if response is missing tokens', async () => {
+      const mockAuthResponse = {
+        user: { id: 'user_123' },
+      };
+
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      expect(response.status).toBe(500);
+    });
   });
 });
