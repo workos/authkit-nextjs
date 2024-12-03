@@ -1,5 +1,3 @@
-'use client';
-
 import * as React from 'react';
 import { withAuth } from './session.js';
 import { workos } from './workos.js';
