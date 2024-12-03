@@ -1,6 +1,6 @@
+import { workos } from '../src/workos.js';
 import { handleAuth } from '../src/authkit-callback-route.js';
 import { NextRequest, NextResponse } from 'next/server';
-import { workos } from '../src/workos.js';
 
 // Mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';

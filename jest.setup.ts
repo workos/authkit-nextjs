@@ -7,8 +7,6 @@ process.env.WORKOS_COOKIE_DOMAIN = 'example.com';
 const cookieStore = new Map();
 const headersStore = new Map();
 
-type CookieValue = string | { [key: string]: string | number | boolean };
-
 // Mock the next/headers module
 jest.mock('next/headers', () => ({
   headers: async () => ({
@@ -26,7 +24,9 @@ jest.mock('next/headers', () => ({
     }),
     get: jest.fn((name: string) => cookieStore.get(name)),
     getAll: jest.fn(() => Array.from(cookieStore.entries())),
-    set: jest.fn((name: string, value: CookieValue) => cookieStore.set(name, value)),
+    set: jest.fn((name: string, value: string | { [key: string]: string | number | boolean }) =>
+      cookieStore.set(name, value),
+    ),
     _reset: () => {
       cookieStore.clear();
     },

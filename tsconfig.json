@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "outDir": "./dist/esm",
     "module": "ES2020",
-    "moduleResolution": "Node"
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true
   },
   "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"]
 }

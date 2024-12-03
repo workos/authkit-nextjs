@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+
 import { withAuth, updateSession, refreshSession, getSession, terminateSession } from '../src/session.js';
+import { workos } from '../src/workos.js';
+import * as envVariables from '../src/env-variables.js';
+
 import { jwtVerify, SignJWT } from 'jose';
 import { sealData } from 'iron-session';
-import { workos } from '../src/workos.js';
 import { User } from '@workos-inc/node';
-import * as envVariables from '../src/env-variables.js';
 
 jest.mock('jose', () => ({
   jwtVerify: jest.fn(),

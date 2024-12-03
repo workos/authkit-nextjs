@@ -1,9 +1,11 @@
+'use client';
+
 import * as React from 'react';
 import { withAuth } from './session.js';
-import { signOut } from './auth.js';
 import { workos } from './workos.js';
 import { Button } from './button.js';
 import { MinMaxButton } from './min-max-button.js';
+import { handleSignOutAction } from './actions.js';
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
   side?: 'top' | 'bottom';
@@ -69,10 +71,7 @@ export async function Impersonation({ side = 'bottom', ...props }: Impersonation
         }}
       >
         <form
-          action={async () => {
-            'use server';
-            await signOut();
-          }}
+          onSubmit={handleSignOutAction}
           style={{
             display: 'flex',
             alignItems: 'baseline',
