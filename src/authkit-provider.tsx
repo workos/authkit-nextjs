@@ -19,7 +19,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       return;
     }
 
-    // We'll use this flag to prevent multiple calls to the checkSessionAction
     let visibilityChangedCalled = false;
 
     const handleVisibilityChange = async () => {
