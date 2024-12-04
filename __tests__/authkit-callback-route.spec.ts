@@ -78,6 +78,20 @@ describe('authkit-callback-route', () => {
       expect(data.error.message).toBe('Something went wrong');
     });
 
+    it('should handle authentication failure if a non-Error object is thrown', async () => {
+      // Mock authentication failure
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue('Auth failed');
+
+      request.nextUrl.searchParams.set('code', 'invalid-code');
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error.message).toBe('Something went wrong');
+    });
+
     it('should handle missing code parameter', async () => {
       const handler = handleAuth();
       const response = await handler(request);

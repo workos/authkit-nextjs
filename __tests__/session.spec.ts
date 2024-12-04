@@ -58,11 +58,14 @@ describe('session.ts', () => {
 
     (jwtVerify as jest.Mock).mockReset();
 
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args) => {
+      console.info(...args);
+    });
   });
 
   afterEach(() => {
     consoleLogSpy.mockRestore();
+    jest.resetModules();
   });
 
   describe('withAuth', () => {
@@ -390,6 +393,38 @@ describe('session.ts', () => {
             [],
           );
         }).rejects.toThrow();
+      });
+
+      it('should throw an error if the provided regex is invalid and a non-Error object is thrown', async () => {
+        // Reset modules to ensure clean import state
+        jest.resetModules();
+
+        // Import first, then spy
+        const pathToRegexp = await import('path-to-regexp');
+        const parseSpy = jest.spyOn(pathToRegexp, 'parse').mockImplementation(() => {
+          throw 'invalid regex';
+        });
+
+        // Import session after setting up the spy
+        const { updateSession } = await import('../src/session.js');
+
+        const request = new NextRequest(new URL('http://example.com/invalid-regex'));
+
+        await expect(async () => {
+          await updateSession(
+            request,
+            false,
+            {
+              enabled: true,
+              unauthenticatedPaths: ['[*'],
+            },
+            process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+            [],
+          );
+        }).rejects.toThrow('Error parsing routes for middleware auth. Reason: invalid regex');
+
+        // Verify the mock was called
+        expect(parseSpy).toHaveBeenCalled();
       });
 
       it('should default to the WORKOS_REDIRECT_URI environment variable if no redirect URI is provided', async () => {

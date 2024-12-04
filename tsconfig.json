@@ -14,7 +14,9 @@
     "outDir": "./dist/esm",
     "module": "ES2020",
     "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "declarationDir": "./dist/types"
   },
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts"]
 }
+

@@ -12,6 +12,7 @@ import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
+import { redirectWithFallback } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -90,7 +91,7 @@ async function updateSession(
 
     const redirectTo = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
-      redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
+      redirectUri: redirectUri,
       screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     });
 
@@ -235,6 +236,7 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 
     return new RegExp(regex);
   } catch (err) {
+    console.log('err', err);
     const message = err instanceof Error ? err.message : String(err);
 
     throw new Error(`Error parsing routes for middleware auth. Reason: ${message}`);
@@ -388,14 +390,6 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   });
 
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
-}
-
-function redirectWithFallback(redirectUri: string) {
-  // Fall back to standard Response if NextResponse is not available.
-  // This is to support Next.js 13.
-  return NextResponse?.redirect
-    ? NextResponse.redirect(redirectUri)
-    : new Response(null, { status: 307, headers: { Location: redirectUri } });
 }
 
 export { encryptSession, withAuth, refreshSession, terminateSession, updateSession, getSession };

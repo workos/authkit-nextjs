@@ -26,6 +26,19 @@ describe('MinMaxButton', () => {
     expect(root).toHaveStyle({ '--wi-minimized': '1' });
   });
 
+  it('does nothing if root is undefined', () => {
+    const { getByRole } = render(<MinMaxButton minimizedValue="1">Minimize</MinMaxButton>);
+
+    const root = document.querySelector('[data-workos-impersonation-root]');
+
+    // Mock querySelector to return null for this test
+    jest.spyOn(document, 'querySelector').mockReturnValue(null);
+
+    const button = getByRole('button');
+    fireEvent.click(button);
+    expect(root).not.toHaveStyle({ '--wi-minimized': '1' });
+  });
+
   it('renders children correctly', () => {
     const { getByText } = render(<MinMaxButton minimizedValue="0">Test Child</MinMaxButton>);
 
