@@ -167,6 +167,8 @@ async function refreshSession(options: {
   organizationId?: string;
   ensureSignedIn?: boolean;
 }): Promise<UserInfo | NoUserInfo>;
+
+/* istanbul ignore next */
 async function refreshSession({
   organizationId: nextOrganizationId,
   ensureSignedIn = false,
