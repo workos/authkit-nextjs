@@ -17,6 +17,9 @@ jest.mock('jose', () => ({
   decodeJwt: jest.requireActual('jose').decodeJwt,
 }));
 
+// logging is disabled by default, flip this to true to still have logs in the console
+const DEBUG = false;
+
 describe('session.ts', () => {
   const mockSession = {
     accessToken: 'access-token',
@@ -59,7 +62,9 @@ describe('session.ts', () => {
     (jwtVerify as jest.Mock).mockReset();
 
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args) => {
-      console.info(...args);
+      if (DEBUG) {
+        console.info(...args);
+      }
     });
   });
 
