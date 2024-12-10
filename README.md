@@ -250,8 +250,13 @@ export function SwitchOrganizationButton() {
   }
 
   const handleRefreshSession = async () => {
-    // Provide the organizationId to switch to
-    await refreshAuth({ organizationId: 'org_123' });
+    const result = await refreshAuth({
+      // Provide the organizationId to switch to
+      organizationId: 'org_123',
+    });
+    if (result?.error) {
+      console.log('Error refreshing session:', result.error);
+    }
   };
 
   if (user) {

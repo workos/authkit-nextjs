@@ -16,7 +16,7 @@ type AuthContextType = {
   accessToken: string | undefined;
   loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
-  refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void>;
+  refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void | { error: string }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +56,14 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setAccessToken(auth.accessToken);
     } catch (error) {
       setUser(null);
+      setSessionId(undefined);
+      setOrganizationId(undefined);
+      setRole(undefined);
+      setPermissions(undefined);
+      setEntitlements(undefined);
+      setImpersonator(undefined);
+      setOauthTokens(undefined);
+      setAccessToken(undefined);
     } finally {
       setLoading(false);
     }
@@ -79,15 +87,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setOauthTokens(auth.oauthTokens);
       setAccessToken(auth.accessToken);
     } catch (error) {
-      setUser(null);
-      setSessionId(undefined);
-      setOrganizationId(undefined);
-      setRole(undefined);
-      setPermissions(undefined);
-      setEntitlements(undefined);
-      setImpersonator(undefined);
-      setOauthTokens(undefined);
-      setAccessToken(undefined);
+      return error instanceof Error ? { error: error.message } : { error: String(error) };
     } finally {
       setLoading(false);
     }

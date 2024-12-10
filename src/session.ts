@@ -375,7 +375,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   if (!hasMiddleware) {
     const url = headersList.get('x-url');
     throw new Error(
-      `You are calling 'withAuth' on ${url} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
+      `You are calling 'withAuth' on ${url ?? 'a route'} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
   }
 
