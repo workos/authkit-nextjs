@@ -68,6 +68,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
     try {
       setLoading(true);
       const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -169,14 +170,6 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthKitProvider');
-  }
-  return context;
-}
-
-export function refreshAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('refreshAuth must be used within an AuthKitProvider');
   }
   return context;
 }

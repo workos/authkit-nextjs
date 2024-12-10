@@ -186,12 +186,21 @@ async function refreshSession({
 
   const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-  const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
-    clientId: WORKOS_CLIENT_ID,
-    refreshToken: session.refreshToken,
-    organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
-  });
+  let refreshResult;
 
+  try {
+    refreshResult = await workos.userManagement.authenticateWithRefreshToken({
+      clientId: WORKOS_CLIENT_ID,
+      refreshToken: session.refreshToken,
+      organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
+    });
+  } catch (error) {
+    throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
+  }
+
+  const { accessToken, refreshToken, user, impersonator } = refreshResult;
   // Encrypt session with new access and refresh tokens
   const encryptedSession = await encryptSession({
     accessToken,

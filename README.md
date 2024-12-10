@@ -150,7 +150,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ### Get the current user in a server component
 
-For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user profile from WorkOS.
+For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user session from WorkOS.
 
 ```jsx
 import Link from 'next/link';
@@ -198,6 +198,7 @@ For client components, use the `useAuth` hook to get the current user session.
 import { useAuth } from '@workos-inc/authkit-nextjs/components';
 
 export default function MyComponent() {
+  // Retrieves the user from the session or returns `null` if no user is signed in
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -221,6 +222,45 @@ const { user, loading } = useAuth({ ensureSignedIn: true });
 ```
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
+
+### Refreshing the session
+
+Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
+
+The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
+
+In client components, you can refresh the session with the `refreshAuth` hook.
+
+```tsx
+'use client';
+
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+import React, { useEffect } from 'react';
+
+export function SwitchOrganizationButton() {
+  const { user, organizationId, loading, refreshAuth } = useAuth();
+
+  useEffect(() => {
+    // This will log out the new organizationId after refreshing the session
+    console.log('organizationId', organizationId);
+  }, [organizationId]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  const handleRefreshSession = async () => {
+    // Provide the organizationId to switch to
+    await refreshAuth({ organizationId: 'org_123' });
+  };
+
+  if (user) {
+    return <button onClick={handleRefreshSession}>Refresh session</button>;
+  } else {
+    return <div>Not signed in</div>;
+  }
+}
+```
 
 ### Middleware auth
 
@@ -317,12 +357,6 @@ export default async function HomePage() {
 }
 ```
 
-### Refreshing the session
-
-Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
-
-The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
-
 ### Sign up paths
 
 The `signUpPaths` option can be passed to `authkitMiddleware` to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit. This is useful for cases where you want a path that mandates authentication to be treated as a sign up page.
@@ -350,3 +384,7 @@ export default authkitMiddleware({ debug: true });
 #### NEXT_REDIRECT error when using try/catch blocks
 
 Wrapping a `withAuth({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `withAuth` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
+
+#### Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins (Unhandled scheme).
+
+You may encounter this error if you attempt to import server side code from authkit-nextjs into a client component. Likely you are using `withAuth` in a client component instead of the `useAuth` hook. Either move the code to a server component or use the `useAuth` hook.
