@@ -1,6 +1,8 @@
 'use server';
 
 import { signOut } from './auth.js';
+import { refreshSession, withAuth } from './session.js';
+import { workos } from './workos.js';
 
 /**
  * This action is only accessible to authenticated users,
@@ -13,4 +15,22 @@ export const checkSessionAction = async () => {
 
 export const handleSignOutAction = async () => {
   await signOut();
+};
+
+export const getOrganizationAction = async (organizationId: string) => {
+  return await workos.organizations.getOrganization(organizationId);
+};
+
+export const getAuthAction = async (ensureSignedIn?: boolean) => {
+  return await withAuth({ ensureSignedIn: ensureSignedIn as false });
+};
+
+export const refreshAuthAction = async ({
+  ensureSignedIn,
+  organizationId,
+}: {
+  ensureSignedIn?: boolean;
+  organizationId?: string;
+}) => {
+  return await refreshSession({ ensureSignedIn, organizationId });
 };

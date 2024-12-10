@@ -265,9 +265,8 @@ async function redirectToSignIn() {
 }
 
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-// @ts-expect-error - TS complains about the overload signature when we have more than 2 optional properties
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
-async function withAuth({ ensureSignedIn = false } = {}) {
+async function withAuth({ ensureSignedIn = false } = {}): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromHeader();
 
   if (!session) {

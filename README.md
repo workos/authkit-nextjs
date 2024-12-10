@@ -132,10 +132,10 @@ Custom redirect URIs will be used over a redirect URI configured in the environm
 
 ### Wrap your app in `AuthKitProvider`
 
-Use `AuthKitProvider` to wrap your app layout, which adds some protections for auth edge cases.
+Use `AuthKitProvider` to wrap your app layout, which provides client side auth methods adds protections for auth edge cases.
 
 ```jsx
-import { AuthKitProvider } from '@workos-inc/authkit-nextjs';
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -148,7 +148,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### Get the current user
+### Get the current user in a server component
 
 For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user profile from WorkOS.
 
@@ -189,12 +189,35 @@ export default async function HomePage() {
 }
 ```
 
+### Get the current user in a client component
+
+For client components, use the `useAuth` hook to get the current user session.
+
+```jsx
+// Note the updated import path
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+
+export default function MyComponent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return <div>{user?.firstName}</div>;
+}
+```
+
 ### Requiring auth
 
 For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` option:
 
 ```jsx
+// Server component
 const { user } = await withAuth({ ensureSignedIn: true });
+
+// Client component
+const { user, loading } = useAuth({ ensureSignedIn: true });
 ```
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
@@ -256,13 +279,15 @@ Render the `Impersonation` component in your app so that it is clear when someon
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
 ```jsx
-import { Impersonation } from '@workos-inc/authkit-nextjs';
+import { Impersonation, AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
 
 export default function App() {
   return (
     <div>
-      <Impersonation />
-      {/* Your app content */}
+      <AuthKitProvider>
+        <Impersonation />
+        {/* Your app content */}
+      </AuthKitProvider>
     </div>
   );
 }

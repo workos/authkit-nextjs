@@ -34,6 +34,7 @@ export interface NoUserInfo {
   organizationId?: undefined;
   role?: undefined;
   permissions?: undefined;
+  entitlements?: undefined;
   impersonator?: undefined;
   oauthTokens?: undefined;
   accessToken?: undefined;

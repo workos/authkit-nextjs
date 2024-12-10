@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { AuthKitProvider } from '../src/authkit-provider.js';
+import { AuthKitProvider } from '../src/components/authkit-provider.js';
 import { checkSessionAction } from '../src/actions.js';
 
 jest.mock('../src/actions', () => ({

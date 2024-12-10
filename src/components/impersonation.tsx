@@ -1,20 +1,27 @@
+'use client';
+
 import * as React from 'react';
-import { withAuth } from './session.js';
-import { workos } from './workos.js';
 import { Button } from './button.js';
 import { MinMaxButton } from './min-max-button.js';
-import { handleSignOutAction } from './actions.js';
+import { getOrganizationAction, handleSignOutAction } from '../actions.js';
+import type { Organization } from '@workos-inc/node';
+import { useAuth } from './authkit-provider.js';
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
   side?: 'top' | 'bottom';
 }
 
-export async function Impersonation({ side = 'bottom', ...props }: ImpersonationProps) {
-  const { impersonator, user, organizationId } = await withAuth();
+export function Impersonation({ side = 'bottom', ...props }: ImpersonationProps) {
+  const { user, impersonator, organizationId, loading } = useAuth();
 
-  if (!impersonator) return null;
+  const [organization, setOrganization] = React.useState<Organization | null>(null);
 
-  const organization = organizationId ? await workos.organizations.getOrganization(organizationId) : null;
+  React.useEffect(() => {
+    if (!organizationId) return;
+    getOrganizationAction(organizationId).then(setOrganization);
+  }, [organizationId]);
+
+  if (loading || !impersonator || !user) return null;
 
   return (
     <div

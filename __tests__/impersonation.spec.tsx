@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { Impersonation } from '../src/impersonation.js';
+import { Impersonation } from '../src/components/impersonation.js';
 import { withAuth } from '../src/session.js';
 import { workos } from '../src/workos.js';
 
