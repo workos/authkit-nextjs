@@ -4,6 +4,7 @@ import { withAuth, refreshSession, getSession } from './session.js';
 import { getSignInUrl, getSignUpUrl, signOut } from './auth.js';
 import { Impersonation } from './impersonation.js';
 import { AuthKitProvider } from './authkit-provider.js';
+import { workos } from './workos.js';
 
 export {
   handleAuth,
@@ -19,4 +20,6 @@ export {
   //
   Impersonation,
   AuthKitProvider,
+  //
+  workos,
 };
