@@ -21,7 +21,10 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
 async function encryptSession(session: Session) {
-  return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
+  return sealData(session, {
+    password: WORKOS_COOKIE_PASSWORD,
+    ttl: 0,
+  });
 }
 
 async function updateSession(
