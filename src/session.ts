@@ -12,6 +12,7 @@ import { getAuthorizationUrl } from './get-authorization-url.js';
 import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
+import { redirectWithFallback } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -93,20 +94,11 @@ async function updateSession(
 
     const redirectTo = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
-      redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
+      redirectUri: redirectUri,
       screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     });
 
-    // Fall back to standard Response if NextResponse is not available.
-    // This is to support Next.js 13.
-    return NextResponse?.redirect
-      ? NextResponse.redirect(redirectTo)
-      : new Response(null, {
-          status: 302,
-          headers: {
-            Location: redirectTo,
-          },
-        });
+    return redirectWithFallback(redirectTo);
   }
 
   // If no session, just continue
@@ -171,20 +163,15 @@ async function updateSession(
   // We redirect to the current URL which will trigger the middleware again.
   // This is outside of the above block because you cannot redirect in Next.js
   // from inside a try/catch block.
-  return NextResponse?.redirect
-    ? NextResponse.redirect(request.url)
-    : new Response(null, {
-        status: 307,
-        headers: {
-          Location: request.url,
-        },
-      });
+  return redirectWithFallback(request.url);
 }
 
 async function refreshSession(options: {
   organizationId?: string;
   ensureSignedIn?: boolean;
 }): Promise<UserInfo | NoUserInfo>;
+
+/* istanbul ignore next */
 async function refreshSession({
   organizationId: nextOrganizationId,
   ensureSignedIn = false,
@@ -202,12 +189,21 @@ async function refreshSession({
 
   const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-  const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
-    clientId: WORKOS_CLIENT_ID,
-    refreshToken: session.refreshToken,
-    organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
-  });
+  let refreshResult;
 
+  try {
+    refreshResult = await workos.userManagement.authenticateWithRefreshToken({
+      clientId: WORKOS_CLIENT_ID,
+      refreshToken: session.refreshToken,
+      organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
+    });
+  } catch (error) {
+    throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
+  }
+
+  const { accessToken, refreshToken, user, impersonator } = refreshResult;
   // Encrypt session with new access and refresh tokens
   const encryptedSession = await encryptSession({
     accessToken,
@@ -245,17 +241,16 @@ async function refreshSession({
 }
 
 function getMiddlewareAuthPathRegex(pathGlob: string) {
-  let regex: string;
-
   try {
     const url = new URL(pathGlob, 'https://example.com');
     const path = `${url.pathname!}${url.hash || ''}`;
 
     const tokens = parse(path);
-    regex = tokensToRegexp(tokens).source;
+    const regex = tokensToRegexp(tokens).source;
 
     return new RegExp(regex);
   } catch (err) {
+    console.log('err', err);
     const message = err instanceof Error ? err.message : String(err);
 
     throw new Error(`Error parsing routes for middleware auth. Reason: ${message}`);
@@ -264,7 +259,11 @@ function getMiddlewareAuthPathRegex(pathGlob: string) {
 
 async function redirectToSignIn() {
   const headersList = await headers();
-  const url = headersList.get('x-url') ?? '';
+  const url = headersList.get('x-url');
+
+  if (!url) {
+    throw new Error('No URL found in the headers');
+  }
 
   // Determine if the current route is in the sign up paths
   const signUpPaths = headersList.get(signUpPathsHeaderName)?.split(',');
@@ -272,15 +271,14 @@ async function redirectToSignIn() {
   const pathname = new URL(url).pathname;
   const screenHint = getScreenHint(signUpPaths, pathname);
 
-  const returnPathname = url && getReturnPathname(url);
+  const returnPathname = getReturnPathname(url);
 
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-// @ts-expect-error - TS complains about the overload signature when we have more than 2 optional properties
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
-async function withAuth({ ensureSignedIn = false } = {}) {
+async function withAuth({ ensureSignedIn = false } = {}): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromHeader();
 
   if (!session) {
@@ -315,8 +313,9 @@ async function terminateSession() {
   const { sessionId } = await withAuth();
   if (sessionId) {
     redirect(workos.userManagement.getLogoutUrl({ sessionId }));
+  } else {
+    redirect('/');
   }
-  redirect('/');
 }
 
 async function verifyAccessToken(accessToken: string) {
@@ -334,7 +333,7 @@ async function getSessionFromCookie(response?: NextResponse) {
   const cookie = response ? response.cookies.get(cookieName) : nextCookies.get(cookieName);
 
   if (cookie) {
-    return unsealData<Session>(cookie.value, {
+    return unsealData<Session>(cookie.value ?? cookie, {
       password: WORKOS_COOKIE_PASSWORD,
     });
   }
@@ -379,7 +378,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   if (!hasMiddleware) {
     const url = headersList.get('x-url');
     throw new Error(
-      `You are calling 'withAuth' on ${url} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
+      `You are calling 'withAuth' on ${url ?? 'a route'} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
   }
 
@@ -395,13 +394,8 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-function getScreenHint(signUpPaths: string[] | string | undefined, pathname: string) {
+function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   if (!signUpPaths) return 'sign-in';
-
-  if (!Array.isArray(signUpPaths)) {
-    const pathRegex = getMiddlewareAuthPathRegex(signUpPaths);
-    return pathRegex.exec(pathname) ? 'sign-up' : 'sign-in';
-  }
 
   const screenHintPaths: string[] = signUpPaths.filter((pathGlob) => {
     const pathRegex = getMiddlewareAuthPathRegex(pathGlob);
