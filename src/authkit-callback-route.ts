@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { encryptSession } from './session.js';
+import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { getCookieOptions } from './cookie.js';
 import { HandleAuthOptions } from './interfaces.js';
 
@@ -26,10 +27,11 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     if (code) {
       try {
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
-        const { accessToken, refreshToken, user, impersonator, oauthTokens } = await workos.userManagement.authenticateWithCode({
-          clientId: WORKOS_CLIENT_ID,
-          code,
-        });
+        const { accessToken, refreshToken, user, impersonator, oauthTokens } =
+          await workos.userManagement.authenticateWithCode({
+            clientId: WORKOS_CLIENT_ID,
+            code,
+          });
 
         // If baseURL is provided, use it instead of request.nextUrl
         // This is useful if the app is being run in a container like docker where
@@ -57,14 +59,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         // Fall back to standard Response if NextResponse is not available.
         // This is to support Next.js 13.
-        const response = NextResponse?.redirect
-          ? NextResponse.redirect(url)
-          : new Response(null, {
-              status: 302,
-              headers: {
-                Location: url.toString(),
-              },
-            });
+        const response = redirectWithFallback(url.toString());
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
@@ -92,20 +87,11 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   };
 
   function errorResponse() {
-    const errorBody = {
+    return errorResponseWithFallback({
       error: {
         message: 'Something went wrong',
         description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
       },
-    };
-
-    // Use NextResponse if available, fallback to standard Response
-    // This is to support Next.js 13.
-    return NextResponse?.json
-      ? NextResponse.json(errorBody, { status: 500 })
-      : new Response(JSON.stringify(errorBody), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        });
+    });
   }
 }
