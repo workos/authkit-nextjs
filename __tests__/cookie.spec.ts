@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+import { getCookieOptions } from '../src/cookie.js';
 
 // Mock at the top of the file
 jest.mock('../src/env-variables');
@@ -13,8 +14,6 @@ describe('cookie.ts', () => {
 
   describe('getCookieOptions', () => {
     it('should return the default cookie options', async () => {
-      const { getCookieOptions } = await import('../src/cookie');
-
       const options = getCookieOptions();
       expect(options).toEqual(
         expect.objectContaining({
