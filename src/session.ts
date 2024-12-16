@@ -36,6 +36,12 @@ async function updateSession(
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
   }
 
+  if (!WORKOS_COOKIE_PASSWORD || WORKOS_COOKIE_PASSWORD.length < 32) {
+    throw new Error(
+      'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+    );
+  }
+
   const session = await getSessionFromCookie();
   const newRequestHeaders = new Headers(request.headers);
 
