@@ -80,12 +80,23 @@ You can also control the pathname the user will be sent to after signing-in by p
 export const GET = handleAuth({ returnPathname: '/dashboard' });
 ```
 
-`handleAuth` can be used with several options.
+If you're application needs to persist data upon a successful authentication like the `oauthTokens` from an upstream provider, you can pass the `onSuccess` option:
+
+```ts
+export const GET = handleAUth({
+  onSuccess: async ({ oauthTokens }) => {
+    await saveTokens(oauthTokens);
+  },
+});
+```
+
+`handleAuth` can be used with the following options.
 
 | Option           | Default     | Description                                                                                                                                                                                           |
 | ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `returnPathname` | `/`         | The pathname to redirect the user to after signing in                                                                                                                                                 |
 | `baseURL`        | `undefined` | The base URL to use for the redirect URI instead of the one in the request. Useful if the app is being run in a container like docker where the hostname can be different from the one in the request |
+| `onSuccess`      | `undefined` | A function that receives successful authentication data and can be used for side-effects like persisting tokens                                                                                       |
 
 ### Middleware
 
