@@ -80,7 +80,7 @@ You can also control the pathname the user will be sent to after signing-in by p
 export const GET = handleAuth({ returnPathname: '/dashboard' });
 ```
 
-If you're application needs to persist data upon a successful authentication like the `oauthTokens` from an upstream provider, you can pass the `onSuccess` option:
+If your application needs to persist data upon a successful authentication, like the `oauthTokens` from an upstream provider, you can pass in a `onSuccess` function that will get called after the user has successfully authenticated:
 
 ```ts
 export const GET = handleAUth({
