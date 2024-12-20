@@ -20,6 +20,7 @@ async function signOut() {
   if (WORKOS_COOKIE_DOMAIN) cookie.domain = WORKOS_COOKIE_DOMAIN;
 
   const nextCookies = await cookies();
+
   nextCookies.delete(cookie);
   await terminateSession();
 }
