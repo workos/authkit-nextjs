@@ -166,18 +166,20 @@ async function updateSession(
     nextCookies.delete(cookieName);
   }
 
-  // If we get here, the session is invalid and the user needs to sign in again.
-  // We redirect to the current URL which will trigger the middleware again.
-  // This is outside of the above block because you cannot redirect in Next.js
-  // from inside a try/catch block.
-  return NextResponse?.redirect
-    ? NextResponse.redirect(request.url)
-    : new Response(null, {
-        status: 307,
-        headers: {
-          Location: request.url,
-        },
-      });
+  if (middlewareAuth.enabled) {
+    // If we get here, the session is invalid and the user needs to sign in again because we're using middleware auth mode.
+    // We redirect to the current URL which will trigger the middleware again.
+    // This is outside of the above block because you cannot redirect in Next.js
+    // from inside a try/catch block.
+    return NextResponse?.redirect
+      ? NextResponse.redirect(request.url)
+      : new Response(null, {
+          status: 307,
+          headers: {
+            Location: request.url,
+          },
+        });
+  }
 }
 
 async function refreshSession(options: {
