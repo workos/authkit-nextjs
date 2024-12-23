@@ -161,7 +161,7 @@ async function updateSession(
     response.cookies.set(cookieName, encryptedSession, getCookieOptions(redirectUri));
     return response;
   } catch (e) {
-    if (debug) console.log('Failed to refresh. Deleting cookie and redirecting.', e);
+    if (debug) console.log('Failed to refresh. Deleting cookie.', e);
 
     nextCookies.delete(cookieName);
   }
@@ -171,6 +171,7 @@ async function updateSession(
     // We redirect to the current URL which will trigger the middleware again.
     // This is outside of the above block because you cannot redirect in Next.js
     // from inside a try/catch block.
+    if (debug) console.log('Redirecting to AuthKit to log in again.');
     return NextResponse?.redirect
       ? NextResponse.redirect(request.url)
       : new Response(null, {
@@ -180,6 +181,13 @@ async function updateSession(
           },
         });
   }
+
+  // If we aren't in middleware auth mode, we return a response and let the page handle what to do next.
+  const response = NextResponse.next({
+    request: { headers: newRequestHeaders },
+  });
+
+  return response;
 }
 
 async function refreshSession(options: {
