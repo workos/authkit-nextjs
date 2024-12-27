@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/authkit-nextjs",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
   "sideEffects": false,
   "type": "module",
@@ -30,8 +30,8 @@
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "jest",
     "test:watch": "jest --watch",
-    "prettier": "prettier \"src/**/*.{js,ts,tsx}\" --check",
-    "format": "prettier \"src/**/*.{js,ts,tsx}\" --write"
+    "prettier": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --check",
+    "format": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --write"
   },
   "dependencies": {
     "@workos-inc/node": "^7.33.0",

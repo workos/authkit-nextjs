@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-
 import { withAuth, updateSession, refreshSession, getSession, terminateSession } from '../src/session.js';
 import { workos } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';

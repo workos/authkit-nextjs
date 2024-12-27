@@ -8,7 +8,7 @@ import { getCookieOptions } from './cookie.js';
 import { HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
-  const { returnPathname: returnPathnameOption = '/', baseURL } = options;
+  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess } = options;
 
   // Throw early if baseURL is provided but invalid
   if (baseURL) {
@@ -63,9 +63,13 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
+        if (onSuccess) {
+          await onSuccess({ accessToken, refreshToken, user, impersonator, oauthTokens });
+        }
+
         // The refreshToken should never be accesible publicly, hence why we encrypt it in the cookie session
         // Alternatively you could persist the refresh token in a backend database
-        const session = await encryptSession({ accessToken, refreshToken, user, impersonator, oauthTokens });
+        const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
         const nextCookies = await cookies();
 
