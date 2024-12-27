@@ -1,19 +1,11 @@
 'use client';
 
 import * as React from 'react';
-<<<<<<< HEAD:src/components/impersonation.tsx
 import { Button } from './button.js';
 import { MinMaxButton } from './min-max-button.js';
 import { getOrganizationAction, handleSignOutAction } from '../actions.js';
 import type { Organization } from '@workos-inc/node';
 import { useAuth } from './authkit-provider.js';
-=======
-import { withAuth } from './session.js';
-import { workos } from './workos.js';
-import { Button } from './button.js';
-import { MinMaxButton } from './min-max-button.js';
-import { handleSignOutAction } from './actions.js';
->>>>>>> main:src/impersonation.tsx
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
   side?: 'top' | 'bottom';

@@ -2,7 +2,7 @@
 
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { checkSessionAction, getAuthAction, refreshAuthAction } from '../actions.js';
-import type { Impersonator, OauthTokens, User } from '@workos-inc/node';
+import type { Impersonator, User } from '@workos-inc/node';
 
 type AuthContextType = {
   user: User | null;
@@ -12,7 +12,6 @@ type AuthContextType = {
   permissions: string[] | undefined;
   entitlements: string[] | undefined;
   impersonator: Impersonator | undefined;
-  oauthTokens: OauthTokens | undefined;
   accessToken: string | undefined;
   loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
@@ -38,7 +37,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [permissions, setPermissions] = useState<string[] | undefined>(undefined);
   const [entitlements, setEntitlements] = useState<string[] | undefined>(undefined);
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
-  const [oauthTokens, setOauthTokens] = useState<OauthTokens | undefined>(undefined);
   const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +50,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
       setImpersonator(auth.impersonator);
-      setOauthTokens(auth.oauthTokens);
       setAccessToken(auth.accessToken);
     } catch (error) {
       setUser(null);
@@ -62,7 +59,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(undefined);
       setEntitlements(undefined);
       setImpersonator(undefined);
-      setOauthTokens(undefined);
       setAccessToken(undefined);
     } finally {
       setLoading(false);
@@ -84,7 +80,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
       setImpersonator(auth.impersonator);
-      setOauthTokens(auth.oauthTokens);
       setAccessToken(auth.accessToken);
     } catch (error) {
       return error instanceof Error ? { error: error.message } : { error: String(error) };
@@ -154,7 +149,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         permissions,
         entitlements,
         impersonator,
-        oauthTokens,
         accessToken,
         loading,
         getAuth,
