@@ -245,7 +245,7 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Refresh successful. New access token ends in'));
     });
 
-    it('should delete the cookie and redirect when refreshing fails', async () => {
+    it('should delete the cookie when refreshing fails', async () => {
       jest.spyOn(console, 'log').mockImplementation(() => {});
 
       mockSession.accessToken = await generateTestToken({}, true);
@@ -277,7 +277,7 @@ describe('session.ts', () => {
         [],
       );
 
-      expect(result.status).toBe(307);
+      expect(result.status).toBe(200);
       expect(nextCookies.get('wos-session')).toBeUndefined();
       expect(console.log).toHaveBeenCalledTimes(2);
       expect(console.log).toHaveBeenNthCalledWith(
@@ -286,7 +286,7 @@ describe('session.ts', () => {
       );
       expect(console.log).toHaveBeenNthCalledWith(
         2,
-        'Failed to refresh. Deleting cookie and redirecting.',
+        'Failed to refresh. Deleting cookie.',
         new Error('Failed to refresh'),
       );
     });
@@ -446,6 +446,54 @@ describe('session.ts', () => {
         );
 
         expect(result.status).toBe(307);
+      });
+
+      it('should delete the cookie and redirect when refreshing fails', async () => {
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+
+        mockSession.accessToken = await generateTestToken({}, true);
+
+        const nextCookies = await cookies();
+        nextCookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        (jwtVerify as jest.Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+
+        jest
+          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
+          .mockRejectedValue(new Error('Failed to refresh'));
+
+        const request = new NextRequest(new URL('http://example.com'));
+
+        const result = await updateSession(
+          request,
+          true,
+          {
+            enabled: true,
+            unauthenticatedPaths: [],
+          },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          [],
+        );
+
+        expect(result.status).toBe(307);
+        expect(nextCookies.get('wos-session')).toBeUndefined();
+        expect(console.log).toHaveBeenCalledTimes(3);
+        expect(console.log).toHaveBeenNthCalledWith(
+          1,
+          `Session invalid. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
+        );
+        expect(console.log).toHaveBeenNthCalledWith(
+          2,
+          'Failed to refresh. Deleting cookie.',
+          new Error('Failed to refresh'),
+        );
+
+        expect(console.log).toHaveBeenNthCalledWith(3, 'Redirecting to AuthKit to log in again.');
       });
 
       describe('sign up paths', () => {
