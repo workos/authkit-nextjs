@@ -232,5 +232,30 @@ describe('authkit-callback-route', () => {
 
       expect(response.status).toBe(500);
     });
+
+    it('should call onSuccess if provided', async () => {
+      const mockAuthResponse = {
+        accessToken: 'access123',
+        refreshToken: 'refresh123',
+        user: { id: 'user_123' },
+        oauthTokens: {
+          access_token: 'access123',
+          refresh_token: 'refresh123',
+          expires_at: 1719811200,
+          scopes: ['foo', 'bar'],
+        },
+      };
+
+      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const onSuccess = jest.fn();
+      const handler = handleAuth({ onSuccess: onSuccess });
+      await handler(request);
+
+      expect(onSuccess).toHaveBeenCalledWith(mockAuthResponse);
+    });
   });
 });
