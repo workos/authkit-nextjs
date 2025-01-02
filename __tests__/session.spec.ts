@@ -159,6 +159,52 @@ describe('session.ts', () => {
       jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
     });
 
+    it('should throw an error if the cookie password is not set', async () => {
+      const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
+
+      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
+
+      await expect(async () => {
+        await updateSession(
+          new NextRequest(new URL('http://example.com')),
+          false,
+          {
+            enabled: false,
+            unauthenticatedPaths: [],
+          },
+          '',
+          [],
+        );
+      }).rejects.toThrow(
+        'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+      );
+
+      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+    });
+
+    it('should throw an error if the cookie password is less than 32 characters', async () => {
+      const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
+
+      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
+
+      await expect(async () => {
+        await updateSession(
+          new NextRequest(new URL('http://example.com')),
+          false,
+          {
+            enabled: false,
+            unauthenticatedPaths: [],
+          },
+          '',
+          [],
+        );
+      }).rejects.toThrow(
+        'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+      );
+
+      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+    });
+
     it('should return early if there is no session', async () => {
       const request = new NextRequest(new URL('http://example.com'));
       const result = await updateSession(
