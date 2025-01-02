@@ -16,6 +16,28 @@ jest.mock('../src/workos', () => ({
 }));
 
 describe('authkit-callback-route', () => {
+  const mockAuthResponse = {
+    accessToken: 'access123',
+    refreshToken: 'refresh123',
+    user: {
+      id: 'user_123',
+      email: 'test@example.com',
+      emailVerified: true,
+      profilePictureUrl: 'https://example.com/photo.jpg',
+      firstName: 'Test',
+      lastName: 'User',
+      object: 'user' as const,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    },
+    oauthTokens: {
+      accessToken: 'access123',
+      refreshToken: 'refresh123',
+      expiresAt: 1719811200,
+      scopes: ['foo', 'bar'],
+    },
+  };
+
   describe('handleAuth', () => {
     let request: NextRequest;
 
@@ -42,14 +64,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle successful authentication', async () => {
-      // Mock successful authentication response
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user_123' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -80,7 +95,7 @@ describe('authkit-callback-route', () => {
 
     it('should handle authentication failure if a non-Error object is thrown', async () => {
       // Mock authentication failure
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue('Auth failed');
+      jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
 
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
@@ -102,13 +117,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should respect custom returnPathname', async () => {
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user1' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       request.nextUrl.searchParams.set('code', 'test-code');
 
@@ -119,13 +128,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle state parameter with returnPathname', async () => {
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user1' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -138,13 +141,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should extract custom search params from returnPathname', async () => {
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user1' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -160,14 +157,7 @@ describe('authkit-callback-route', () => {
       const originalRedirect = NextResponse.redirect;
       (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
 
-      // Mock successful authentication response
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user_123' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -199,14 +189,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should use baseURL if provided', async () => {
-      // Mock successful authentication response
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user_123' },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -234,19 +217,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should call onSuccess if provided', async () => {
-      const mockAuthResponse = {
-        accessToken: 'access123',
-        refreshToken: 'refresh123',
-        user: { id: 'user_123' },
-        oauthTokens: {
-          access_token: 'access123',
-          refresh_token: 'refresh123',
-          expires_at: 1719811200,
-          scopes: ['foo', 'bar'],
-        },
-      };
-
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
