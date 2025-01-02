@@ -22,7 +22,10 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
 
 async function encryptSession(session: Session) {
-  return sealData(session, { password: WORKOS_COOKIE_PASSWORD });
+  return sealData(session, {
+    password: WORKOS_COOKIE_PASSWORD,
+    ttl: 0,
+  });
 }
 
 async function updateSession(
@@ -34,6 +37,12 @@ async function updateSession(
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
+  }
+
+  if (!WORKOS_COOKIE_PASSWORD || WORKOS_COOKIE_PASSWORD.length < 32) {
+    throw new Error(
+      'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+    );
   }
 
   const session = await getSessionFromCookie();
@@ -139,7 +148,6 @@ async function updateSession(
       refreshToken,
       user,
       impersonator,
-      oauthTokens: session.oauthTokens,
     });
 
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
@@ -293,7 +301,6 @@ async function withAuth({ ensureSignedIn = false } = {}) {
     permissions,
     entitlements,
     impersonator: session.impersonator,
-    oauthTokens: session.oauthTokens,
     accessToken: session.accessToken,
   };
 }
