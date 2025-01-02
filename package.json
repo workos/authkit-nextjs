@@ -5,13 +5,23 @@
   "sideEffects": false,
   "type": "module",
   "main": "./dist/esm/index.js",
-  "types": "./dist/esm/index.d.ts",
+  "types": "./dist/esm/types/index.d.ts",
   "files": [
     "dist",
     "src",
     "LICENSE",
     "README.md"
   ],
+  "exports": {
+    "./components": {
+      "types": "./dist/esm/types/components/index.d.ts",
+      "import": "./dist/esm/components/index.js"
+    },
+    ".": {
+      "types": "./dist/esm/types/index.d.ts",
+      "import": "./dist/esm/index.js"
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
