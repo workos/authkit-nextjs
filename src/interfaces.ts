@@ -59,6 +59,7 @@ export interface GetAuthURLOptions {
 export interface AuthkitMiddlewareAuth {
   enabled: boolean;
   unauthenticatedPaths: string[];
+  fallbackRedirectUri?: string;
 }
 
 export interface AuthkitMiddlewareOptions {
