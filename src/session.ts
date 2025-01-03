@@ -98,7 +98,7 @@ async function updateSession(
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
     if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
 
-    const redirectTo = await getAuthorizationUrl({
+    const redirectTo = middlewareAuth.fallbackRedirectUri ?? await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
       redirectUri: redirectUri,
       screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
