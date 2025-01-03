@@ -159,8 +159,6 @@ describe('session.ts', () => {
       jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
     });
 
-<<<<<<< HEAD
-=======
     it('should throw an error if the cookie password is not set', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
@@ -207,7 +205,6 @@ describe('session.ts', () => {
       jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
     });
 
->>>>>>> origin/main
     it('should return early if there is no session', async () => {
       const request = new NextRequest(new URL('http://example.com'));
       const result = await updateSession(

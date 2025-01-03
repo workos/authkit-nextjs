@@ -28,7 +28,7 @@ async function encryptSession(session: Session) {
   });
 }
 
-async function updateSession(
+async function updateSessionMiddleware(
   request: NextRequest,
   debug: boolean,
   middlewareAuth: AuthkitMiddlewareAuth,
@@ -401,4 +401,4 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
 }
 
-export { encryptSession, withAuth, refreshSession, terminateSession, updateSession, getSession };
+export { encryptSession, withAuth, refreshSession, terminateSession, updateSessionMiddleware, getSession };
