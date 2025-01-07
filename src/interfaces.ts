@@ -68,6 +68,15 @@ export interface AuthkitMiddlewareOptions {
   signUpPaths?: string[];
 }
 
+export interface AuthkitOptions {
+  debug?: boolean;
+}
+
+export interface AuthkitResponse {
+  session: UserInfo | NoUserInfo;
+  redirectUri: string;
+}
+
 export interface CookieOptions {
   path: '/';
   httpOnly: true;

@@ -9,7 +9,7 @@ import { getCookieOptions } from './cookie.js';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { AccessToken, AuthkitMiddlewareAuth, NoUserInfo, Session, UserInfo } from './interfaces.js';
+import { AccessToken, AuthkitMiddlewareAuth, AuthkitOptions, NoUserInfo, Session, UserInfo } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { redirectWithFallback } from './utils.js';
@@ -169,6 +169,59 @@ async function updateSessionMiddleware(
   // This is outside of the above block because you cannot redirect in Next.js
   // from inside a try/catch block.
   return redirectWithFallback(request.url);
+}
+
+async function updateSession(request: NextRequest, options: AuthkitOptions): Promise<UserInfo | NoUserInfo> {
+  const session = await getSessionFromCookie();
+  if (!session) {
+    if (options.debug) console.log('No session found from cookie');
+    return { user: null };
+  }
+
+  const newRequestHeaders = new Headers(request.headers);
+
+  // Record that the request was routed through the middleware so we can check later for DX purposes
+  newRequestHeaders.set(middlewareHeaderName, 'true');
+
+  const hasValidSession = await verifyAccessToken(session.accessToken);
+
+  if (!hasValidSession) {
+    if (options.debug)
+      console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
+
+    try {
+      const newSession = await refreshSession({
+        ensureSignedIn: false,
+      });
+
+      return newSession;
+    } catch (e) {
+      if (options.debug) console.log('Failed to refresh. Deleting cookie.', e);
+      const nextCookies = await cookies();
+      nextCookies.delete(WORKOS_COOKIE_NAME || 'wos-session');
+
+      return { user: null };
+    }
+  }
+
+  const {
+    sid: sessionId,
+    org_id: organizationId,
+    role,
+    permissions,
+    entitlements,
+  } = decodeJwt<AccessToken>(session.accessToken);
+
+  return {
+    sessionId,
+    user: session.user,
+    organizationId,
+    role,
+    permissions,
+    entitlements,
+    impersonator: session.impersonator,
+    accessToken: session.accessToken,
+  };
 }
 
 async function refreshSession(options: {
@@ -336,6 +389,7 @@ async function getSessionFromCookie(response?: NextResponse) {
 }
 
 /**
+ * @deprecated Use composable middleware via the `authkit` method instead.
  * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `withAuth` instead.
  *
  * @returns UserInfo | NoUserInfo
@@ -401,4 +455,12 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
 }
 
-export { encryptSession, withAuth, refreshSession, terminateSession, updateSessionMiddleware, getSession };
+export {
+  encryptSession,
+  withAuth,
+  refreshSession,
+  terminateSession,
+  updateSessionMiddleware,
+  updateSession,
+  getSession,
+};
