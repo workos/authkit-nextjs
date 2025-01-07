@@ -12,11 +12,11 @@
     "alwaysStrict": true,
     "skipLibCheck": true,
     "outDir": "./dist/esm",
+    "declarationDir": "./dist/esm/types",
     "module": "ES2020",
     "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "declarationDir": "./dist/types"
+    "allowSyntheticDefaultImports": true
   },
-  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts"]
+  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts", "/dist/**/*", "__tests__/**/*"]
 }
 
