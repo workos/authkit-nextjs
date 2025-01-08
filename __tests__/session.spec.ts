@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, getSession, terminateSession } from '../src/session.js';
+import {
+  withAuth,
+  updateSession,
+  refreshSession,
+  getSession,
+  terminateSession,
+  updateSessionMiddleware,
+} from '../src/session.js';
 import { workos } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
@@ -18,7 +25,7 @@ jest.mock('jose', () => ({
 }));
 
 // logging is disabled by default, flip this to true to still have logs in the console
-const DEBUG = false;
+const DEBUG = true;
 
 describe('session.ts', () => {
   const mockSession = {
@@ -137,14 +144,14 @@ describe('session.ts', () => {
     });
   });
 
-  describe('updateSession', () => {
+  describe('updateSessionMiddleware', () => {
     it('should throw an error if the redirect URI is not set', async () => {
       const originalWorkosRedirectUri = envVariables.WORKOS_REDIRECT_URI;
 
       jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', '');
 
       await expect(async () => {
-        await updateSession(
+        await updateSessionMiddleware(
           new NextRequest(new URL('http://example.com')),
           false,
           {
@@ -165,7 +172,7 @@ describe('session.ts', () => {
       jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
 
       await expect(async () => {
-        await updateSession(
+        await updateSessionMiddleware(
           new NextRequest(new URL('http://example.com')),
           false,
           {
@@ -188,7 +195,7 @@ describe('session.ts', () => {
       jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
 
       await expect(async () => {
-        await updateSession(
+        await updateSessionMiddleware(
           new NextRequest(new URL('http://example.com')),
           false,
           {
@@ -207,7 +214,7 @@ describe('session.ts', () => {
 
     it('should return early if there is no session', async () => {
       const request = new NextRequest(new URL('http://example.com'));
-      const result = await updateSession(
+      const result = await updateSessionMiddleware(
         request,
         false,
         {
@@ -236,7 +243,7 @@ describe('session.ts', () => {
       });
 
       const request = new NextRequest(new URL('http://example.com'));
-      const result = await updateSession(
+      const result = await updateSessionMiddleware(
         request,
         true,
         {
@@ -273,7 +280,7 @@ describe('session.ts', () => {
 
       const request = new NextRequest(new URL('http://example.com'));
 
-      const result = await updateSession(
+      const result = await updateSessionMiddleware(
         request,
         true,
         {
@@ -312,7 +319,7 @@ describe('session.ts', () => {
 
       const request = new NextRequest(new URL('http://example.com'));
 
-      const result = await updateSession(
+      const result = await updateSessionMiddleware(
         request,
         true,
         {
@@ -342,7 +349,7 @@ describe('session.ts', () => {
         jest.spyOn(console, 'log').mockImplementation(() => {});
 
         const request = new NextRequest(new URL('http://example.com/protected'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           true,
           {
@@ -364,7 +371,7 @@ describe('session.ts', () => {
         (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
 
         const request = new NextRequest(new URL('http://example.com/protected'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           false,
           {
@@ -383,7 +390,7 @@ describe('session.ts', () => {
 
       it('should automatically add the redirect URI to unauthenticatedPaths when middleware is enabled', async () => {
         const request = new NextRequest(new URL('http://example.com/protected'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           false,
           {
@@ -399,7 +406,7 @@ describe('session.ts', () => {
 
       it('should redirect unauthenticated users to sign up page on protected routes included in signUpPaths', async () => {
         const request = new NextRequest(new URL('http://example.com/protected-signup'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           false,
           {
@@ -416,7 +423,7 @@ describe('session.ts', () => {
 
       it('should allow logged out users on unauthenticated paths', async () => {
         const request = new NextRequest(new URL('http://example.com/unauthenticated'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           false,
           {
@@ -433,7 +440,7 @@ describe('session.ts', () => {
       it('should throw an error if the provided regex is invalid', async () => {
         const request = new NextRequest(new URL('http://example.com/invalid-regex'));
         await expect(async () => {
-          await updateSession(
+          await updateSessionMiddleware(
             request,
             false,
             {
@@ -457,12 +464,12 @@ describe('session.ts', () => {
         });
 
         // Import session after setting up the spy
-        const { updateSession } = await import('../src/session.js');
+        const { updateSessionMiddleware } = await import('../src/session.js');
 
         const request = new NextRequest(new URL('http://example.com/invalid-regex'));
 
         await expect(async () => {
-          await updateSession(
+          await updateSessionMiddleware(
             request,
             false,
             {
@@ -480,7 +487,7 @@ describe('session.ts', () => {
 
       it('should default to the WORKOS_REDIRECT_URI environment variable if no redirect URI is provided', async () => {
         const request = new NextRequest(new URL('http://example.com/protected'));
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           false,
           {
@@ -498,7 +505,7 @@ describe('session.ts', () => {
         it('should redirect to sign up when unauthenticated user is on a sign up path', async () => {
           const request = new NextRequest(new URL('http://example.com/signup'));
 
-          const result = await updateSession(
+          const result = await updateSessionMiddleware(
             request,
             false,
             {
@@ -523,6 +530,92 @@ describe('session.ts', () => {
           expect(redirect).toHaveBeenCalledWith(expect.stringContaining('screen_hint=sign-up'));
         });
       });
+    });
+  });
+
+  describe('updateSession', () => {
+    it('should return an authorization url if the session is invalid', async () => {
+      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+        debug: true,
+      });
+
+      expect(result.authorizationUrl).toBeDefined();
+      expect(result.session.user).toBeNull();
+    });
+
+    it('should return a session if the session is valid', async () => {
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+        debug: true,
+      });
+      console.log('result', result);
+
+      expect(result.session).toBeDefined();
+    });
+
+    it('should attempt to refresh an invalid session', async () => {
+      // Setup invalid session
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      // Mock token verification to fail
+      (jwtVerify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      // Mock successful refresh
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+        debug: true,
+      });
+
+      expect(result.session).toBeDefined();
+      expect(result.session.user).toBeDefined();
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('Session invalid. Refreshing access token that ends in'),
+      );
+    });
+
+    it('should handle refresh failure by returning auth URL', async () => {
+      // Setup invalid session
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      // Mock token verification to fail
+      (jwtVerify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      // Mock refresh failure
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+
+      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+        debug: true,
+      });
+
+      expect(result.session.user).toBeNull();
+      expect(result.authorizationUrl).toBeDefined();
+      expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
   });
 

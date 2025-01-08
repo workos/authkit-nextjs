@@ -74,7 +74,8 @@ export interface AuthkitOptions {
 
 export interface AuthkitResponse {
   session: UserInfo | NoUserInfo;
-  redirectUri: string;
+  headers: Headers;
+  authorizationUrl?: string;
 }
 
 export interface CookieOptions {

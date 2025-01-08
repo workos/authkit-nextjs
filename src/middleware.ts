@@ -15,12 +15,5 @@ export function authkitMiddleware({
 }
 
 export async function authkit(request: NextRequest, options: AuthkitOptions = {}): Promise<AuthkitResponse> {
-  const session = await updateSession(request, options);
-
-  const response = {
-    session,
-    redirectUri: WORKOS_REDIRECT_URI,
-  };
-
-  return response;
+  return await updateSession(request, options);
 }

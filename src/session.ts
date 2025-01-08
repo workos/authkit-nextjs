@@ -9,7 +9,15 @@ import { getCookieOptions } from './cookie.js';
 import { workos } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { AccessToken, AuthkitMiddlewareAuth, AuthkitOptions, NoUserInfo, Session, UserInfo } from './interfaces.js';
+import {
+  AccessToken,
+  AuthkitMiddlewareAuth,
+  AuthkitOptions,
+  AuthkitResponse,
+  NoUserInfo,
+  Session,
+  UserInfo,
+} from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { redirectWithFallback } from './utils.js';
@@ -171,38 +179,69 @@ async function updateSessionMiddleware(
   return redirectWithFallback(request.url);
 }
 
-async function updateSession(request: NextRequest, options: AuthkitOptions): Promise<UserInfo | NoUserInfo> {
+async function updateSession(request: NextRequest, options: AuthkitOptions): Promise<AuthkitResponse> {
   const session = await getSessionFromCookie();
-  if (!session) {
-    if (options.debug) console.log('No session found from cookie');
-    return { user: null };
-  }
 
   const newRequestHeaders = new Headers(request.headers);
 
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
 
+  // We store the current request url in a custom header, so we can always have access to it
+  // This is because on hard navigations we don't have access to `next-url` but need to get the current
+  // `pathname` to be able to return the users where they came from before sign-in
+  newRequestHeaders.set('x-url', request.url);
+
+  newRequestHeaders.delete(sessionHeaderName);
+
+  if (!session) {
+    if (options.debug) console.log('No session found from cookie');
+    return {
+      session: { user: null },
+      headers: newRequestHeaders,
+      authorizationUrl: await getAuthorizationUrl({
+        returnPathname: getReturnPathname(request.url),
+      }),
+    };
+  }
+
   const hasValidSession = await verifyAccessToken(session.accessToken);
 
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  const nextCookies = await cookies();
+
   if (!hasValidSession) {
-    if (options.debug)
+    if (options.debug) {
       console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
+    }
 
     try {
       const newSession = await refreshSession({
         ensureSignedIn: false,
       });
 
-      return newSession;
+      newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
+
+      return {
+        session: newSession,
+        headers: newRequestHeaders,
+      };
     } catch (e) {
       if (options.debug) console.log('Failed to refresh. Deleting cookie.', e);
       const nextCookies = await cookies();
-      nextCookies.delete(WORKOS_COOKIE_NAME || 'wos-session');
+      nextCookies.delete(cookieName);
 
-      return { user: null };
+      return {
+        session: { user: null },
+        headers: newRequestHeaders,
+        authorizationUrl: await getAuthorizationUrl({
+          returnPathname: getReturnPathname(request.url),
+        }),
+      };
     }
   }
+
+  newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
 
   const {
     sid: sessionId,
@@ -213,14 +252,17 @@ async function updateSession(request: NextRequest, options: AuthkitOptions): Pro
   } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
-    sessionId,
-    user: session.user,
-    organizationId,
-    role,
-    permissions,
-    entitlements,
-    impersonator: session.impersonator,
-    accessToken: session.accessToken,
+    session: {
+      sessionId,
+      user: session.user,
+      organizationId,
+      role,
+      permissions,
+      entitlements,
+      impersonator: session.impersonator,
+      accessToken: session.accessToken,
+    },
+    headers: newRequestHeaders,
   };
 }
 
