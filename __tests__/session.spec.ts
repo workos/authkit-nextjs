@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import {
-  withAuth,
-  updateSession,
-  refreshSession,
-  getSession,
-  terminateSession,
-  updateSessionMiddleware,
-} from '../src/session.js';
+import { withAuth, updateSession, refreshSession, terminateSession, updateSessionMiddleware } from '../src/session.js';
 import { workos } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
@@ -679,54 +672,6 @@ describe('session.ts', () => {
 
       expect(result).toHaveProperty('user');
       expect(result.organizationId).toBe('org_456');
-    });
-  });
-
-  describe('getSession', () => {
-    it('should return session info when valid', async () => {
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
-      const result = await getSession();
-      expect(result).toHaveProperty('user');
-    });
-
-    it('should return null user when no session exists', async () => {
-      const result = await getSession();
-      expect(result).toEqual({ user: null });
-    });
-
-    it('should return undefined if the access token is invalid', async () => {
-      mockSession.accessToken = 'invalid-token';
-
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      const result = await getSession();
-      expect(result).toEqual(undefined);
-    });
-
-    it('should return cookie from a response object if provided', async () => {
-      mockSession.accessToken = await generateTestToken();
-
-      const response = new NextResponse();
-      response.cookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
-      const result = await getSession(response);
-      expect(result).toEqual(mockSession);
     });
   });
 

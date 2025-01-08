@@ -233,27 +233,36 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 `unauthenticatedPaths` uses the same glob logic as the [Next.js matcher](https://nextjs.org/docs/pages/building-your-application/routing/middleware#matcher).
 
-### Retrieve session in middleware
+### Composing middleware
 
-Sometimes it's useful to check the user session if you want to compose custom middleware. The `getSession` helper method will retrieve the session from the cookie and verify the access token.
+If you don't want to use `authkitMiddleware` and instead want to compose your own middleware, you can use the `authkit` method. In this mode you are responsible to handling what to do when there's no session on a protected route.
 
 ```ts
-import { authkitMiddleware, getSession } from '@workos-inc/authkit-nextjs';
-import { NextRequest, NextFetchEvent } from 'next/server';
+export default async function middleware(request: NextRequest) {
+  // Perform logic before or after AuthKit
 
-export default async function middleware(request: NextRequest, event: NextFetchEvent) {
-  // authkitMiddleware will handle refreshing the session if the access token has expired
-  const response = await authkitMiddleware()(request, event);
+  // Auth object contains the session, response headers and an auhorization URL in the case that the session isn't valid
+  // This method will automatically handle setting the cookie and refreshing the session
+  const { session, headers, authorizationUrl } = await authkit(request, {
+    debug: true,
+  });
 
-  // If session is undefined, the user is not authenticated
-  const session = await getSession(response);
+  // Control of what to do when there's no session on a protected route is left to the developer
+  if (request.url.includes('/account') && !session.user) {
+    console.log('No session on protected path');
+    return NextResponse.redirect(authorizationUrl);
 
-  // ...add additional middleware logic here
+    // Alternatively you could redirect to your own login page, for example if you want to use your own UI instead of hosted AuthKit
+    return NextResponse.redirect('/login');
+  }
 
-  return response;
+  // Headers from the authkit response need to be included in every non-redirect response to ensure that `withAuth` works as expected
+  return NextResponse.next({
+    headers: headers,
+  });
 }
 
-// Match against pages that require auth
+// Match against the pages
 export const config = { matcher: ['/', '/account/:path*'] };
 ```
 

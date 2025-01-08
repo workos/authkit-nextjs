@@ -464,12 +464,4 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
 }
 
-export {
-  encryptSession,
-  withAuth,
-  refreshSession,
-  terminateSession,
-  updateSessionMiddleware,
-  updateSession,
-  getSession,
-};
+export { encryptSession, withAuth, refreshSession, terminateSession, updateSessionMiddleware, updateSession };
