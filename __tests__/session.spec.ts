@@ -25,7 +25,7 @@ jest.mock('jose', () => ({
 }));
 
 // logging is disabled by default, flip this to true to still have logs in the console
-const DEBUG = true;
+const DEBUG = false;
 
 describe('session.ts', () => {
   const mockSession = {
