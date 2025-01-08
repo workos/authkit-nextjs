@@ -179,7 +179,7 @@ async function updateSessionMiddleware(
   return redirectWithFallback(request.url);
 }
 
-async function updateSession(request: NextRequest, options: AuthkitOptions): Promise<AuthkitResponse> {
+async function updateSession(request: NextRequest, options?: AuthkitOptions): Promise<AuthkitResponse> {
   const session = await getSessionFromCookie();
 
   const newRequestHeaders = new Headers(request.headers);
@@ -195,7 +195,7 @@ async function updateSession(request: NextRequest, options: AuthkitOptions): Pro
   newRequestHeaders.delete(sessionHeaderName);
 
   if (!session) {
-    if (options.debug) console.log('No session found from cookie');
+    if (options && options.debug) console.log('No session found from cookie');
     return {
       session: { user: null },
       headers: newRequestHeaders,
@@ -211,7 +211,7 @@ async function updateSession(request: NextRequest, options: AuthkitOptions): Pro
   const nextCookies = await cookies();
 
   if (!hasValidSession) {
-    if (options.debug) {
+    if (options && options.debug) {
       console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
     }
 
@@ -227,7 +227,7 @@ async function updateSession(request: NextRequest, options: AuthkitOptions): Pro
         headers: newRequestHeaders,
       };
     } catch (e) {
-      if (options.debug) console.log('Failed to refresh. Deleting cookie.', e);
+      if (options && options.debug) console.log('Failed to refresh. Deleting cookie.', e);
       const nextCookies = await cookies();
       nextCookies.delete(cookieName);
 
@@ -418,13 +418,13 @@ async function verifyAccessToken(accessToken: string) {
   }
 }
 
-async function getSessionFromCookie(response?: NextResponse) {
+async function getSessionFromCookie() {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   const nextCookies = await cookies();
-  const cookie = response ? response.cookies.get(cookieName) : nextCookies.get(cookieName);
+  const cookie = nextCookies.get(cookieName);
 
   if (cookie) {
-    return unsealData<Session>(cookie.value ?? cookie, {
+    return unsealData<Session>(cookie.value, {
       password: WORKOS_COOKIE_PASSWORD,
     });
   }
