@@ -430,39 +430,6 @@ async function getSessionFromCookie(response?: NextResponse) {
   }
 }
 
-/**
- * @deprecated Use composable middleware via the `authkit` method instead.
- * Retrieves the session from the cookie. Meant for use in the middleware, for client side use `withAuth` instead.
- *
- * @returns UserInfo | NoUserInfo
- */
-async function getSession(response?: NextResponse) {
-  const session = await getSessionFromCookie(response);
-
-  if (!session) return { user: null };
-
-  if (await verifyAccessToken(session.accessToken)) {
-    const {
-      sid: sessionId,
-      org_id: organizationId,
-      role,
-      permissions,
-      entitlements,
-    } = decodeJwt<AccessToken>(session.accessToken);
-
-    return {
-      sessionId,
-      user: session.user,
-      organizationId,
-      role,
-      permissions,
-      entitlements,
-      impersonator: session.impersonator,
-      accessToken: session.accessToken,
-    };
-  }
-}
-
 async function getSessionFromHeader(): Promise<Session | undefined> {
   const headersList = await headers();
   const hasMiddleware = Boolean(headersList.get(middlewareHeaderName));
