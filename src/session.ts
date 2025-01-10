@@ -24,7 +24,6 @@ import { redirectWithFallback } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
-const redirectUriHeaderName = 'x-redirect-uri';
 const signUpPathsHeaderName = 'x-sign-up-paths';
 
 const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
@@ -53,33 +52,13 @@ async function updateSessionMiddleware(
     );
   }
 
-  const session = await getSessionFromCookie();
-  const newRequestHeaders = new Headers(request.headers);
-
-  // We store the current request url in a custom header, so we can always have access to it
-  // This is because on hard navigations we don't have access to `next-url` but need to get the current
-  // `pathname` to be able to return the users where they came from before sign-in
-  newRequestHeaders.set('x-url', request.url);
-
-  // Record that the request was routed through the middleware so we can check later for DX purposes
-  newRequestHeaders.set(middlewareHeaderName, 'true');
-
-  // Record the sign up paths so we can use it later
-  if (signUpPaths.length > 0) {
-    newRequestHeaders.set(signUpPathsHeaderName, signUpPaths.join(','));
-  }
-
   let url;
 
-  // If the redirect URI is set, store it in the headers so we can use it later
   if (redirectUri) {
-    newRequestHeaders.set(redirectUriHeaderName, redirectUri);
     url = new URL(redirectUri);
   } else {
     url = new URL(WORKOS_REDIRECT_URI);
   }
-
-  newRequestHeaders.delete(sessionHeaderName);
 
   if (
     middlewareAuth.enabled &&
@@ -102,92 +81,35 @@ async function updateSessionMiddleware(
     return pathRegex.exec(request.nextUrl.pathname);
   });
 
+  const { session, headers, authorizationUrl } = await updateSession(request, {
+    debug,
+    redirectUri,
+    screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
+  });
+
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
-  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session) {
-    if (debug) console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
+  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
+    if (debug) {
+      console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
+    }
 
-    const redirectTo = await getAuthorizationUrl({
-      returnPathname: getReturnPathname(request.url),
-      redirectUri: redirectUri,
-      screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
-    });
-
-    return redirectWithFallback(redirectTo);
+    return redirectWithFallback(authorizationUrl as string);
   }
 
-  // If no session, just continue
-  if (!session) {
-    return NextResponse.next({
-      request: { headers: newRequestHeaders },
-    });
+  // Record the sign up paths so we can use them later
+  if (signUpPaths.length > 0) {
+    headers.set(signUpPathsHeaderName, signUpPaths.join(','));
   }
 
-  const hasValidSession = await verifyAccessToken(session.accessToken);
-  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-
-  const nextCookies = await cookies();
-
-  if (hasValidSession) {
-    if (debug) console.log('Session is valid');
-    // set the x-workos-session header according to the current cookie value
-    newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
-    return NextResponse.next({
-      request: { headers: newRequestHeaders },
-    });
-  }
-
-  try {
-    if (debug) console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
-
-    const { org_id: organizationId } = decodeJwt<AccessToken>(session.accessToken);
-
-    // If the session is invalid (i.e. the access token has expired) attempt to re-authenticate with the refresh token
-    const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
-      clientId: WORKOS_CLIENT_ID,
-      refreshToken: session.refreshToken,
-      organizationId,
-    });
-
-    if (debug) console.log(`Refresh successful. New access token ends in ${accessToken.slice(-10)}`);
-
-    // Encrypt session with new access and refresh tokens
-    const encryptedSession = await encryptSession({
-      accessToken,
-      refreshToken,
-      user,
-      impersonator,
-    });
-
-    newRequestHeaders.set(sessionHeaderName, encryptedSession);
-
-    const response = NextResponse.next({
-      request: { headers: newRequestHeaders },
-    });
-    // update the cookie
-    response.cookies.set(cookieName, encryptedSession, getCookieOptions(redirectUri));
-    return response;
-  } catch (e) {
-    if (debug) console.log('Failed to refresh. Deleting cookie.', e);
-
-    nextCookies.delete(cookieName);
-  }
-
-  if (middlewareAuth.enabled) {
-    // If we get here, the session is invalid and the user needs to sign in again because we're using middleware auth mode.
-    // We redirect to the current URL which will trigger the middleware again.
-    // This is outside of the above block because you cannot redirect in Next.js
-    // from inside a try/catch block.
-    if (debug) console.log('Redirecting to AuthKit to log in again.');
-    return redirectWithFallback(request.url);
-  }
-
-  // If we aren't in middleware auth mode, we return a response and let the page handle what to do next.
   return NextResponse.next({
-    request: { headers: newRequestHeaders },
+    request: { headers },
   });
 }
 
-async function updateSession(request: NextRequest, options?: AuthkitOptions): Promise<AuthkitResponse> {
+async function updateSession(
+  request: NextRequest,
+  options: AuthkitOptions = { debug: false },
+): Promise<AuthkitResponse> {
   const session = await getSessionFromCookie();
 
   const newRequestHeaders = new Headers(request.headers);
@@ -203,12 +125,17 @@ async function updateSession(request: NextRequest, options?: AuthkitOptions): Pr
   newRequestHeaders.delete(sessionHeaderName);
 
   if (!session) {
-    if (options && options.debug) console.log('No session found from cookie');
+    if (options.debug) {
+      console.log('No session found from cookie');
+    }
+
     return {
       session: { user: null },
       headers: newRequestHeaders,
       authorizationUrl: await getAuthorizationUrl({
         returnPathname: getReturnPathname(request.url),
+        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+        screenHint: options.screenHint,
       }),
     };
   }
@@ -219,7 +146,7 @@ async function updateSession(request: NextRequest, options?: AuthkitOptions): Pr
   const nextCookies = await cookies();
 
   if (!hasValidSession) {
-    if (options && options.debug) {
+    if (options.debug) {
       console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
     }
 
@@ -228,6 +155,10 @@ async function updateSession(request: NextRequest, options?: AuthkitOptions): Pr
         ensureSignedIn: false,
       });
 
+      if (options.debug) {
+        console.log('Session successfully refreshed');
+      }
+
       newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
 
       return {
@@ -235,7 +166,10 @@ async function updateSession(request: NextRequest, options?: AuthkitOptions): Pr
         headers: newRequestHeaders,
       };
     } catch (e) {
-      if (options && options.debug) console.log('Failed to refresh. Deleting cookie.', e);
+      if (options.debug) {
+        console.log('Failed to refresh. Deleting cookie.', e);
+      }
+
       const nextCookies = await cookies();
       nextCookies.delete(cookieName);
 

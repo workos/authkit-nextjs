@@ -70,6 +70,8 @@ export interface AuthkitMiddlewareOptions {
 
 export interface AuthkitOptions {
   debug?: boolean;
+  redirectUri?: string;
+  screenHint?: 'sign-up' | 'sign-in';
 }
 
 export interface AuthkitResponse {

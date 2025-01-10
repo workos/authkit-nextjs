@@ -249,7 +249,6 @@ describe('session.ts', () => {
 
       expect(result).toBeInstanceOf(NextResponse);
       expect(result.status).toBe(200);
-      expect(console.log).toHaveBeenCalledWith('Session is valid');
     });
 
     it('should attempt to refresh the session when the access token is invalid', async () => {
@@ -288,7 +287,7 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledWith(
         `Session invalid. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
       );
-      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Refresh successful. New access token ends in'));
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Session successfully refreshed'));
     });
 
     it('should delete the cookie when refreshing fails', async () => {
@@ -414,6 +413,24 @@ describe('session.ts', () => {
         expect(result.headers.get('Location')).toContain('screen_hint=sign-up');
       });
 
+      it('should set the sign up paths in the headers', async () => {
+        const request = new NextRequest(new URL('http://example.com/protected-signup'));
+        const result = await updateSessionMiddleware(
+          request,
+          false,
+          {
+            enabled: false,
+            unauthenticatedPaths: [],
+          },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          ['/protected-signup'],
+        );
+
+        console.log('result headers:', result.headers);
+
+        expect(result.headers.get('x-middleware-request-x-sign-up-paths')).toBe('/protected-signup');
+      });
+
       it('should allow logged out users on unauthenticated paths', async () => {
         const request = new NextRequest(new URL('http://example.com/unauthenticated'));
         const result = await updateSessionMiddleware(
@@ -515,7 +532,7 @@ describe('session.ts', () => {
 
         const request = new NextRequest(new URL('http://example.com'));
 
-        const result = await updateSession(
+        const result = await updateSessionMiddleware(
           request,
           true,
           {
@@ -539,7 +556,10 @@ describe('session.ts', () => {
           new Error('Failed to refresh'),
         );
 
-        expect(console.log).toHaveBeenNthCalledWith(3, 'Redirecting to AuthKit to log in again.');
+        expect(console.log).toHaveBeenNthCalledWith(
+          3,
+          'Unauthenticated user on protected route http://example.com/, redirecting to AuthKit',
+        );
       });
 
       describe('sign up paths', () => {
@@ -578,10 +598,13 @@ describe('session.ts', () => {
     it('should return an authorization url if the session is invalid', async () => {
       const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
         debug: true,
+        screenHint: 'sign-up',
       });
 
       expect(result.authorizationUrl).toBeDefined();
+      expect(result.authorizationUrl).toContain('screen_hint=sign-up');
       expect(result.session.user).toBeNull();
+      expect(console.log).toHaveBeenCalledWith('No session found from cookie');
     });
 
     it('should return a session if the session is valid', async () => {
@@ -591,10 +614,7 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
-        debug: true,
-      });
-      console.log('result', result);
+      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')));
 
       expect(result.session).toBeDefined();
     });
