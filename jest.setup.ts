@@ -26,7 +26,10 @@ jest.mock('next/headers', () => {
       get: jest.fn((name: string) => cookieStore.get(name)),
       getAll: jest.fn(() => Array.from(cookieStore.entries())),
       set: jest.fn((name: string, value: string | { [key: string]: string | number | boolean }) =>
-        cookieStore.set(name, value),
+        cookieStore.set(name, {
+          name,
+          value,
+        }),
       ),
       _reset: () => {
         cookieStore.clear();

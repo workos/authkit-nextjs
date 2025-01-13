@@ -1,6 +1,6 @@
-import { NextMiddleware } from 'next/server';
-import { updateSession } from './session.js';
-import { AuthkitMiddlewareOptions } from './interfaces.js';
+import { NextMiddleware, NextRequest } from 'next/server';
+import { updateSessionMiddleware, updateSession } from './session.js';
+import { AuthkitMiddlewareOptions, AuthkitOptions, AuthkitResponse } from './interfaces.js';
 import { WORKOS_REDIRECT_URI } from './env-variables.js';
 
 export function authkitMiddleware({
@@ -10,6 +10,10 @@ export function authkitMiddleware({
   signUpPaths = [],
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
-    return updateSession(request, debug, middlewareAuth, redirectUri, signUpPaths);
+    return updateSessionMiddleware(request, debug, middlewareAuth, redirectUri, signUpPaths);
   };
+}
+
+export async function authkit(request: NextRequest, options: AuthkitOptions = {}): Promise<AuthkitResponse> {
+  return await updateSession(request, options);
 }
