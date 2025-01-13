@@ -18,9 +18,7 @@ describe('getAuthorizationUrl', () => {
     // Mock workos.userManagement.getAuthorizationUrl
     jest.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
-    const url = await getAuthorizationUrl({});
-
-    expect(url).toBe('mock-url');
+    await getAuthorizationUrl({});
 
     expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
       expect.objectContaining({

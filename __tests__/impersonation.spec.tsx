@@ -1,19 +1,19 @@
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { Impersonation } from '../src/impersonation.js';
-import { withAuth } from '../src/session.js';
-import { workos } from '../src/workos.js';
+import { Impersonation } from '../src/components/impersonation.js';
+import { useAuth } from '../src/components/authkit-provider.js';
+import { getOrganizationAction } from '../src/actions.js';
+import * as React from 'react';
 
-jest.mock('../src/session', () => ({
-  withAuth: jest.fn(),
+// Mock the useAuth hook
+jest.mock('../src/components/authkit-provider', () => ({
+  useAuth: jest.fn(),
 }));
 
-jest.mock('../src/workos', () => ({
-  workos: {
-    organizations: {
-      getOrganization: jest.fn(),
-    },
-  },
+// Mock the getOrganizationAction
+jest.mock('../src/actions', () => ({
+  getOrganizationAction: jest.fn(),
+  handleSignOutAction: jest.fn(),
 }));
 
 describe('Impersonation', () => {
@@ -21,77 +21,98 @@ describe('Impersonation', () => {
     jest.clearAllMocks();
   });
 
-  it('should return null if not impersonating', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+  it('should return null if not impersonating', () => {
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: null,
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: null,
+      loading: false,
     });
 
-    const { container } = await render(await Impersonation({}));
+    const { container } = render(<Impersonation />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('should render impersonation banner when impersonating', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+  it('should return null if loading', () => {
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: null,
+      loading: true,
     });
 
-    const { container } = await render(await Impersonation({}));
+    const { container } = render(<Impersonation />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('should render impersonation banner when impersonating', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: null,
+      loading: false,
+    });
+
+    const { container } = render(<Impersonation />);
     expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
   });
 
   it('should render with organization info when organizationId is provided', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: 'org_123',
+      loading: false,
     });
 
-    (workos.organizations.getOrganization as jest.Mock).mockResolvedValue({
+    (getOrganizationAction as jest.Mock).mockResolvedValue({
       id: 'org_123',
       name: 'Test Org',
     });
 
-    const { container } = await render(await Impersonation({}));
+    const { container } = await act(async () => {
+      return render(<Impersonation />);
+    });
+
     expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
   });
 
-  it('should render at the bottom by default', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+  it('should render at the bottom by default', () => {
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: null,
+      loading: false,
     });
 
-    const { container } = await render(await Impersonation({}));
+    const { container } = render(<Impersonation />);
     const banner = container.querySelector('[data-workos-impersonation-root] > div:nth-child(2)');
     expect(banner).toHaveStyle({ bottom: 'var(--wi-s)' });
   });
 
-  it('should render at the top when side prop is "top"', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+  it('should render at the top when side prop is "top"', () => {
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: null,
+      loading: false,
     });
 
-    const { container } = await render(await Impersonation({ side: 'top' }));
+    const { container } = render(<Impersonation side="top" />);
     const banner = container.querySelector('[data-workos-impersonation-root] > div:nth-child(2)');
     expect(banner).toHaveStyle({ top: 'var(--wi-s)' });
   });
 
-  it('should merge custom styles with default styles', async () => {
-    (withAuth as jest.Mock).mockResolvedValue({
+  it('should merge custom styles with default styles', () => {
+    (useAuth as jest.Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
-      user: { id: '123' },
+      user: { id: '123', email: 'user@example.com' },
       organizationId: null,
+      loading: false,
     });
 
     const customStyle = { backgroundColor: 'red' };
-    const { container } = await render(await Impersonation({ style: customStyle }));
+    const { container } = render(<Impersonation style={customStyle} />);
     const root = container.querySelector('[data-workos-impersonation-root]');
     expect(root).toHaveStyle({ backgroundColor: 'red' });
   });

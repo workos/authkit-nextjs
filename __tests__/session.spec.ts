@@ -116,6 +116,17 @@ describe('session.ts', () => {
       );
     });
 
+    it('should throw an error if the route is not covered by the middleware and there is no URL in the headers', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.delete('x-workos-middleware');
+
+      await expect(async () => {
+        await withAuth({ ensureSignedIn: true });
+      }).rejects.toThrow(
+        "You are calling 'withAuth' on a route that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.",
+      );
+    });
+
     it('should throw an error if the URL is not found in the headers', async () => {
       const nextHeaders = await headers();
       nextHeaders.delete('x-url');

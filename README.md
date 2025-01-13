@@ -143,10 +143,10 @@ Custom redirect URIs will be used over a redirect URI configured in the environm
 
 ### Wrap your app in `AuthKitProvider`
 
-Use `AuthKitProvider` to wrap your app layout, which adds some protections for auth edge cases.
+Use `AuthKitProvider` to wrap your app layout, which provides client side auth methods adds protections for auth edge cases.
 
 ```jsx
-import { AuthKitProvider } from '@workos-inc/authkit-nextjs';
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -159,9 +159,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### Get the current user
+### Get the current user in a server component
 
-For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user profile from WorkOS.
+For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user session from WorkOS.
 
 ```jsx
 import Link from 'next/link';
@@ -200,15 +200,83 @@ export default async function HomePage() {
 }
 ```
 
+### Get the current user in a client component
+
+For client components, use the `useAuth` hook to get the current user session.
+
+```jsx
+// Note the updated import path
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+
+export default function MyComponent() {
+  // Retrieves the user from the session or returns `null` if no user is signed in
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return <div>{user?.firstName}</div>;
+}
+```
+
 ### Requiring auth
 
 For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` option:
 
 ```jsx
+// Server component
 const { user } = await withAuth({ ensureSignedIn: true });
+
+// Client component
+const { user, loading } = useAuth({ ensureSignedIn: true });
 ```
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
+
+### Refreshing the session
+
+Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
+
+The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
+
+In client components, you can refresh the session with the `refreshAuth` hook.
+
+```tsx
+'use client';
+
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+import React, { useEffect } from 'react';
+
+export function SwitchOrganizationButton() {
+  const { user, organizationId, loading, refreshAuth } = useAuth();
+
+  useEffect(() => {
+    // This will log out the new organizationId after refreshing the session
+    console.log('organizationId', organizationId);
+  }, [organizationId]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  const handleRefreshSession = async () => {
+    const result = await refreshAuth({
+      // Provide the organizationId to switch to
+      organizationId: 'org_123',
+    });
+    if (result?.error) {
+      console.log('Error refreshing session:', result.error);
+    }
+  };
+
+  if (user) {
+    return <button onClick={handleRefreshSession}>Refresh session</button>;
+  } else {
+    return <div>Not signed in</div>;
+  }
+}
+```
 
 ### Middleware auth
 
@@ -276,13 +344,15 @@ Render the `Impersonation` component in your app so that it is clear when someon
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
 ```jsx
-import { Impersonation } from '@workos-inc/authkit-nextjs';
+import { Impersonation, AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
 
 export default function App() {
   return (
     <div>
-      <Impersonation />
-      {/* Your app content */}
+      <AuthKitProvider>
+        <Impersonation />
+        {/* Your app content */}
+      </AuthKitProvider>
     </div>
   );
 }
@@ -312,12 +382,6 @@ export default async function HomePage() {
 }
 ```
 
-### Refreshing the session
-
-Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
-
-The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
-
 ### Sign up paths
 
 The `signUpPaths` option can be passed to `authkitMiddleware` to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit. This is useful for cases where you want a path that mandates authentication to be treated as a sign up page.
@@ -345,3 +409,7 @@ export default authkitMiddleware({ debug: true });
 #### NEXT_REDIRECT error when using try/catch blocks
 
 Wrapping a `withAuth({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `withAuth` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
+
+#### Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins (Unhandled scheme).
+
+You may encounter this error if you attempt to import server side code from authkit-nextjs into a client component. Likely you are using `withAuth` in a client component instead of the `useAuth` hook. Either move the code to a server component or use the `useAuth` hook.
