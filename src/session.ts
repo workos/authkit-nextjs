@@ -202,12 +202,21 @@ async function refreshSession({
 
   const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-  const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
-    clientId: WORKOS_CLIENT_ID,
-    refreshToken: session.refreshToken,
-    organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
-  });
+  let refreshResult;
 
+  try {
+    refreshResult = await workos.userManagement.authenticateWithRefreshToken({
+      clientId: WORKOS_CLIENT_ID,
+      refreshToken: session.refreshToken,
+      organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
+    });
+  } catch (error) {
+    throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
+  }
+
+  const { accessToken, refreshToken, user, impersonator } = refreshResult;
   // Encrypt session with new access and refresh tokens
   const encryptedSession = await encryptSession({
     accessToken,
@@ -281,9 +290,8 @@ async function redirectToSignIn() {
 }
 
 async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-// @ts-expect-error - TS complains about the overload signature when we have more than 2 optional properties
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
-async function withAuth({ ensureSignedIn = false } = {}) {
+async function withAuth({ ensureSignedIn = false } = {}): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromHeader();
 
   if (!session) {
@@ -382,7 +390,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   if (!hasMiddleware) {
     const url = headersList.get('x-url');
     throw new Error(
-      `You are calling 'withAuth' on ${url} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
+      `You are calling 'withAuth' on ${url ?? 'a route'} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
   }
 

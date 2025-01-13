@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { generateTestToken } from './test-helpers.js';
 import { withAuth, updateSession, refreshSession, getSession, terminateSession } from '../src/session.js';
 import { workos } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
-import { jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 
@@ -113,6 +112,17 @@ describe('session.ts', () => {
         await withAuth();
       }).rejects.toThrow(
         "You are calling 'withAuth' on https://example.com/ that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.",
+      );
+    });
+
+    it('should throw an error if the route is not covered by the middleware and there is no URL in the headers', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.delete('x-workos-middleware');
+
+      await expect(async () => {
+        await withAuth({ ensureSignedIn: true });
+      }).rejects.toThrow(
+        "You are calling 'withAuth' on a route that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.",
       );
     });
 
@@ -716,3 +726,26 @@ describe('session.ts', () => {
     });
   });
 });
+
+async function generateTestToken(payload = {}, expired = false) {
+  const defaultPayload = {
+    sid: 'session_123',
+    org_id: 'org_123',
+    role: 'member',
+    permissions: ['posts:create', 'posts:delete'],
+    entitlements: ['audit-logs'],
+  };
+
+  const mergedPayload = { ...defaultPayload, ...payload };
+
+  const secret = new TextEncoder().encode(process.env.WORKOS_COOKIE_PASSWORD as string);
+
+  const token = await new SignJWT(mergedPayload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setIssuer('urn:example:issuer')
+    .setExpirationTime(expired ? '0s' : '2h')
+    .sign(secret);
+
+  return token;
+}
