@@ -343,7 +343,7 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenNthCalledWith(
         2,
         'Failed to refresh. Deleting cookie.',
-        new Error('Failed to refresh'),
+        new Error('Failed to refresh session: Failed to refresh'),
       );
     });
 
@@ -564,7 +564,7 @@ describe('session.ts', () => {
         expect(console.log).toHaveBeenNthCalledWith(
           2,
           'Failed to refresh. Deleting cookie.',
-          new Error('Failed to refresh'),
+          new Error('Failed to refresh session: Failed to refresh'),
         );
 
         expect(console.log).toHaveBeenNthCalledWith(
