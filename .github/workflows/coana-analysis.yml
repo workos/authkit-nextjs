@@ -15,8 +15,11 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout code
+      - name: Checkout the ${{github.base_ref}} branch
         uses: actions/checkout@v4
+        with:
+          ## checkout the base branch (usually master/main).
+          ref: ${{github.base_ref}}
       - name: Run Coana CLI
         id: coana-cli
         run: |
