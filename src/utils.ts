@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 
-export function redirectWithFallback(redirectUri: string) {
+export function redirectWithFallback(redirectUri: string, headers?: Headers) {
+  const newHeaders = headers ? new Headers(headers) : new Headers();
+  newHeaders.set('Location', redirectUri);
+
   // Fall back to standard Response if NextResponse is not available.
   // This is to support Next.js 13.
   return NextResponse?.redirect
-    ? NextResponse.redirect(redirectUri)
-    : new Response(null, { status: 307, headers: { Location: redirectUri } });
+    ? NextResponse.redirect(redirectUri, { headers })
+    : new Response(null, { status: 307, headers: newHeaders });
 }
 
 export function errorResponseWithFallback(errorBody: { error: { message: string; description: string } }) {

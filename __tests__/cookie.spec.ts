@@ -46,6 +46,40 @@ describe('cookie.ts', () => {
           domain: 'foobar.com',
         }),
       );
+
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+
+      const options2 = getCookieOptions('http://example.com');
+      expect(options2).toEqual(
+        expect.objectContaining({
+          secure: false,
+          maxAge: 1000,
+          domain: '',
+        }),
+      );
+
+      const options3 = getCookieOptions('https://example.com', true);
+
+      expect(options3).toEqual(expect.stringContaining('Domain='));
+    });
+
+    it('should return the cookie options with expired set to true', async () => {
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions('http://example.com', false, true);
+      expect(options).toEqual(expect.objectContaining({ maxAge: 0 }));
+    });
+
+    it('should return the cookie options as a string', async () => {
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions('http://example.com', true, false);
+      expect(options).toEqual(
+        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite="Lax"; Max-Age=34560000; Domain=example.com'),
+      );
+
+      const options2 = getCookieOptions('https://example.com', true, true);
+      expect(options2).toEqual(
+        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite="Lax"; Max-Age=0; Domain=example.com'),
+      );
     });
   });
 });

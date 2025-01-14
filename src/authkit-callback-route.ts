@@ -5,7 +5,7 @@ import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { encryptSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { getCookieOptions } from './cookie.js';
-import { HandleAuthOptions } from './interfaces.js';
+import { CookieOptions, HandleAuthOptions } from './interfaces.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
   const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess } = options;
@@ -73,7 +73,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
         const nextCookies = await cookies();
 
-        nextCookies.set(cookieName, session, getCookieOptions(request.url));
+        nextCookies.set(cookieName, session, getCookieOptions(request.url) as CookieOptions);
 
         return response;
       } catch (error) {

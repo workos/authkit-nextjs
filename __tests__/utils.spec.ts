@@ -16,10 +16,20 @@ describe('utils', () => {
 
       const result = redirectWithFallback(redirectUrl);
 
-      expect(mockRedirect).toHaveBeenCalledWith(redirectUrl);
+      expect(mockRedirect).toHaveBeenCalledWith(redirectUrl, { headers: undefined });
       expect(result).toBe('redirected');
 
       NextResponse.redirect = originalRedirect;
+    });
+
+    it('uses headers when provided', () => {
+      const redirectUrl = 'https://example.com';
+      const headers = new Headers();
+      headers.set('Set-Cookie', 'test=1');
+
+      const result = redirectWithFallback(redirectUrl, headers);
+
+      expect(result.headers.get('Set-Cookie')).toBe('test=1');
     });
 
     it('falls back to standard Response when NextResponse exists but redirect is undefined', async () => {
