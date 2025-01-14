@@ -1,6 +1,19 @@
 import { WORKOS_REDIRECT_URI, WORKOS_COOKIE_MAX_AGE, WORKOS_COOKIE_DOMAIN } from './env-variables.js';
 import { CookieOptions } from './interfaces.js';
 
+export function getCookieOptions(): CookieOptions;
+export function getCookieOptions(redirectUri?: string | null): CookieOptions;
+export function getCookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
+export function getCookieOptions(
+  redirectUri: string | null | undefined,
+  asString: false,
+  expired?: boolean,
+): CookieOptions;
+export function getCookieOptions(
+  redirectUri?: string | null,
+  asString?: boolean,
+  expired?: boolean,
+): CookieOptions | string;
 export function getCookieOptions(
   redirectUri?: string | null,
   asString: boolean = false,
