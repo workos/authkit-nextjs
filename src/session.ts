@@ -14,6 +14,7 @@ import {
   AuthkitMiddlewareAuth,
   AuthkitOptions,
   AuthkitResponse,
+  CookieOptions,
   NoUserInfo,
   Session,
   UserInfo,
@@ -93,7 +94,7 @@ async function updateSessionMiddleware(
       console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
     }
 
-    return redirectWithFallback(authorizationUrl as string);
+    return redirectWithFallback(authorizationUrl as string, headers);
   }
 
   // Record the sign up paths so we can use them later
@@ -102,7 +103,7 @@ async function updateSessionMiddleware(
   }
 
   return NextResponse.next({
-    request: { headers },
+    headers,
   });
 }
 
@@ -110,7 +111,7 @@ async function updateSession(
   request: NextRequest,
   options: AuthkitOptions = { debug: false },
 ): Promise<AuthkitResponse> {
-  const session = await getSessionFromCookie();
+  const session = await getSessionFromCookie(request);
 
   const newRequestHeaders = new Headers(request.headers);
 
@@ -143,69 +144,98 @@ async function updateSession(
   const hasValidSession = await verifyAccessToken(session.accessToken);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const nextCookies = await cookies();
 
-  if (!hasValidSession) {
-    if (options.debug) {
-      console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
-    }
+  if (hasValidSession) {
+    newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
 
-    try {
-      const newSession = await refreshSession({
-        ensureSignedIn: false,
-      });
-
-      if (options.debug) {
-        console.log('Session successfully refreshed');
-      }
-
-      newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
-
-      return {
-        session: newSession,
-        headers: newRequestHeaders,
-      };
-    } catch (e) {
-      if (options.debug) {
-        console.log('Failed to refresh. Deleting cookie.', e);
-      }
-
-      const nextCookies = await cookies();
-      nextCookies.delete(cookieName);
-
-      return {
-        session: { user: null },
-        headers: newRequestHeaders,
-        authorizationUrl: await getAuthorizationUrl({
-          returnPathname: getReturnPathname(request.url),
-        }),
-      };
-    }
-  }
-
-  newRequestHeaders.set(sessionHeaderName, nextCookies.get(cookieName)!.value);
-
-  const {
-    sid: sessionId,
-    org_id: organizationId,
-    role,
-    permissions,
-    entitlements,
-  } = decodeJwt<AccessToken>(session.accessToken);
-
-  return {
-    session: {
-      sessionId,
-      user: session.user,
-      organizationId,
+    const {
+      sid: sessionId,
+      org_id: organizationId,
       role,
       permissions,
       entitlements,
-      impersonator: session.impersonator,
-      accessToken: session.accessToken,
-    },
-    headers: newRequestHeaders,
-  };
+    } = decodeJwt<AccessToken>(session.accessToken);
+
+    return {
+      session: {
+        sessionId,
+        user: session.user,
+        organizationId,
+        role,
+        permissions,
+        entitlements,
+        impersonator: session.impersonator,
+        accessToken: session.accessToken,
+      },
+      headers: newRequestHeaders,
+    };
+  }
+
+  if (options.debug) {
+    console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
+  }
+
+  try {
+    const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
+
+    const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
+      clientId: WORKOS_CLIENT_ID,
+      refreshToken: session.refreshToken,
+      organizationId: organizationIdFromAccessToken,
+    });
+
+    if (options.debug) {
+      console.log('Session successfully refreshed');
+    }
+    // Encrypt session with new access and refresh tokens
+    const encryptedSession = await encryptSession({
+      accessToken,
+      refreshToken,
+      user,
+      impersonator,
+    });
+
+    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
+    newRequestHeaders.set(sessionHeaderName, encryptedSession);
+
+    const {
+      sid: sessionId,
+      org_id: organizationId,
+      role,
+      permissions,
+      entitlements,
+    } = decodeJwt<AccessToken>(accessToken);
+
+    return {
+      session: {
+        sessionId,
+        user,
+        organizationId,
+        role,
+        permissions,
+        entitlements,
+        impersonator,
+        accessToken,
+      },
+      headers: newRequestHeaders,
+    };
+  } catch (e) {
+    if (options.debug) {
+      console.log('Failed to refresh. Deleting cookie.', e);
+    }
+
+    // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
+    const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+    newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    return {
+      session: { user: null },
+      headers: newRequestHeaders,
+      authorizationUrl: await getAuthorizationUrl({
+        returnPathname: getReturnPathname(request.url),
+      }),
+    };
+  }
 }
 
 async function refreshSession(options: {
@@ -260,7 +290,7 @@ async function refreshSession({
   const url = headersList.get('x-url');
 
   const nextCookies = await cookies();
-  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
+  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url) as CookieOptions);
 
   const {
     sid: sessionId,
@@ -368,10 +398,16 @@ async function verifyAccessToken(accessToken: string) {
   }
 }
 
-async function getSessionFromCookie() {
+async function getSessionFromCookie(request?: NextRequest) {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const nextCookies = await cookies();
-  const cookie = nextCookies.get(cookieName);
+  let cookie;
+
+  if (request) {
+    cookie = request.cookies.get(cookieName);
+  } else {
+    const nextCookies = await cookies();
+    cookie = nextCookies.get(cookieName);
+  }
 
   if (cookie) {
     return unsealData<Session>(cookie.value, {

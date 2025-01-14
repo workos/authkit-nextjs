@@ -265,12 +265,6 @@ describe('session.ts', () => {
     it('should attempt to refresh the session when the access token is invalid', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
       (jwtVerify as jest.Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -282,6 +276,11 @@ describe('session.ts', () => {
       });
 
       const request = new NextRequest(new URL('http://example.com'));
+
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
 
       const result = await updateSessionMiddleware(
         request,
@@ -306,12 +305,6 @@ describe('session.ts', () => {
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
       (jwtVerify as jest.Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -322,7 +315,12 @@ describe('session.ts', () => {
 
       const request = new NextRequest(new URL('http://example.com'));
 
-      const result = await updateSessionMiddleware(
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSessionMiddleware(
         request,
         true,
         {
@@ -333,8 +331,8 @@ describe('session.ts', () => {
         [],
       );
 
-      expect(result.status).toBe(200);
-      expect(nextCookies.get('wos-session')).toBeUndefined();
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Set-Cookie')).toContain('wos-session=;');
       expect(console.log).toHaveBeenCalledTimes(2);
       expect(console.log).toHaveBeenNthCalledWith(
         1,
@@ -343,7 +341,7 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenNthCalledWith(
         2,
         'Failed to refresh. Deleting cookie.',
-        new Error('Failed to refresh session: Failed to refresh'),
+        new Error('Failed to refresh'),
       );
     });
 
@@ -437,9 +435,7 @@ describe('session.ts', () => {
           ['/protected-signup'],
         );
 
-        console.log('result headers:', result.headers);
-
-        expect(result.headers.get('x-middleware-request-x-sign-up-paths')).toBe('/protected-signup');
+        expect(result.headers.get('x-sign-up-paths')).toBe('/protected-signup');
       });
 
       it('should allow logged out users on unauthenticated paths', async () => {
@@ -527,12 +523,6 @@ describe('session.ts', () => {
 
         mockSession.accessToken = await generateTestToken({}, true);
 
-        const nextCookies = await cookies();
-        nextCookies.set(
-          'wos-session',
-          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-        );
-
         (jwtVerify as jest.Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
@@ -543,7 +533,12 @@ describe('session.ts', () => {
 
         const request = new NextRequest(new URL('http://example.com'));
 
-        const result = await updateSessionMiddleware(
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const response = await updateSessionMiddleware(
           request,
           true,
           {
@@ -554,8 +549,8 @@ describe('session.ts', () => {
           [],
         );
 
-        expect(result.status).toBe(307);
-        expect(nextCookies.get('wos-session')).toBeUndefined();
+        expect(response.status).toBe(307);
+        expect(response.headers.get('Set-Cookie')).toContain('wos-session=;');
         expect(console.log).toHaveBeenCalledTimes(3);
         expect(console.log).toHaveBeenNthCalledWith(
           1,
@@ -564,7 +559,7 @@ describe('session.ts', () => {
         expect(console.log).toHaveBeenNthCalledWith(
           2,
           'Failed to refresh. Deleting cookie.',
-          new Error('Failed to refresh session: Failed to refresh'),
+          new Error('Failed to refresh'),
         );
 
         expect(console.log).toHaveBeenNthCalledWith(
@@ -619,13 +614,13 @@ describe('session.ts', () => {
     });
 
     it('should return a session if the session is valid', async () => {
-      const nextCookies = await cookies();
-      nextCookies.set(
+      const request = new NextRequest(new URL('http://example.com/protected'));
+      request.cookies.set(
         'wos-session',
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')));
+      const result = await updateSession(request);
 
       expect(result.session).toBeDefined();
     });
@@ -633,12 +628,6 @@ describe('session.ts', () => {
     it('should attempt to refresh an invalid session', async () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
-
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
 
       // Mock token verification to fail
       (jwtVerify as jest.Mock).mockImplementation(() => {
@@ -652,12 +641,18 @@ describe('session.ts', () => {
         user: mockSession.user,
       });
 
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+      const request = new NextRequest(new URL('http://example.com/protected'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSession(request, {
         debug: true,
       });
 
-      expect(result.session).toBeDefined();
-      expect(result.session.user).toBeDefined();
+      expect(response.session).toBeDefined();
+      expect(response.session.user).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('Session invalid. Refreshing access token that ends in'),
       );
@@ -667,12 +662,6 @@ describe('session.ts', () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      const nextCookies = await cookies();
-      nextCookies.set(
-        'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
-      );
-
       // Mock token verification to fail
       (jwtVerify as jest.Mock).mockImplementation(() => {
         throw new Error('Invalid token');
@@ -681,12 +670,18 @@ describe('session.ts', () => {
       // Mock refresh failure
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+      const request = new NextRequest(new URL('http://example.com/protected'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSession(request, {
         debug: true,
       });
 
-      expect(result.session.user).toBeNull();
-      expect(result.authorizationUrl).toBeDefined();
+      expect(response.session.user).toBeNull();
+      expect(response.authorizationUrl).toBeDefined();
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
   });
