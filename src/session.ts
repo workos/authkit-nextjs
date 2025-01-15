@@ -382,12 +382,12 @@ async function withAuth({ ensureSignedIn = false }: { ensureSignedIn?: boolean }
   };
 }
 
-async function terminateSession() {
+async function terminateSession({ returnTo }: { returnTo?: string } = {}) {
   const { sessionId } = await withAuth();
   if (sessionId) {
-    redirect(workos.userManagement.getLogoutUrl({ sessionId }));
+    redirect(workos.userManagement.getLogoutUrl({ sessionId, returnTo }));
   } else {
-    redirect('/');
+    redirect(returnTo ?? '/');
   }
 }
 
