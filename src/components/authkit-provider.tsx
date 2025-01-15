@@ -42,7 +42,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
 
   const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
     try {
-      const auth = await getAuthAction(ensureSignedIn);
+      const auth = await getAuthAction({ ensureSignedIn });
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -160,10 +160,18 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   );
 };
 
-export function useAuth() {
+export function useAuth({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) {
   const context = useContext(AuthContext);
+
+  useEffect(() => {
+    if (context && ensureSignedIn && !context.user && !context.loading) {
+      context.getAuth({ ensureSignedIn });
+    }
+  }, [ensureSignedIn, context?.user, context?.loading, context?.getAuth]);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthKitProvider');
   }
+
   return context;
 }

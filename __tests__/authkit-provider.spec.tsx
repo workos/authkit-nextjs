@@ -165,6 +165,34 @@ describe('AuthKitProvider', () => {
 });
 
 describe('useAuth', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should call getAuth when a user is not returned when ensureSignedIn is true', async () => {
+    // First and second calls return no user, second call returns a user
+    (getAuthAction as jest.Mock)
+      .mockResolvedValueOnce({ user: null, loading: true })
+      .mockResolvedValueOnce({ user: { email: 'test@example.com' }, loading: false });
+
+    const TestComponent = () => {
+      const auth = useAuth({ ensureSignedIn: true });
+      return <div data-testid="email">{auth.user?.email}</div>;
+    };
+
+    const { getByTestId } = render(
+      <AuthKitProvider>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getAuthAction).toHaveBeenCalledTimes(2);
+      expect(getAuthAction).toHaveBeenLastCalledWith({ ensureSignedIn: true });
+      expect(getByTestId('email')).toHaveTextContent('test@example.com');
+    });
+  });
+
   it('should throw error when used outside of AuthKitProvider', () => {
     const TestComponent = () => {
       const auth = useAuth();
