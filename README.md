@@ -41,7 +41,7 @@ NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in
 openssl rand -base64 24
 ```
 
-To use the `signOut` method, you'll need to set your app's homepage in your WorkOS dashboard settings under "Redirects".
+To use the `signOut` method, you'll need to set a default Logout URI in your WorkOS dashboard settings under "Redirects".
 
 ### Optional configuration
 
@@ -336,7 +336,13 @@ export const config = { matcher: ['/', '/account/:path*'] };
 
 ### Signing out
 
-Use the `signOut` method to sign out the current logged in user and redirect to your app's homepage. The homepage redirect is set in your WorkOS dashboard settings under "Redirect".
+Use the `signOut` method to sign out the current logged in user and redirect to your app's default Logout URI. The Logout URI is set in your WorkOS dashboard settings under "Redirect".
+
+To use a non-default Logout URI, you can use the `returnTo` parameter.
+
+```tsx
+await signOut({ returnTo: 'https://your-app.com/signed-out' });
+```
 
 ### Visualizing an impersonation
 
