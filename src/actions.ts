@@ -21,8 +21,8 @@ export const getOrganizationAction = async (organizationId: string) => {
   return await workos.organizations.getOrganization(organizationId);
 };
 
-export const getAuthAction = async (ensureSignedIn?: boolean) => {
-  return await withAuth({ ensureSignedIn: ensureSignedIn as false });
+export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
+  return await withAuth(options);
 };
 
 export const refreshAuthAction = async ({
