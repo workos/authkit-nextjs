@@ -188,7 +188,7 @@ describe('useAuth', () => {
 
     await waitFor(() => {
       expect(getAuthAction).toHaveBeenCalledTimes(2);
-      expect(getAuthAction).toHaveBeenLastCalledWith(true);
+      expect(getAuthAction).toHaveBeenLastCalledWith({ ensureSignedIn: true });
       expect(getByTestId('email')).toHaveTextContent('test@example.com');
     });
   });
