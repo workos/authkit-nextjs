@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 import { getSignInUrl, getSignUpUrl, signOut } from '../src/auth.js';
+import * as session from '../src/session';
 
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { UserInfo } from '../src/interfaces';
+
+jest.mock('../src/session', () => {
+  const actual = jest.requireActual<typeof session>('../src/session');
+
+  return { ...actual, terminateSession: jest.fn(actual.terminateSession) };
+});
 
 describe('auth.ts', () => {
   beforeEach(async () => {
@@ -72,6 +80,33 @@ describe('auth.ts', () => {
 
       const sessionCookie = nextCookies.get('wos-session');
       expect(sessionCookie).toBeUndefined();
+    });
+
+    describe('when given a `returnTo` parameter', () => {
+      it('passes the `returnTo` through to `terminateSession`', async () => {
+        const nextHeaders = await headers();
+
+        nextHeaders.set('x-workos-middleware', 'true');
+
+        await signOut({ returnTo: 'https://example.com/signed-out' });
+
+        expect(redirect).toHaveBeenCalledTimes(1);
+        expect(redirect).toHaveBeenCalledWith('https://example.com/signed-out');
+        expect(session.terminateSession).toHaveBeenCalledWith({ returnTo: 'https://example.com/signed-out' });
+      });
+
+      describe('when there is no session', () => {
+        it('returns to the `returnTo`', async () => {
+          const nextHeaders = await headers();
+
+          nextHeaders.set('x-workos-middleware', 'true');
+
+          await signOut({ returnTo: 'https://example.com/signed-out' });
+
+          expect(redirect).toHaveBeenCalledTimes(1);
+          expect(redirect).toHaveBeenCalledWith('https://example.com/signed-out');
+        });
+      });
     });
   });
 });

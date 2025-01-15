@@ -13,7 +13,7 @@ async function getSignUpUrl() {
   return getAuthorizationUrl({ screenHint: 'sign-up' });
 }
 
-async function signOut() {
+async function signOut({ returnTo }: { returnTo?: string } = {}) {
   const cookie: { name: string; domain?: string } = {
     name: WORKOS_COOKIE_NAME || 'wos-session',
   };
@@ -22,7 +22,7 @@ async function signOut() {
   const nextCookies = await cookies();
 
   nextCookies.delete(cookie);
-  await terminateSession();
+  await terminateSession({ returnTo });
 }
 
 export { getSignInUrl, getSignUpUrl, signOut };

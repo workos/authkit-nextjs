@@ -778,5 +778,26 @@ describe('session.ts', () => {
       expect(redirect).toHaveBeenCalledTimes(1);
       expect(redirect).toHaveBeenCalledWith('/');
     });
+
+    describe('when given a `returnTo` URL', () => {
+      it('includes a `return_to` query parameter in the logout URL', async () => {
+        const nextHeaders = await headers();
+        nextHeaders.set('x-url', 'http://example.com/protected');
+
+        mockSession.accessToken = await generateTestToken();
+
+        nextHeaders.set(
+          'x-workos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        await terminateSession({ returnTo: 'http://example.com/signed-out' });
+
+        expect(redirect).toHaveBeenCalledTimes(1);
+        expect(redirect).toHaveBeenCalledWith(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123&return_to=http%3A%2F%2Fexample.com%2Fsigned-out',
+        );
+      });
+    });
   });
 });
