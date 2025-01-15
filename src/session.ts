@@ -113,7 +113,10 @@ async function updateSession(
 ): Promise<AuthkitResponse> {
   const session = await getSessionFromCookie(request);
 
-  const newRequestHeaders = new Headers(request.headers);
+  // Since we're setting the headers in the response, we need to create a new Headers object without copying
+  // the request headers.
+  // See https://github.com/vercel/next.js/issues/50659#issuecomment-2333990159
+  const newRequestHeaders = new Headers();
 
   // Record that the request was routed through the middleware so we can check later for DX purposes
   newRequestHeaders.set(middlewareHeaderName, 'true');
@@ -348,9 +351,8 @@ async function redirectToSignIn() {
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
-async function withAuth(options?: { ensureSignedIn: false }): Promise<UserInfo | NoUserInfo>;
-async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
-async function withAuth({ ensureSignedIn = false } = {}): Promise<UserInfo | NoUserInfo> {
+async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInfo | NoUserInfo>;
+async function withAuth({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromHeader();
 
   if (!session) {

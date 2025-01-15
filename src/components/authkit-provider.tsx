@@ -42,7 +42,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
 
   const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
     try {
-      const auth = await getAuthAction(ensureSignedIn);
+      const auth = await getAuthAction({ ensureSignedIn });
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
