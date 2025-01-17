@@ -2,12 +2,13 @@ import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AuthKitProvider, useAuth } from '../src/components/authkit-provider.js';
-import { checkSessionAction, getAuthAction, refreshAuthAction } from '../src/actions.js';
+import { checkSessionAction, getAuthAction, refreshAuthAction, handleSignOutAction } from '../src/actions.js';
 
 jest.mock('../src/actions', () => ({
   checkSessionAction: jest.fn(),
   getAuthAction: jest.fn(),
   refreshAuthAction: jest.fn(),
+  handleSignOutAction: jest.fn(),
 }));
 
 describe('AuthKitProvider', () => {
@@ -331,7 +332,7 @@ describe('useAuth', () => {
     });
   });
 
-  it('should receive an error when refreshAuth fails with an errstringor', async () => {
+  it('should receive an error when refreshAuth fails with a string error', async () => {
     (refreshAuthAction as jest.Mock).mockRejectedValueOnce('Refresh failed');
 
     let error: string | undefined;
@@ -366,5 +367,57 @@ describe('useAuth', () => {
     await waitFor(() => {
       expect(error).toBe('Refresh failed');
     });
+  });
+
+  it('should call handleSignOutAction when signOut is called', async () => {
+    (handleSignOutAction as jest.Mock).mockResolvedValueOnce({});
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="session">{auth.sessionId}</div>
+          <button onClick={() => auth.signOut()}>Sign out</button>
+        </div>
+      );
+    };
+
+    const { getByRole } = render(
+      <AuthKitProvider>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    act(() => {
+      getByRole('button').click();
+    });
+
+    expect(handleSignOutAction).toHaveBeenCalled();
+  });
+
+  it('should pass returnTo parameter to handleSignOutAction', async () => {
+    (handleSignOutAction as jest.Mock).mockResolvedValueOnce({});
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="session">{auth.sessionId}</div>
+          <button onClick={() => auth.signOut({ returnTo: '/home' })}>Sign out</button>
+        </div>
+      );
+    };
+
+    const { getByRole } = render(
+      <AuthKitProvider>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    act(() => {
+      getByRole('button').click();
+    });
+
+    expect(handleSignOutAction).toHaveBeenCalledWith({ returnTo: '/home' });
   });
 });

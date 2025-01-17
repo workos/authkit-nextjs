@@ -76,7 +76,10 @@ export function Impersonation({ side = 'bottom', ...props }: ImpersonationProps)
         }}
       >
         <form
-          onSubmit={handleSignOutAction}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            await handleSignOutAction();
+          }}
           style={{
             display: 'flex',
             alignItems: 'baseline',
