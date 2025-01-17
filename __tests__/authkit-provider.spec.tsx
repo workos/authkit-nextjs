@@ -388,7 +388,7 @@ describe('useAuth', () => {
       </AuthKitProvider>,
     );
 
-    act(() => {
+    await act(async () => {
       getByRole('button').click();
     });
 
@@ -414,7 +414,7 @@ describe('useAuth', () => {
       </AuthKitProvider>,
     );
 
-    act(() => {
+    await act(async () => {
       getByRole('button').click();
     });
 
