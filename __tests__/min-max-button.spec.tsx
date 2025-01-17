@@ -1,4 +1,4 @@
-import { render, fireEvent } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { MinMaxButton } from '../src/components/min-max-button.js';
 import * as React from 'react';
 import '@testing-library/jest-dom';
@@ -19,8 +19,9 @@ describe('MinMaxButton', () => {
   it('sets minimized value when clicked', () => {
     const { getByRole } = render(<MinMaxButton minimizedValue="1">Minimize</MinMaxButton>);
 
-    const button = getByRole('button');
-    fireEvent.click(button);
+    act(() => {
+      getByRole('button').click();
+    });
 
     const root = document.querySelector('[data-workos-impersonation-root]');
     expect(root).toHaveStyle({ '--wi-minimized': '1' });
@@ -34,8 +35,10 @@ describe('MinMaxButton', () => {
     // Mock querySelector to return null for this test
     jest.spyOn(document, 'querySelector').mockReturnValue(null);
 
-    const button = getByRole('button');
-    fireEvent.click(button);
+    act(() => {
+      getByRole('button').click();
+    });
+
     expect(root).not.toHaveStyle({ '--wi-minimized': '1' });
   });
 

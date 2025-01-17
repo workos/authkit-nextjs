@@ -13,8 +13,8 @@ export const checkSessionAction = async () => {
   return true;
 };
 
-export const handleSignOutAction = async () => {
-  await signOut();
+export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = {}) => {
+  await signOut({ returnTo });
 };
 
 export const getOrganizationAction = async (organizationId: string) => {

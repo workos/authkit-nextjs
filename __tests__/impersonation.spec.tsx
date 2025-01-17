@@ -1,9 +1,10 @@
-import { render, act } from '@testing-library/react';
+import { render, act, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Impersonation } from '../src/components/impersonation.js';
 import { useAuth } from '../src/components/authkit-provider.js';
 import { getOrganizationAction } from '../src/actions.js';
 import * as React from 'react';
+import { handleSignOutAction } from '../src/actions.js';
 
 // Mock the useAuth hook
 jest.mock('../src/components/authkit-provider', () => ({
@@ -115,5 +116,19 @@ describe('Impersonation', () => {
     const { container } = render(<Impersonation style={customStyle} />);
     const root = container.querySelector('[data-workos-impersonation-root]');
     expect(root).toHaveStyle({ backgroundColor: 'red' });
+  });
+
+  it('should should sign out when the Stop button is called', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: null,
+      loading: false,
+    });
+
+    render(<Impersonation />);
+    const stopButton = await screen.findByText('Stop');
+    stopButton.click();
+    expect(handleSignOutAction).toHaveBeenCalled();
   });
 });

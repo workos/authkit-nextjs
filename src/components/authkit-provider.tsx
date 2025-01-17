@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { checkSessionAction, getAuthAction, refreshAuthAction } from '../actions.js';
+import { checkSessionAction, getAuthAction, handleSignOutAction, refreshAuthAction } from '../actions.js';
 import type { Impersonator, User } from '@workos-inc/node';
 
 type AuthContextType = {
@@ -16,6 +16,7 @@ type AuthContextType = {
   loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
   refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void | { error: string }>;
+  signOut: (options?: { returnTo?: string }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,6 +89,10 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
     }
   };
 
+  const signOut = async ({ returnTo }: { returnTo?: string } = {}) => {
+    await handleSignOutAction({ returnTo });
+  };
+
   useEffect(() => {
     getAuth();
 
@@ -153,6 +158,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         loading,
         getAuth,
         refreshAuth,
+        signOut,
       }}
     >
       {children}
