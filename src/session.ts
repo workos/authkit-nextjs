@@ -351,12 +351,13 @@ async function redirectToSignIn() {
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
-async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInfo | NoUserInfo>;
-async function withAuth({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}): Promise<UserInfo | NoUserInfo> {
+async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
+async function withAuth(options?: { ensureSignedIn?: true | false }): Promise<UserInfo | NoUserInfo>;
+async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromHeader();
 
   if (!session) {
-    if (ensureSignedIn) {
+    if (options?.ensureSignedIn) {
       await redirectToSignIn();
     }
     return { user: null };
