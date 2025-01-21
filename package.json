@@ -34,7 +34,7 @@
     "format": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --write"
   },
   "dependencies": {
-    "@workos-inc/node": "^7.37.0",
+    "@workos-inc/node": "^7.37.1",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3",
     "path-to-regexp": "^6.2.2"
