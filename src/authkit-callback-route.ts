@@ -1,14 +1,14 @@
-import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { workos } from './workos.js';
+import { NextRequest } from 'next/server';
+import { getCookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { HandleAuthOptions } from './interfaces.js';
 import { encryptSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
-import { getCookieOptions } from './cookie.js';
-import { HandleAuthOptions } from './interfaces.js';
+import { workos } from './workos.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
-  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess } = options;
+  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, resolveErrorResponse } = options;
 
   // Throw early if baseURL is provided but invalid
   if (baseURL) {
@@ -83,19 +83,21 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         console.error(errorRes);
 
-        return errorResponse();
+        return errorResponse(error);
       }
     }
 
     return errorResponse();
   };
 
-  function errorResponse() {
+  function errorResponse(error?: unknown) {
+    const errorResponse = resolveErrorResponse?.(error) ?? {
+      message: 'Something went wrong',
+      description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
+    };
+
     return errorResponseWithFallback({
-      error: {
-        message: 'Something went wrong',
-        description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
-      },
+      error: errorResponse,
     });
   }
 }

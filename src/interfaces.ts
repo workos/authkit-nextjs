@@ -1,9 +1,15 @@
 import { OauthTokens, User } from '@workos-inc/node';
 
+export interface ErrorResponse {
+  message: string;
+  description: string;
+}
+
 export interface HandleAuthOptions {
   returnPathname?: string;
   baseURL?: string;
   onSuccess?: (data: HandleAuthSuccessData) => void | Promise<void>;
+  resolveErrorResponse?: (error?: unknown) => ErrorResponse;
 }
 
 export interface HandleAuthSuccessData extends Session {
