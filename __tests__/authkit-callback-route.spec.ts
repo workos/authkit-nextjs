@@ -107,16 +107,18 @@ describe('authkit-callback-route', () => {
       expect(data.error.message).toBe('Something went wrong');
     });
 
-    it('should handle authentication failure with custom error response', async () => {
+    it('should handle authentication failure with custom onError handler', async () => {
       // Mock authentication failure
       jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
       const handler = handleAuth({
-        resolveErrorResponse: (error) => ({
-          message: 'Custom error',
-          description: error?.toString() ?? 'No description',
-        }),
+        onError: ({ error }) => {
+          return new Response(JSON.stringify({ error: { message: 'Custom error' } }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        },
       });
       const response = await handler(request);
 

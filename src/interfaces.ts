@@ -1,15 +1,11 @@
 import { OauthTokens, User } from '@workos-inc/node';
-
-export interface ErrorResponse {
-  message: string;
-  description: string;
-}
+import { type NextRequest } from 'next/server';
 
 export interface HandleAuthOptions {
   returnPathname?: string;
   baseURL?: string;
   onSuccess?: (data: HandleAuthSuccessData) => void | Promise<void>;
-  resolveErrorResponse?: (error?: unknown) => ErrorResponse;
+  onError?: (params: { error?: unknown; request: NextRequest }) => Response | Promise<Response>;
 }
 
 export interface HandleAuthSuccessData extends Session {

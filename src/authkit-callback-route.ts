@@ -8,7 +8,7 @@ import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { workos } from './workos.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
-  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, resolveErrorResponse } = options;
+  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, onError } = options;
 
   // Throw early if baseURL is provided but invalid
   if (baseURL) {
@@ -83,21 +83,23 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         console.error(errorRes);
 
-        return errorResponse(error);
+        return errorResponse(request, error);
       }
     }
 
-    return errorResponse();
+    return errorResponse(request);
   };
 
-  function errorResponse(error?: unknown) {
-    const errorResponse = resolveErrorResponse?.(error) ?? {
-      message: 'Something went wrong',
-      description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
-    };
+  function errorResponse(request: NextRequest, error?: unknown) {
+    if (onError) {
+      return onError({ error, request });
+    }
 
     return errorResponseWithFallback({
-      error: errorResponse,
+      error: {
+        message: 'Something went wrong',
+        description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
+      },
     });
   }
 }
