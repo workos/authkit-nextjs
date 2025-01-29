@@ -97,7 +97,7 @@ export const GET = handleAUth({
 | `returnPathname` | `/`         | The pathname to redirect the user to after signing in                                                                                                                                                 |
 | `baseURL`        | `undefined` | The base URL to use for the redirect URI instead of the one in the request. Useful if the app is being run in a container like docker where the hostname can be different from the one in the request |
 | `onSuccess`      | `undefined` | A function that receives successful authentication data and can be used for side-effects like persisting tokens                                                                                       |
-| `onError` | `undefined` | A function that can receive the error and the request and handle the error in its own way.| 
+| `onError`        | `undefined` | A function that can receive the error and the request and handle the error in its own way.                                                                                                            |
 
 ### Middleware
 
