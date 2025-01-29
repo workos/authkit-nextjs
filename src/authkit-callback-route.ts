@@ -1,14 +1,14 @@
-import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { workos } from './workos.js';
+import { NextRequest } from 'next/server';
+import { getCookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { HandleAuthOptions } from './interfaces.js';
 import { encryptSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
-import { getCookieOptions } from './cookie.js';
-import { HandleAuthOptions } from './interfaces.js';
+import { workos } from './workos.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
-  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess } = options;
+  const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, onError } = options;
 
   // Throw early if baseURL is provided but invalid
   if (baseURL) {
@@ -83,14 +83,18 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         console.error(errorRes);
 
-        return errorResponse();
+        return errorResponse(request, error);
       }
     }
 
-    return errorResponse();
+    return errorResponse(request);
   };
 
-  function errorResponse() {
+  function errorResponse(request: NextRequest, error?: unknown) {
+    if (onError) {
+      return onError({ error, request });
+    }
+
     return errorResponseWithFallback({
       error: {
         message: 'Something went wrong',
