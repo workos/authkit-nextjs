@@ -166,6 +166,10 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   );
 };
 
+export function useAuth(options: {
+  ensureSignedIn: true;
+}): AuthContextType & ({ loading: true; user: User | null } | { loading: false; user: User });
+export function useAuth(options?: { ensureSignedIn?: false }): AuthContextType;
 export function useAuth({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) {
   const context = useContext(AuthContext);
 
