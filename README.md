@@ -20,8 +20,8 @@ yarn add @workos-inc/authkit-nextjs
 
 ## Video tutorial
 
-<a href="https://youtu.be/gMkHOotg0xc?feature=shared" target="_blank">
-  <img src="https://github.com/user-attachments/assets/ed67129b-3b27-4745-8960-64db4c8ab393" alt="YouTube tutorial: Next.js App Router Authentication with AuthKit" style="display: block; width: 100%; max-width: 720px; height: auto; aspect-ratio: 16/9; object-fit: cover; object-position: center; margin: 1em auto;" onerror="this.onerror=null; this.src='https://img.youtube.com/vi/gMkHOotg0xc/0.jpg'" />
+<a href="https://youtu.be/W8TmptLkEvA?feature=shared" target="_blank">
+  <img src="https://github.com/user-attachments/assets/08c77835-1140-412a-baa9-a587ab27fc5e" alt="YouTube tutorial: Next.js App Router Authentication with AuthKit" style="display: block; width: 100%; max-width: 720px; height: auto; aspect-ratio: 16/9; object-fit: cover; object-position: center; margin: 1em auto;" onerror="this.onerror=null; this.src='https://i3.ytimg.com/vi/W8TmptLkEvA/maxresdefault.jpg'" />
 </a>
 
 ## Pre-flight
