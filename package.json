@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/esm/types/index.d.ts",
       "import": "./dist/esm/index.js"
+    },
+    "./interfaces": {
+     "types": "./dist/esm/types/interfaces.d.ts",
+     "import": "./dist/esm/interfaces.js"
     }
   },
   "scripts": {
