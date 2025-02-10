@@ -3,6 +3,8 @@ import { authkit, authkitMiddleware } from './middleware.js';
 import { withAuth, refreshSession } from './session.js';
 import { getSignInUrl, getSignUpUrl, signOut } from './auth.js';
 
+export * from './interfaces.js';
+
 export {
   handleAuth,
   //
