@@ -1,8 +1,8 @@
 import { WorkOS } from '@workos-inc/node';
-import { createWorkOSInstance, VERSION } from '../src/workos.js';
+import { getWorkOSInstance, VERSION } from '../src/workos.js';
 
 describe('workos', () => {
-  const workos = createWorkOSInstance();
+  const workos = getWorkOSInstance();
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -45,21 +45,21 @@ describe('workos', () => {
 
     it('uses custom API hostname when provided', async () => {
       process.env.WORKOS_API_HOSTNAME = 'custom.workos.com';
-      const { createWorkOSInstance: customWorkos } = await import('../src/workos.js');
+      const { getWorkOSInstance: customWorkos } = await import('../src/workos.js');
 
       expect(customWorkos().options.apiHostname).toEqual('custom.workos.com');
     });
 
     it('uses custom HTTPS setting when provided', async () => {
       process.env.WORKOS_API_HTTPS = 'false';
-      const { createWorkOSInstance: customWorkos } = await import('../src/workos.js');
+      const { getWorkOSInstance: customWorkos } = await import('../src/workos.js');
 
       expect(customWorkos().options.https).toEqual(false);
     });
 
     it('uses custom port when provided', async () => {
       process.env.WORKOS_API_PORT = '8080';
-      const { createWorkOSInstance: customWorkos } = await import('../src/workos.js');
+      const { getWorkOSInstance: customWorkos } = await import('../src/workos.js');
 
       expect(customWorkos().options.port).toEqual(8080);
     });
