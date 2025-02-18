@@ -1,5 +1,6 @@
 import { WorkOS } from '@workos-inc/node';
 import { WORKOS_API_HOSTNAME, WORKOS_API_KEY, WORKOS_API_HTTPS, WORKOS_API_PORT } from './env-variables.js';
+import { lazy } from './utils.js';
 
 export const VERSION = '1.4.0';
 
@@ -13,7 +14,9 @@ const options = {
   },
 };
 
-// Initialize the WorkOS client
-const workos = new WorkOS(WORKOS_API_KEY, options);
-
-export { workos };
+/**
+ * Create a WorkOS instance with the provided API key and options.
+ * If an instance already exists, it returns the existing instance.
+ * @returns The WorkOS instance.
+ */
+export const createWorkOSInstance = lazy(() => new WorkOS(WORKOS_API_KEY, options));

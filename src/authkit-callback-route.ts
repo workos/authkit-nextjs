@@ -5,7 +5,7 @@ import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { encryptSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
-import { workos } from './workos.js';
+import { createWorkOSInstance } from './workos.js';
 
 export function handleAuth(options: HandleAuthOptions = {}) {
   const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, onError } = options;
@@ -28,7 +28,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       try {
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
         const { accessToken, refreshToken, user, impersonator, oauthTokens } =
-          await workos.userManagement.authenticateWithCode({
+          await createWorkOSInstance().userManagement.authenticateWithCode({
             clientId: WORKOS_CLIENT_ID,
             code,
           });

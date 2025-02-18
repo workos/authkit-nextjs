@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
 import { getCookieOptions } from './cookie.js';
-import { workos } from './workos.js';
+import { createWorkOSInstance } from './workos.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
@@ -21,13 +21,15 @@ import {
 } from './interfaces.js';
 
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { redirectWithFallback } from './utils.js';
+import { lazy, redirectWithFallback } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
 
-const JWKS = createRemoteJWKSet(new URL(workos.userManagement.getJwksUrl(WORKOS_CLIENT_ID)));
+const JWKS = lazy(() =>
+  createRemoteJWKSet(new URL(createWorkOSInstance().userManagement.getJwksUrl(WORKOS_CLIENT_ID))),
+);
 
 async function encryptSession(session: Session) {
   return sealData(session, {
@@ -184,11 +186,12 @@ async function updateSession(
 
     const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-    const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
-      clientId: WORKOS_CLIENT_ID,
-      refreshToken: session.refreshToken,
-      organizationId: organizationIdFromAccessToken,
-    });
+    const { accessToken, refreshToken, user, impersonator } =
+      await createWorkOSInstance().userManagement.authenticateWithRefreshToken({
+        clientId: WORKOS_CLIENT_ID,
+        refreshToken: session.refreshToken,
+        organizationId: organizationIdFromAccessToken,
+      });
 
     if (options.debug) {
       console.log('Session successfully refreshed');
@@ -270,7 +273,7 @@ async function refreshSession({
   let refreshResult;
 
   try {
-    refreshResult = await workos.userManagement.authenticateWithRefreshToken({
+    refreshResult = await createWorkOSInstance().userManagement.authenticateWithRefreshToken({
       clientId: WORKOS_CLIENT_ID,
       refreshToken: session.refreshToken,
       organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
@@ -389,7 +392,7 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
 async function terminateSession({ returnTo }: { returnTo?: string } = {}) {
   const { sessionId } = await withAuth();
   if (sessionId) {
-    redirect(workos.userManagement.getLogoutUrl({ sessionId, returnTo }));
+    redirect(createWorkOSInstance().userManagement.getLogoutUrl({ sessionId, returnTo }));
   } else {
     redirect(returnTo ?? '/');
   }
@@ -397,7 +400,7 @@ async function terminateSession({ returnTo }: { returnTo?: string } = {}) {
 
 async function verifyAccessToken(accessToken: string) {
   try {
-    await jwtVerify(accessToken, JWKS);
+    await jwtVerify(accessToken, JWKS());
     return true;
   } catch {
     return false;

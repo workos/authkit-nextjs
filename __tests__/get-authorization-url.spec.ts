@@ -1,12 +1,23 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { getAuthorizationUrl } from '../src/get-authorization-url.js';
 import { headers } from 'next/headers';
-import { workos } from '../src/workos.js';
+import { createWorkOSInstance } from '../src/workos.js';
 
 jest.mock('next/headers');
-jest.mock('../src/workos.js');
+
+// Mock dependencies
+const fakeWorkosInstance = {
+  userManagement: {
+    getAuthorizationUrl: jest.fn(),
+  },
+};
+
+jest.mock('../src/workos', () => ({
+  createWorkOSInstance: jest.fn(() => fakeWorkosInstance),
+}));
 
 describe('getAuthorizationUrl', () => {
+  const workos = createWorkOSInstance();
   beforeEach(() => {
     jest.clearAllMocks();
   });

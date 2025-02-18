@@ -1,4 +1,4 @@
-import { workos } from '../src/workos.js';
+import { createWorkOSInstance } from '../src/workos.js';
 import { handleAuth } from '../src/authkit-callback-route.js';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -6,16 +6,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
 // Mock dependencies
-jest.mock('../src/workos', () => ({
-  workos: {
-    userManagement: {
-      authenticateWithCode: jest.fn(),
-      getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
-    },
+const fakeWorkosInstance = {
+  userManagement: {
+    authenticateWithCode: jest.fn(),
+    getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
   },
+};
+
+jest.mock('../src/workos', () => ({
+  createWorkOSInstance: jest.fn(() => fakeWorkosInstance),
 }));
 
 describe('authkit-callback-route', () => {
+  const workos = createWorkOSInstance();
   const mockAuthResponse = {
     accessToken: 'access123',
     refreshToken: 'refresh123',
