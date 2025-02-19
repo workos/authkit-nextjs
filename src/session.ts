@@ -174,11 +174,14 @@ async function updateSession(
     };
   }
 
-  if (options.debug) {
-    console.log(`Session invalid. Refreshing access token that ends in ${session.accessToken.slice(-10)}`);
-  }
-
   try {
+    if (options.debug) {
+      // istanbul ignore next
+      console.log(
+        `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
+      );
+    }
+
     const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
     const { accessToken, refreshToken, user, impersonator } = await workos.userManagement.authenticateWithRefreshToken({
