@@ -2,7 +2,7 @@
 
 import { signOut } from './auth.js';
 import { refreshSession, withAuth } from './session.js';
-import { getWorkOSInstance } from './workos.js';
+import { getWorkOS } from './workos.js';
 
 /**
  * This action is only accessible to authenticated users,
@@ -18,7 +18,7 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
 };
 
 export const getOrganizationAction = async (organizationId: string) => {
-  return await getWorkOSInstance().organizations.getOrganization(organizationId);
+  return await getWorkOS().organizations.getOrganization(organizationId);
 };
 
 export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {

@@ -19,4 +19,4 @@ const options = {
  * If an instance already exists, it returns the existing instance.
  * @returns The WorkOS instance.
  */
-export const getWorkOSInstance = lazy(() => new WorkOS(WORKOS_API_KEY, options));
+export const getWorkOS = lazy(() => new WorkOS(WORKOS_API_KEY, options));
