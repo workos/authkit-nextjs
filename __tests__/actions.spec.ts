@@ -6,19 +6,20 @@ import {
   refreshAuthAction,
 } from '../src/actions.js';
 import { signOut } from '../src/auth.js';
-import { workos } from '../src/workos.js';
+import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 
 jest.mock('../src/auth.js', () => ({
   signOut: jest.fn().mockResolvedValue(true),
 }));
 
-jest.mock('../src/workos.js', () => ({
-  workos: {
-    organizations: {
-      getOrganization: jest.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
-    },
+const fakeWorkosInstance = {
+  organizations: {
+    getOrganization: jest.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
   },
+};
+jest.mock('../src/workos.js', () => ({
+  getWorkOS: jest.fn(() => fakeWorkosInstance),
 }));
 
 jest.mock('../src/session.js', () => ({
@@ -27,6 +28,7 @@ jest.mock('../src/session.js', () => ({
 }));
 
 describe('actions', () => {
+  const workos = getWorkOS();
   describe('checkSessionAction', () => {
     it('should return true for authenticated users', async () => {
       const result = await checkSessionAction();

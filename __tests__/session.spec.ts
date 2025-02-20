@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
 import { withAuth, updateSession, refreshSession, terminateSession, updateSessionMiddleware } from '../src/session.js';
-import { workos } from '../src/workos.js';
+import { getWorkOS } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
 import { jwtVerify } from 'jose';
@@ -19,6 +19,8 @@ jest.mock('jose', () => ({
 
 // logging is disabled by default, flip this to true to still have logs in the console
 const DEBUG = false;
+
+const workos = getWorkOS();
 
 describe('session.ts', () => {
   const mockSession = {

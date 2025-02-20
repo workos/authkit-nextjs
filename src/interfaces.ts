@@ -1,4 +1,4 @@
-import { OauthTokens, User } from '@workos-inc/node';
+import type { OauthTokens, User } from '@workos-inc/node';
 import { type NextRequest } from 'next/server';
 
 export interface HandleAuthOptions {
