@@ -83,7 +83,7 @@ export const GET = handleAuth({ returnPathname: '/dashboard' });
 If your application needs to persist data upon a successful authentication, like the `oauthTokens` from an upstream provider, you can pass in a `onSuccess` function that will get called after the user has successfully authenticated:
 
 ```ts
-export const GET = handleAUth({
+export const GET = handleAuth({
   onSuccess: async ({ oauthTokens }) => {
     await saveTokens(oauthTokens);
   },
