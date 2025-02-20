@@ -401,6 +401,22 @@ export default authkitMiddleware({
 });
 ```
 
+### Advanced: Direct access to the WorkOS client
+
+For advanced use cases or functionality not covered by the helper methods, you can access the underlying WorkOS client directly:
+
+```typescript
+import { getWorkOS } from '@workos-inc/authkit-nextjs';
+
+// Get the configured WorkOS client instance
+const workos = getWorkOS();
+
+// Use any WorkOS SDK method
+const organizations = await workos.organizations.listOrganizations({
+  limit: 10,
+});
+````
+
 ### Debugging
 
 To enable debug logs, initialize the middleware with the debug flag enabled.
