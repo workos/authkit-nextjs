@@ -12,7 +12,6 @@ type AuthContextType = {
   permissions: string[] | undefined;
   entitlements: string[] | undefined;
   impersonator: Impersonator | undefined;
-  accessToken: string | undefined;
   loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
   refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void | { error: string }>;
@@ -38,7 +37,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [permissions, setPermissions] = useState<string[] | undefined>(undefined);
   const [entitlements, setEntitlements] = useState<string[] | undefined>(undefined);
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
-  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
@@ -51,7 +49,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
       setImpersonator(auth.impersonator);
-      setAccessToken(auth.accessToken);
     } catch (error) {
       setUser(null);
       setSessionId(undefined);
@@ -60,7 +57,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(undefined);
       setEntitlements(undefined);
       setImpersonator(undefined);
-      setAccessToken(undefined);
     } finally {
       setLoading(false);
     }
@@ -81,7 +77,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
       setImpersonator(auth.impersonator);
-      setAccessToken(auth.accessToken);
     } catch (error) {
       return error instanceof Error ? { error: error.message } : { error: String(error) };
     } finally {
@@ -154,7 +149,6 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         permissions,
         entitlements,
         impersonator,
-        accessToken,
         loading,
         getAuth,
         refreshAuth,

@@ -220,7 +220,6 @@ describe('useAuth', () => {
       entitlements: ['feature1'],
       impersonator: { email: 'admin@example.com' },
       oauthTokens: { access_token: 'token123' },
-      accessToken: 'access123',
     });
 
     const TestComponent = () => {
