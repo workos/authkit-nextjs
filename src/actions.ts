@@ -11,6 +11,7 @@ import { getWorkOS } from './workos.js';
  * @returns The sanitized auth object
  */
 function sanitize<T extends { accessToken?: string }>(value: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { accessToken, ...sanitized } = value;
   return sanitized;
 }
