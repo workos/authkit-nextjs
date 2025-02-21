@@ -219,7 +219,6 @@ describe('useAuth', () => {
       permissions: ['read', 'write'],
       entitlements: ['feature1'],
       impersonator: { email: 'admin@example.com' },
-      oauthTokens: { access_token: 'token123' },
     });
 
     const TestComponent = () => {
