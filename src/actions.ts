@@ -1,6 +1,7 @@
 'use server';
 
 import { signOut } from './auth.js';
+import { NoUserInfo, UserInfo } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -10,7 +11,7 @@ import { getWorkOS } from './workos.js';
  * @param value - The auth object to sanitize
  * @returns The sanitized auth object
  */
-function sanitize<T extends { accessToken?: string }>(value: T) {
+function sanitize<T extends UserInfo | NoUserInfo>(value: T) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { accessToken, ...sanitized } = value;
   return sanitized;
