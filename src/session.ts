@@ -126,6 +126,12 @@ async function updateSession(
   // `pathname` to be able to return the users where they came from before sign-in
   newRequestHeaders.set('x-url', request.url);
 
+  if (options.redirectUri) {
+    // Store the redirect URI in a custom header, so we always have access to it and so that subsequent
+    // calls to `getAuthorizationUrl` will use the same redirect URI
+    newRequestHeaders.set('x-redirect-uri', options.redirectUri);
+  }
+
   newRequestHeaders.delete(sessionHeaderName);
 
   if (!session) {
