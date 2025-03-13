@@ -4,13 +4,15 @@ import {
   getOrganizationAction,
   getAuthAction,
   refreshAuthAction,
+  switchToOrganizationAction,
 } from '../src/actions.js';
-import { signOut } from '../src/auth.js';
+import { signOut, switchToOrganization } from '../src/auth.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 
 jest.mock('../src/auth.js', () => ({
   signOut: jest.fn().mockResolvedValue(true),
+  switchToOrganization: jest.fn().mockResolvedValue({ organizationId: 'org_123' }),
 }));
 
 const fakeWorkosInstance = {
@@ -66,6 +68,15 @@ describe('actions', () => {
       const result = await refreshAuthAction(params);
       expect(refreshSession).toHaveBeenCalledWith(params);
       expect(result).toEqual({ session: 'newSession' });
+    });
+  });
+
+  describe('switchToOrganizationAction', () => {
+    it('should switch organizations', async () => {
+      const options = { returnTo: '/test' };
+      const result = await switchToOrganizationAction('org_123', options);
+      expect(switchToOrganization).toHaveBeenCalledWith('org_123', options);
+      expect(result).toEqual({ organizationId: 'org_123' });
     });
   });
 });
