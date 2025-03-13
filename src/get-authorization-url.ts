@@ -5,7 +5,13 @@ import { headers } from 'next/headers';
 
 async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
   const headersList = await headers();
-  const { returnPathname, screenHint, organizationId, redirectUri = headersList.get('x-redirect-uri'), loginHint } = options;
+  const {
+    returnPathname,
+    screenHint,
+    organizationId,
+    redirectUri = headersList.get('x-redirect-uri'),
+    loginHint,
+  } = options;
 
   return getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit',
