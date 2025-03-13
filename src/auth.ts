@@ -43,7 +43,7 @@ export async function switchToOrganization(
   const { returnTo, revalidationStrategy = 'path', revalidationTags = [] } = options;
   const headersList = await headers();
   const pathname = returnTo || headersList.get('x-url') || '/';
-  const result = refreshSession({ organizationId, ensureSignedIn: true });
+  const result = await refreshSession({ organizationId, ensureSignedIn: true });
 
   switch (revalidationStrategy) {
     case 'path':

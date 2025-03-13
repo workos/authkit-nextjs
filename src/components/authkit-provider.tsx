@@ -51,6 +51,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [loading, setLoading] = useState(true);
 
   const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+    setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
       setUser(auth.user);
@@ -74,11 +75,17 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   };
 
   const switchToOrganization = async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
-    try {
-      return await switchToOrganizationAction(organizationId, options);
-    } catch (error) {
-      return error instanceof Error ? { error: error.message } : { error: String(error) };
+    const opts = { revalidationStrategy: 'none', ...options };
+    const result = await switchToOrganizationAction(organizationId, {
+      revalidationStrategy: 'none',
+      ...options,
+    });
+
+    if (opts.revalidationStrategy === 'none') {
+      await getAuth({ ensureSignedIn: true });
     }
+
+    return result;
   };
 
   const refreshAuth = async ({
