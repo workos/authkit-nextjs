@@ -749,6 +749,26 @@ describe('session.ts', () => {
       expect(result).toHaveProperty('user');
       expect(result.organizationId).toBe('org_456');
     });
+
+    it('throws if authenticateWithRefreshToken fails with string', async () => {
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
+      expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('fail');
+    });
+
+    it('throws if authenticateWithRefreshToken fails with error', async () => {
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
+      expect(refreshSession()).rejects.toThrow('error');
+    });
   });
 
   describe('terminateSession', () => {
@@ -776,9 +796,10 @@ describe('session.ts', () => {
       nextHeaders.set('x-url', 'http://example.com/protected');
 
       await terminateSession();
-
-      expect(redirect).toHaveBeenCalledTimes(1);
       expect(redirect).toHaveBeenCalledWith('/');
+
+      await terminateSession({ returnTo: '/foo' });
+      expect(redirect).toHaveBeenCalledWith('/foo');
     });
 
     describe('when given a `returnTo` URL', () => {
