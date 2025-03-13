@@ -92,3 +92,9 @@ export interface CookieOptions {
   maxAge: number;
   domain: string | undefined;
 }
+
+export interface SwitchToOrganizationOptions {
+  returnTo?: string;
+  revalidationStrategy?: 'none' | 'tag' | 'path';
+  revalidationTags?: string[];
+}
