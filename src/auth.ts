@@ -1,19 +1,22 @@
 'use server';
 
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { cookies } from 'next/headers';
-import { terminateSession } from './session.js';
+import { cookies, headers } from 'next/headers';
+import { refreshSession, terminateSession } from './session.js';
 import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_DOMAIN } from './env-variables.js';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 
-async function getSignInUrl({ organizationId }: { organizationId?: string } = {}) {
+export async function getSignInUrl({ organizationId }: { organizationId?: string } = {}) {
   return getAuthorizationUrl({ organizationId, screenHint: 'sign-in' });
 }
 
-async function getSignUpUrl() {
+export async function getSignUpUrl() {
   return getAuthorizationUrl({ screenHint: 'sign-up' });
 }
 
-async function signOut({ returnTo }: { returnTo?: string } = {}) {
+export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   const cookie: { name: string; domain?: string } = {
     name: WORKOS_COOKIE_NAME || 'wos-session',
   };
@@ -25,4 +28,29 @@ async function signOut({ returnTo }: { returnTo?: string } = {}) {
   await terminateSession({ returnTo });
 }
 
-export { getSignInUrl, getSignUpUrl, signOut };
+export async function switchToOrganization(
+  organizationId: string,
+  options: SwitchToOrganizationOptions = {},
+): Promise<UserInfo> {
+  const { returnTo, revalidationStrategy = 'path', revalidationTags = [] } = options;
+  const headersList = await headers();
+  // istanbul ignore next
+  const pathname = returnTo || headersList.get('x-url') || '/';
+  const result = await refreshSession({ organizationId, ensureSignedIn: true });
+
+  switch (revalidationStrategy) {
+    case 'path':
+      revalidatePath(pathname);
+      break;
+    case 'tag':
+      for (const tag of revalidationTags) {
+        revalidateTag(tag);
+      }
+      break;
+  }
+  if (revalidationStrategy !== 'none') {
+    redirect(pathname);
+  }
+
+  return result;
+}

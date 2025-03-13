@@ -1,7 +1,7 @@
 'use server';
 
-import { signOut } from './auth.js';
-import { NoUserInfo, UserInfo } from './interfaces.js';
+import { signOut, switchToOrganization } from './auth.js';
+import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -46,4 +46,8 @@ export const refreshAuthAction = async ({
   organizationId?: string;
 }) => {
   return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+};
+
+export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
+  return sanitize(await switchToOrganization(organizationId, options));
 };
