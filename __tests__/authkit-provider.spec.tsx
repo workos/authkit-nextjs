@@ -2,13 +2,20 @@ import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AuthKitProvider, useAuth } from '../src/components/authkit-provider.js';
-import { checkSessionAction, getAuthAction, refreshAuthAction, handleSignOutAction } from '../src/actions.js';
+import {
+  checkSessionAction,
+  getAuthAction,
+  refreshAuthAction,
+  handleSignOutAction,
+  switchToOrganizationAction,
+} from '../src/actions.js';
 
 jest.mock('../src/actions', () => ({
   checkSessionAction: jest.fn(),
   getAuthAction: jest.fn(),
   refreshAuthAction: jest.fn(),
   handleSignOutAction: jest.fn(),
+  switchToOrganizationAction: jest.fn(),
 }));
 
 describe('AuthKitProvider', () => {
@@ -290,6 +297,48 @@ describe('useAuth', () => {
 
     await waitFor(() => {
       expect(getByTestId('session')).toHaveTextContent('new-session');
+    });
+  });
+
+  it('should handle switching organizations', async () => {
+    const mockAuth = {
+      user: { email: 'test@example.com' },
+      sessionId: 'test-session',
+      organizationId: 'new-org',
+    };
+
+    (getAuthAction as jest.Mock)
+      .mockResolvedValue(mockAuth)
+      .mockResolvedValueOnce({ ...mockAuth, organizationId: 'old-org' });
+    (switchToOrganizationAction as jest.Mock).mockResolvedValueOnce(mockAuth);
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="org">{auth.organizationId}</div>
+          <button onClick={async () => await auth.switchToOrganization('test-org')}>Switch Organization</button>
+        </div>
+      );
+    };
+
+    const { getByTestId, getByRole } = render(
+      <AuthKitProvider>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('org')).toHaveTextContent('old-org');
+    });
+
+    // Test refresh
+    act(() => {
+      getByRole('button').click();
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('org')).toHaveTextContent('new-org');
     });
   });
 
