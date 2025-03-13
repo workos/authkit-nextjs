@@ -57,6 +57,7 @@ export interface GetAuthURLOptions {
   returnPathname?: string;
   organizationId?: string;
   redirectUri?: string;
+  loginHint?: string;
 }
 
 export interface AuthkitMiddlewareAuth {
