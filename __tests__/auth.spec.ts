@@ -1,17 +1,33 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
-import { getSignInUrl, getSignUpUrl, signOut } from '../src/auth.js';
-import * as session from '../src/session';
+import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from '../src/auth.js';
+import * as session from '../src/session.js';
+import * as cache from 'next/cache';
 
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { UserInfo } from '../src/interfaces';
+
+jest.mock('next/cache', () => {
+  const actual = jest.requireActual<typeof cache>('next/cache');
+  return {
+    ...actual,
+    revalidateTag: jest.fn(),
+    revalidatePath: jest.fn(),
+  };
+});
+
+const revalidatePath = jest.mocked(cache.revalidatePath);
+const revalidateTag = jest.mocked(cache.revalidateTag);
 
 jest.mock('../src/session', () => {
   const actual = jest.requireActual<typeof session>('../src/session');
 
-  return { ...actual, terminateSession: jest.fn(actual.terminateSession) };
+  return {
+    ...actual,
+    refreshSession: jest.fn(actual.refreshSession),
+    terminateSession: jest.fn(actual.terminateSession),
+  };
 });
 
 describe('auth.ts', () => {
@@ -49,6 +65,31 @@ describe('auth.ts', () => {
       const url = await getSignUpUrl();
       expect(url).toBeDefined();
       expect(() => new URL(url)).not.toThrow();
+    });
+  });
+
+  describe('switchToOrganization', () => {
+    it('should refresh the session with the new organizationId', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://localhost/test');
+      await switchToOrganization('org_123');
+      expect(revalidatePath).toHaveBeenCalledWith('http://localhost/test');
+    });
+
+    it('should revalidate the path and refresh the session with the new organizationId', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://localhost/test');
+      await switchToOrganization('org_123', { returnTo: '/test' });
+      expect(session.refreshSession).toHaveBeenCalledTimes(1);
+      expect(session.refreshSession).toHaveBeenCalledWith({ organizationId: 'org_123', ensureSignedIn: true });
+      expect(revalidatePath).toHaveBeenCalledWith('/test');
+    });
+
+    it('should revalidate the provided tags and refresh the session with the new organizationId', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://localhost/test');
+      await switchToOrganization('org_123', { revalidationStrategy: 'tag', revalidationTags: ['tag1', 'tag2'] });
+      expect(revalidateTag).toHaveBeenCalledTimes(2);
     });
   });
 

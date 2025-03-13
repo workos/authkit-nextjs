@@ -42,6 +42,7 @@ export async function switchToOrganization(
 ): Promise<UserInfo> {
   const { returnTo, revalidationStrategy = 'path', revalidationTags = [] } = options;
   const headersList = await headers();
+  // istanbul ignore next
   const pathname = returnTo || headersList.get('x-url') || '/';
   const result = await refreshSession({ organizationId, ensureSignedIn: true });
 
