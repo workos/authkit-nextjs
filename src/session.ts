@@ -251,19 +251,18 @@ async function updateSession(
   }
 }
 
-async function refreshSession(options: {
+async function refreshSession(options: { organizationId?: string; ensureSignedIn: true }): Promise<UserInfo>;
+async function refreshSession(options?: {
   organizationId?: string;
   ensureSignedIn?: boolean;
 }): Promise<UserInfo | NoUserInfo>;
-
-/* istanbul ignore next */
 async function refreshSession({
   organizationId: nextOrganizationId,
   ensureSignedIn = false,
 }: {
   organizationId?: string;
   ensureSignedIn?: boolean;
-} = {}) {
+} = {}): Promise<UserInfo | NoUserInfo> {
   const session = await getSessionFromCookie();
   if (!session) {
     if (ensureSignedIn) {
