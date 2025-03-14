@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from '../src/auth.js';
 import * as session from '../src/session.js';
 import * as cache from 'next/cache';
+import * as workos from '@workos-inc/workos';
 
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
@@ -17,8 +18,16 @@ jest.mock('next/cache', () => {
   };
 });
 
+jest.mock('@workos-inc/workos', () => {
+  const actual = jest.requireActual<typeof workos>('@workos-inc/workos');
+  return {
+    ...actual,
+  };
+});
+
 const revalidatePath = jest.mocked(cache.revalidatePath);
 const revalidateTag = jest.mocked(cache.revalidateTag);
+const refreshSession = jest.mocked(session.refreshSession);
 
 jest.mock('../src/session', () => {
   const actual = jest.requireActual<typeof session>('../src/session');
@@ -90,6 +99,20 @@ describe('auth.ts', () => {
       nextHeaders.set('x-url', 'http://localhost/test');
       await switchToOrganization('org_123', { revalidationStrategy: 'tag', revalidationTags: ['tag1', 'tag2'] });
       expect(revalidateTag).toHaveBeenCalledTimes(2);
+    });
+
+    describe('on error', () => {
+      it('should redirect to sign in', async () => {
+        refreshSession.mockRejectedValue('sso_required');
+        await switchToOrganization('org_123');
+        expect(redirect).toHaveBeenCalledTimes(1);
+      });
+
+      it('should redirect to the authkit_redirect_url when provided', async () => {
+        refreshSession.mockRejectedValue({ rawData: { authkit_redirect_url: 'http://localhost/test' } });
+        await switchToOrganization('org_123');
+        expect(redirect).toHaveBeenCalledWith('http://localhost/test');
+      });
     });
   });
 
