@@ -1,12 +1,12 @@
 'use server';
 
-import { getAuthorizationUrl } from './get-authorization-url.js';
-import { cookies, headers } from 'next/headers';
-import { refreshSession, terminateSession } from './session.js';
-import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_DOMAIN } from './env-variables.js';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
+import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { getAuthorizationUrl } from './get-authorization-url.js';
+import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import { refreshSession, terminateSession } from './session.js';
 
 export async function getSignInUrl({
   organizationId,
@@ -42,9 +42,26 @@ export async function switchToOrganization(
 ): Promise<UserInfo> {
   const { returnTo, revalidationStrategy = 'path', revalidationTags = [] } = options;
   const headersList = await headers();
+  let result: UserInfo;
   // istanbul ignore next
   const pathname = returnTo || headersList.get('x-url') || '/';
-  const result = await refreshSession({ organizationId, ensureSignedIn: true });
+  try {
+    result = await refreshSession({ organizationId, ensureSignedIn: true });
+  } catch (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    error: any
+  ) {
+    const { cause } = error;
+    if (cause?.rawData?.authkit_redirect_url) {
+      redirect(cause.rawData.authkit_redirect_url);
+    } else {
+      if (cause?.error === 'sso_required' || cause?.error === 'mfa_enrollment') {
+        const url = await getAuthorizationUrl({ organizationId });
+        redirect(url);
+      }
+      throw error;
+    }
+  }
 
   switch (revalidationStrategy) {
     case 'path':
