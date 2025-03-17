@@ -110,10 +110,13 @@ describe('auth.ts', () => {
     });
 
     describe('on error', () => {
-      it.only('should redirect to sign in', async () => {
+      beforeEach(async () => {
         const nextHeaders = await headers();
         nextHeaders.set('x-url', 'http://localhost/test');
         await generateSession();
+      });
+
+      it('should redirect to sign in', async () => {
         authenticateWithRefreshToken.mockImplementation(() => {
           return Promise.reject({
             status: 500,
@@ -128,11 +131,17 @@ describe('auth.ts', () => {
         expect(redirect).toHaveBeenCalledTimes(1);
       });
 
-      //it('should redirect to the authkit_redirect_url when provided', async () => {
-      //  refreshSession.mockRejectedValue({ rawData: { authkit_redirect_url: 'http://localhost/test' } });
-      //  await switchToOrganization('org_123');
-      //  expect(redirect).toHaveBeenCalledWith('http://localhost/test');
-      //});
+      it('should redirect to the authkit_redirect_url when provided', async () => {
+        authenticateWithRefreshToken.mockImplementation(() => {
+          return Promise.reject({
+            rawData: {
+              authkit_redirect_url: 'http://localhost/test',
+            },
+          });
+        });
+        await switchToOrganization('org_123');
+        expect(redirect).toHaveBeenCalledWith('http://localhost/test');
+      });
     });
   });
 
