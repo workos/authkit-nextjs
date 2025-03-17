@@ -54,6 +54,12 @@ WORKOS_COOKIE_NAME='authkit-cookie'
 WORKOS_API_HOSTNAME='api.workos.com' # base WorkOS API URL
 WORKOS_API_HTTPS=true # whether to use HTTPS in API calls
 WORKOS_API_PORT=3000 # port to use for API calls
+
+# Only change this if you specifically need cross-origin cookie support.
+WORKOS_COOKIE_SAMESITE='lax' # SameSite attribute for cookies: 'lax' (default), 'strict', or 'none'.
+
+>[!IMPORTANT] Security Note:
+>Setting WORKOS_COOKIE_SAMESITE='none' allows cookies to be sent in cross-origin contexts (like iframes), but reduces protection against CSRF attacks. This setting forces cookies to be secure (HTTPS only) and should only be used when absolutely necessary for your application architecture.
 ```
 
 `WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains.
