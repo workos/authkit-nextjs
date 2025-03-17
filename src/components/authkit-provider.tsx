@@ -1,8 +1,15 @@
 'use client';
 
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { checkSessionAction, getAuthAction, handleSignOutAction, refreshAuthAction } from '../actions.js';
+import {
+  checkSessionAction,
+  getAuthAction,
+  handleSignOutAction,
+  refreshAuthAction,
+  switchToOrganizationAction,
+} from '../actions.js';
 import type { Impersonator, User } from '@workos-inc/node';
+import type { UserInfo, SwitchToOrganizationOptions } from '../interfaces.js';
 
 type AuthContextType = {
   user: User | null;
@@ -16,6 +23,10 @@ type AuthContextType = {
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
   refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void | { error: string }>;
   signOut: (options?: { returnTo?: string }) => Promise<void>;
+  switchToOrganization: (
+    organizationId: string,
+    options?: SwitchToOrganizationOptions,
+  ) => Promise<Omit<UserInfo, 'accessToken'> | { error: string }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +51,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [loading, setLoading] = useState(true);
 
   const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+    setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
       setUser(auth.user);
@@ -60,6 +72,20 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
     } finally {
       setLoading(false);
     }
+  };
+
+  const switchToOrganization = async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
+    const opts = { revalidationStrategy: 'none', ...options };
+    const result = await switchToOrganizationAction(organizationId, {
+      revalidationStrategy: 'none',
+      ...options,
+    });
+
+    if (opts.revalidationStrategy === 'none') {
+      await getAuth({ ensureSignedIn: true });
+    }
+
+    return result;
   };
 
   const refreshAuth = async ({
@@ -153,6 +179,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         getAuth,
         refreshAuth,
         signOut,
+        switchToOrganization,
       }}
     >
       {children}
