@@ -5,12 +5,20 @@ import { cookies } from 'next/headers';
 import { terminateSession } from './session.js';
 import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_DOMAIN } from './env-variables.js';
 
-async function getSignInUrl({ organizationId }: { organizationId?: string } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in' });
+async function getSignInUrl({
+  organizationId,
+  loginHint,
+  redirectUri,
+}: { organizationId?: string; loginHint?: string; redirectUri?: string } = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri });
 }
 
-async function getSignUpUrl() {
-  return getAuthorizationUrl({ screenHint: 'sign-up' });
+async function getSignUpUrl({
+  organizationId,
+  loginHint,
+  redirectUri,
+}: { organizationId?: string; loginHint?: string; redirectUri?: string } = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri });
 }
 
 async function signOut({ returnTo }: { returnTo?: string } = {}) {
