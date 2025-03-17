@@ -1,3 +1,5 @@
+// istanbul ignore file
+
 import { sealData } from 'iron-session';
 import { SignJWT } from 'jose';
 import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from '../src/env-variables.js';

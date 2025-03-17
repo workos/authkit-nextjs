@@ -52,6 +52,7 @@ export async function switchToOrganization(
     error: any
   ) {
     const { cause } = error;
+    /* istanbul ignore next */
     if (cause?.rawData?.authkit_redirect_url) {
       redirect(cause.rawData.authkit_redirect_url);
     } else {

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from '../src/auth.js';
 import * as session from '../src/session.js';
 import * as cache from 'next/cache';
+import * as workosModule from '../src/workos.js';
 
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
@@ -18,7 +19,7 @@ jest.mock('next/cache', () => {
   };
 });
 
-// Create a fake WorkOS instance
+// Create a fake WorkOS instance that will be used only in the "on error" tests
 const fakeWorkosInstance = {
   userManagement: {
     authenticateWithRefreshToken: jest.fn(),
@@ -27,13 +28,9 @@ const fakeWorkosInstance = {
   },
 };
 
-// Mock the getWorkOS function to return our fake instance
-jest.mock('../src/workos.js', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
-}));
-
 const revalidatePath = jest.mocked(cache.revalidatePath);
 const revalidateTag = jest.mocked(cache.revalidateTag);
+// We'll only use these in the "on error" tests
 const authenticateWithRefreshToken = fakeWorkosInstance.userManagement.authenticateWithRefreshToken;
 const getAuthorizationUrl = fakeWorkosInstance.userManagement.getAuthorizationUrl;
 
@@ -114,14 +111,55 @@ describe('auth.ts', () => {
         const nextHeaders = await headers();
         nextHeaders.set('x-url', 'http://localhost/test');
         await generateSession();
+
+        // Create a WorkOS-like object that matches what our tests need
+        const mockWorkOS = {
+          userManagement: fakeWorkosInstance.userManagement,
+          // Add minimal properties to satisfy TypeScript
+          createHttpClient: jest.fn(),
+          createWebhookClient: jest.fn(),
+          createActionsClient: jest.fn(),
+          createIronSessionProvider: jest.fn(),
+          apiKey: 'test',
+          clientId: 'test',
+          host: 'test',
+          port: 443,
+          protocol: 'https',
+          headers: {},
+          version: '0.0.0',
+        };
+
+        // Apply the mock for these tests only
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        jest.spyOn(workosModule, 'getWorkOS').mockImplementation(() => mockWorkOS as any);
       });
 
-      it('should redirect to sign in', async () => {
+      afterEach(() => {
+        // Restore all mocks after each test
+        jest.restoreAllMocks();
+      });
+
+      it('should redirect to sign in when error is "sso_required"', async () => {
         authenticateWithRefreshToken.mockImplementation(() => {
           return Promise.reject({
             status: 500,
             requestID: 'sso_required',
             error: 'sso_required',
+            errorDescription: 'User must authenticate using one of the matching connections.',
+          });
+        });
+
+        await switchToOrganization('org_123');
+        expect(getAuthorizationUrl).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org_123' }));
+        expect(redirect).toHaveBeenCalledTimes(1);
+      });
+
+      it('should redirect to sign in when error is "mfa_enrollment"', async () => {
+        authenticateWithRefreshToken.mockImplementation(() => {
+          return Promise.reject({
+            status: 500,
+            requestID: 'mfa_enrollment',
+            error: 'mfa_enrollment',
             errorDescription: 'User must authenticate using one of the matching connections.',
           });
         });
@@ -141,6 +179,13 @@ describe('auth.ts', () => {
         });
         await switchToOrganization('org_123');
         expect(redirect).toHaveBeenCalledWith('http://localhost/test');
+      });
+
+      it('throws other errors', async () => {
+        authenticateWithRefreshToken.mockImplementation(() => {
+          return Promise.reject(new Error('Fail'));
+        });
+        await expect(switchToOrganization('org_123')).rejects.toThrow('Fail');
       });
     });
   });
