@@ -33,7 +33,7 @@ export function getCookieOptions(
   expired: boolean = false,
 ): CookieOptions | string {
   const url = new URL(redirectUri || WORKOS_REDIRECT_URI);
-  const sameSite = WORKOS_COOKIE_SAMESITE || 'Lax';
+  const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
   assertValidSamSite(sameSite);
   const secure = sameSite.toLowerCase() === 'none' ? true : url.protocol === 'https:';
 

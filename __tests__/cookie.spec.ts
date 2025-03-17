@@ -73,13 +73,30 @@ describe('cookie.ts', () => {
       const { getCookieOptions } = await import('../src/cookie');
       const options = getCookieOptions('http://example.com', true, false);
       expect(options).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite="Lax"; Max-Age=34560000; Domain=example.com'),
+        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite="lax"; Max-Age=34560000; Domain=example.com'),
       );
 
       const options2 = getCookieOptions('https://example.com', true, true);
       expect(options2).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite="Lax"; Max-Age=0; Domain=example.com'),
+        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite="lax"; Max-Age=0; Domain=example.com'),
       );
+    });
+
+    it('allows the sameSite config to be set by the WORKOS_COOKIE_SAMESITE env variable', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions('http://example.com');
+      expect(options).toEqual(expect.objectContaining({ sameSite: 'none' }));
+    });
+
+    it('throws an error if the sameSite value is invalid', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'invalid' });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      expect(() => getCookieOptions('http://example.com')).toThrow('Invalid SameSite value: invalid');
     });
   });
 });
