@@ -57,7 +57,7 @@ export async function switchToOrganization(
     } else {
       if (cause?.error === 'sso_required' || cause?.error === 'mfa_enrollment') {
         const url = await getAuthorizationUrl({ organizationId });
-        redirect(url);
+        return redirect(url);
       }
       throw error;
     }
