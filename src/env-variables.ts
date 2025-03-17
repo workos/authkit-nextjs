@@ -11,6 +11,7 @@ const WORKOS_API_PORT = getEnvVariable('WORKOS_API_PORT');
 const WORKOS_COOKIE_DOMAIN = getEnvVariable('WORKOS_COOKIE_DOMAIN');
 const WORKOS_COOKIE_MAX_AGE = getEnvVariable('WORKOS_COOKIE_MAX_AGE');
 const WORKOS_COOKIE_NAME = getEnvVariable('WORKOS_COOKIE_NAME');
+const WORKOS_COOKIE_SAMESITE = getEnvVariable('WORKOS_COOKIE_SAMESITE');
 
 // Required env variables
 const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY') ?? '';
@@ -29,4 +30,5 @@ export {
   WORKOS_COOKIE_NAME,
   WORKOS_COOKIE_PASSWORD,
   WORKOS_REDIRECT_URI,
+  WORKOS_COOKIE_SAMESITE,
 };
