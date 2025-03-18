@@ -14,7 +14,6 @@ import {
   AuthkitMiddlewareAuth,
   AuthkitOptions,
   AuthkitResponse,
-  CookieOptions,
   NoUserInfo,
   Session,
   UserInfo,
@@ -287,22 +286,12 @@ async function refreshSession({
     });
   }
 
-  const { accessToken, refreshToken, user, impersonator } = refreshResult;
-  // Encrypt session with new access and refresh tokens
-  const encryptedSession = await encryptSession({
-    accessToken,
-    refreshToken,
-    user,
-    impersonator,
-  });
-
-  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-
   const headersList = await headers();
   const url = headersList.get('x-url');
 
-  const nextCookies = await cookies();
-  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url) as CookieOptions);
+  await saveSession(refreshResult, url || WORKOS_REDIRECT_URI);
+
+  const { accessToken, user, impersonator } = refreshResult;
 
   const {
     sid: sessionId,
@@ -460,6 +449,47 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   });
 
   return screenHintPaths.length > 0 ? 'sign-up' : 'sign-in';
+}
+
+/**
+ * Saves a WorkOS session to a cookie for use with AuthKit.
+ *
+ * This function is intended for advanced use cases where you need to manually manage sessions,
+ * such as custom authentication flows (email verification, etc.) that don't use
+ * the standard AuthKit authentication flow.
+ *
+ * @param session The WorkOS session containing access token, refresh token, and user information.
+ * @param request Either a NextRequest object or a URL string, used to determine cookie settings.
+ *
+ * @example
+ * // With a NextRequest object
+ * import { saveSession } from '@workos-inc/authkit-nextjs';
+ *
+ * async function handleEmailVerification(req: NextRequest) {
+ *   const { code } = await req.json();
+ *   const authResponse = await workos.userManagement.authenticateWithEmailVerification({
+ *     clientId: process.env.WORKOS_CLIENT_ID,
+ *     code,
+ *   });
+ *
+ *   await saveSession({
+ *     accessToken: authResponse.accessToken,
+ *     refreshToken: authResponse.refreshToken,
+ *     user: authResponse.user,
+ *     impersonator: authResponse.impersonator
+ *   }, req);
+ * }
+ *
+ * @example
+ * // With a URL string
+ * await saveSession(session, 'https://example.com/callback');
+ */
+export async function saveSession(session: Session, request: NextRequest | string): Promise<void> {
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  const encryptedSession = await encryptSession(session);
+  const nextCookies = await cookies();
+  const url = typeof request === 'string' ? request : request.url;
+  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 }
 
 export { encryptSession, withAuth, refreshSession, terminateSession, updateSessionMiddleware, updateSession };
