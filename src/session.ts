@@ -29,6 +29,12 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 
+/**
+ * Encrypts session data using the library's encryption mechanism.
+ * This can be useful for custom authentication flows where you need to manually create compatible session data.
+ * @param session The session data to encrypt.
+ * @returns The encrypted session data.
+ */
 async function encryptSession(session: Session) {
   return sealData(session, {
     password: WORKOS_COOKIE_PASSWORD,
