@@ -1,22 +1,21 @@
+import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
 import { authkit, authkitMiddleware } from './middleware.js';
-import { withAuth, refreshSession } from './session.js';
-import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
+import { refreshSession, saveSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
 
 export {
-  getWorkOS,
-  handleAuth,
-  //
-  authkitMiddleware,
   authkit,
-  //
+  authkitMiddleware,
   getSignInUrl,
   getSignUpUrl,
-  withAuth,
+  getWorkOS,
+  handleAuth,
   refreshSession,
+  saveSession,
   signOut,
   switchToOrganization,
+  withAuth,
 };

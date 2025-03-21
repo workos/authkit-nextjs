@@ -422,6 +422,51 @@ const organizations = await workos.organizations.listOrganizations({
 });
 ````
 
+### Advanced: Custom authentication flows
+
+While the standard authentication flow handles session management automatically, some use cases require manually creating and storing a session. This is useful for custom authentication flows like email verification or token exchange.
+
+For these scenarios, you can use the `saveSession` function:
+
+```typescript
+import { saveSession } from '@workos-inc/authkit-nextjs';
+import { getWorkOS } from '@workos-inc/authkit-nextjs';
+
+// Example: Email verification flow
+async function handleEmailVerification(req) {
+  const { code } = await req.json();
+
+  // Authenticate with the WorkOS API directly
+  const authResponse = await getWorkOS().userManagement.authenticateWithEmailVerification({
+    clientId: process.env.WORKOS_CLIENT_ID,
+    code,
+  });
+
+  // Save the session data to a cookie
+  await saveSession({
+    accessToken: authResponse.accessToken,
+    refreshToken: authResponse.refreshToken,
+    user: authResponse.user,
+    impersonator: authResponse.impersonator
+  }, req);
+
+  return Response.redirect('/dashboard');
+}
+```
+
+>[!NOTE]
+>This is an advanced API intended for specific integration scenarios, such as those users using self-hosted AuthKit. If you're using hosted AuthKit you should not need this.
+
+The `saveSession` function accepts either a `NextRequest` object or a URL string as its second parameter.
+
+```typescript
+// With NextRequest
+await saveSession(session, req);
+
+// With URL string
+await saveSession(session, 'https://example.com/callback');
+```
+
 ### Debugging
 
 To enable debug logs, initialize the middleware with the debug flag enabled.

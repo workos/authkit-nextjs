@@ -1,9 +1,7 @@
-import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
-import { getCookieOptions } from './cookie.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { encryptSession } from './session.js';
+import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { getWorkOS } from './workos.js';
 
@@ -67,13 +65,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           await onSuccess({ accessToken, refreshToken, user, impersonator, oauthTokens });
         }
 
-        // The refreshToken should never be accesible publicly, hence why we encrypt it in the cookie session
-        // Alternatively you could persist the refresh token in a backend database
-        const session = await encryptSession({ accessToken, refreshToken, user, impersonator });
-        const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-        const nextCookies = await cookies();
-
-        nextCookies.set(cookieName, session, getCookieOptions(request.url));
+        await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
         return response;
       } catch (error) {
