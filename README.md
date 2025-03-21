@@ -455,8 +455,7 @@ async function handleEmailVerification(req) {
 ```
 
 >[!NOTE]
->This is an advanced API intended for specific integration scenarios. Most applications should use the standard
->authentication flow.
+>This is an advanced API intended for specific integration scenarios, such as those users using self-hosted AuthKit. If you're using hosted AuthKit you should not need this.
 
 The `saveSession` function accepts either a `NextRequest` object or a URL string as its second parameter.
 
