@@ -473,17 +473,12 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
  *     code,
  *   });
  *
- *   await saveSession({
- *     accessToken: authResponse.accessToken,
- *     refreshToken: authResponse.refreshToken,
- *     user: authResponse.user,
- *     impersonator: authResponse.impersonator
- *   }, req);
+ *   await saveSession(authResponse, req);
  * }
  *
  * @example
  * // With a URL string
- * await saveSession(session, 'https://example.com/callback');
+ * await saveSession(authResponse, 'https://example.com/callback');
  */
 export async function saveSession(
   sessionOrResponse: Session | AuthenticationResponse,
