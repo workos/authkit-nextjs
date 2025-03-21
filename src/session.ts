@@ -1,13 +1,12 @@
 'use server';
 
-import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 import { sealData, unsealData } from 'iron-session';
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCookieOptions } from './cookie.js';
-import { getWorkOS } from './workos.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_COOKIE_NAME, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
   AccessToken,
@@ -18,7 +17,9 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
+import { getWorkOS } from './workos.js';
 
+import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { lazy, redirectWithFallback } from './utils.js';
 
@@ -458,7 +459,7 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
  * such as custom authentication flows (email verification, etc.) that don't use
  * the standard AuthKit authentication flow.
  *
- * @param session The WorkOS session containing access token, refresh token, and user information.
+ * @param sessionOrResponse The WorkOS session or AuthenticationResponse containing access token, refresh token, and user information.
  * @param request Either a NextRequest object or a URL string, used to determine cookie settings.
  *
  * @example
@@ -484,12 +485,15 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
  * // With a URL string
  * await saveSession(session, 'https://example.com/callback');
  */
-export async function saveSession(session: Session, request: NextRequest | string): Promise<void> {
+export async function saveSession(
+  sessionOrResponse: Session | AuthenticationResponse,
+  request: NextRequest | string,
+): Promise<void> {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const encryptedSession = await encryptSession(session);
+  const encryptedSession = await encryptSession(sessionOrResponse);
   const nextCookies = await cookies();
   const url = typeof request === 'string' ? request : request.url;
   nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 }
 
-export { encryptSession, withAuth, refreshSession, terminateSession, updateSessionMiddleware, updateSession };
+export { encryptSession, refreshSession, terminateSession, updateSession, updateSessionMiddleware, withAuth };
