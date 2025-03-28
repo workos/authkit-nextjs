@@ -11,10 +11,13 @@ import { getWorkOS } from './workos.js';
  * @param value - The auth object to sanitize
  * @returns The sanitized auth object
  */
-function sanitize<T extends UserInfo | NoUserInfo>(value: T) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { accessToken, ...sanitized } = value;
-  return sanitized;
+function sanitize<T extends UserInfo | NoUserInfo>(value: T, fetchAccessToken = false): T | Omit<T, 'accessToken'> {
+  if (!fetchAccessToken) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { accessToken, ...sanitized } = value;
+    return sanitized;
+  }
+  return value;
 }
 
 /**
@@ -34,20 +37,31 @@ export const getOrganizationAction = async (organizationId: string) => {
   return await getWorkOS().organizations.getOrganization(organizationId);
 };
 
-export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
-  return sanitize(await withAuth(options));
+export const getAuthAction = async ({
+  ensureSignedIn,
+  fetchAccessToken,
+}: {
+  ensureSignedIn?: boolean;
+  fetchAccessToken?: boolean;
+} = {}) => {
+  return sanitize(await withAuth({ ensureSignedIn }), fetchAccessToken);
 };
 
 export const refreshAuthAction = async ({
   ensureSignedIn,
   organizationId,
+  fetchAccessToken,
 }: {
   ensureSignedIn?: boolean;
   organizationId?: string;
+  fetchAccessToken?: boolean;
 }) => {
-  return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+  return sanitize(await refreshSession({ ensureSignedIn, organizationId }), fetchAccessToken);
 };
 
-export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
-  return sanitize(await switchToOrganization(organizationId, options));
+export const switchToOrganizationAction = async (
+  organizationId: string,
+  { fetchAccessToken, ...options }: SwitchToOrganizationOptions & { fetchAccessToken?: boolean } = {},
+) => {
+  return sanitize(await switchToOrganization(organizationId, options), fetchAccessToken);
 };

@@ -394,6 +394,64 @@ export default async function HomePage() {
 }
 ```
 
+#### Client-side Access Token Handling
+
+By default, authentication tokens are not exposed to client components for security reasons. If your application needs access to the raw access token (for example, to make authenticated API requests), you can enable this with the `fetchAccessToken` prop on the `AuthKitProvder`:
+
+```jsx
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <AuthKitProvider fetchAccessToken={true}>
+          {children}
+        </AuthKitProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+When enabled, the access token will be available in the auth context:
+
+```jsx
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+
+function ApiComponent() {
+  const { accessToken, user } = useAuth();
+
+  const fetchProtectedData = async () => {
+    if (!accessToken) return;
+    
+    const response = await fetch('https://api.example.com/protected', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    
+    // Process response...
+  };
+
+  return (
+    <div>
+      {user ? (
+        <button onClick={fetchProtectedData}>Fetch Data</button>
+      ) : (
+        <p>Not signed in</p>
+      )}
+    </div>
+  );
+}
+```
+
+##### Security Considerations
+
+Setting `fetchAccessToken={true}` makes the access token available to all client components using the `useAuth` hook. Only enable this option if your application architecture requires client-side access to the token.
+
+For most applications, it's preferable to handle authenticated API requests through server components or server actions where tokens can be kept secure.
+
 ### Sign up paths
 
 The `signUpPaths` option can be passed to `authkitMiddleware` to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit. This is useful for cases where you want a path that mandates authentication to be treated as a sign up page.

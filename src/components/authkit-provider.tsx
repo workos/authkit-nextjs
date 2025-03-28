@@ -9,9 +9,10 @@ import {
   switchToOrganizationAction,
 } from '../actions.js';
 import type { Impersonator, User } from '@workos-inc/node';
-import type { UserInfo, SwitchToOrganizationOptions } from '../interfaces.js';
+import type { UserInfo, SwitchToOrganizationOptions, NoUserInfo } from '../interfaces.js';
 
 type AuthContextType = {
+  accessToken: string | undefined;
   user: User | null;
   sessionId: string | undefined;
   organizationId: string | undefined;
@@ -38,9 +39,20 @@ interface AuthKitProviderProps {
    * You can also pass this as `false` to disable the expired session checks.
    */
   onSessionExpired?: false | (() => void);
+  /**
+   * If true, the access token will be fetched and stored in the context.
+   */
+  fetchAccessToken?: boolean;
 }
 
-export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderProps) => {
+function hasAccessToken(
+  auth: UserInfo | NoUserInfo | Omit<UserInfo | NoUserInfo, 'accessToken'>,
+): auth is UserInfo | NoUserInfo {
+  return 'accessToken' in auth;
+}
+
+export const AuthKitProvider = ({ children, onSessionExpired, fetchAccessToken = false }: AuthKitProviderProps) => {
+  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<User | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
@@ -50,10 +62,13 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+  const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean; fetchAccessToken?: boolean } = {}) => {
     setLoading(true);
     try {
-      const auth = await getAuthAction({ ensureSignedIn });
+      const auth = await getAuthAction({ ensureSignedIn, fetchAccessToken });
+      if (hasAccessToken(auth)) {
+        setAccessToken(auth.accessToken);
+      }
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -77,6 +92,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const switchToOrganization = async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
     const opts = { revalidationStrategy: 'none', ...options };
     const result = await switchToOrganizationAction(organizationId, {
+      fetchAccessToken,
       revalidationStrategy: 'none',
       ...options,
     });
@@ -94,7 +110,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
     try {
       setLoading(true);
-      const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+      const auth = await refreshAuthAction({ ensureSignedIn, organizationId, fetchAccessToken });
 
       setUser(auth.user);
       setSessionId(auth.sessionId);
@@ -168,6 +184,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   return (
     <AuthContext.Provider
       value={{
+        accessToken,
         user,
         sessionId,
         organizationId,
