@@ -3,11 +3,11 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
 import { refreshSession, terminateSession } from './session.js';
-
+import { getCookieOptions } from './cookie.js';
 export async function getSignInUrl({
   organizationId,
   loginHint,
@@ -25,14 +25,10 @@ export async function getSignUpUrl({
 }
 
 export async function signOut({ returnTo }: { returnTo?: string } = {}) {
-  const cookie: { name: string; domain?: string } = {
-    name: WORKOS_COOKIE_NAME || 'wos-session',
-  };
-  if (WORKOS_COOKIE_DOMAIN) cookie.domain = WORKOS_COOKIE_DOMAIN;
-
+  const cookieOptions = getCookieOptions();
   const nextCookies = await cookies();
-
-  nextCookies.delete(cookie);
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  nextCookies.delete({ name: cookieName, ...cookieOptions });
   await terminateSession({ returnTo });
 }
 

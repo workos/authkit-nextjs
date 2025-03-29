@@ -73,12 +73,12 @@ describe('cookie.ts', () => {
       const { getCookieOptions } = await import('../src/cookie');
       const options = getCookieOptions('http://example.com', true, false);
       expect(options).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite="lax"; Max-Age=34560000; Domain=example.com'),
+        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite=lax; Max-Age=34560000; Domain=example.com'),
       );
 
       const options2 = getCookieOptions('https://example.com', true, true);
       expect(options2).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite="lax"; Max-Age=0; Domain=example.com'),
+        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite=lax; Max-Age=0; Domain=example.com'),
       );
     });
 
