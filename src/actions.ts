@@ -51,3 +51,21 @@ export const refreshAuthAction = async ({
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
   return sanitize(await switchToOrganization(organizationId, options));
 };
+
+/**
+ * This action is used to get the access token from the auth object.
+ * It is used to fetch the access token from the server.
+ */
+export async function getAccessTokenAction() {
+  const auth = await withAuth();
+  return auth.accessToken;
+}
+
+/**
+ * This action is used to refresh the access token from the auth object.
+ * It is used to fetch the access token from the server.
+ */
+export async function refreshAccessTokenAction() {
+  const auth = await refreshSession();
+  return auth.accessToken;
+}
