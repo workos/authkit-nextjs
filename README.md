@@ -284,6 +284,66 @@ export function SwitchOrganizationButton() {
 }
 ```
 
+### Access Token Management
+
+#### useAccessToken Hook
+
+This library provides a `useAccessToken` hook for client-side access token management with automatic refresh functionality.
+
+##### Features
+
+- Automatic token refresh before expiration
+- Manual refresh capability
+- Loading and error states
+- Synchronized with the main authentication session
+- Race condition prevention
+
+##### When to Use
+
+Use this hook when you need direct access to the JWT token for:
+
+- Making authenticated API calls
+- Setting up external auth-dependent libraries
+- Implementing custom authentication logic
+
+##### Basic Usage
+
+```jsx
+function ApiClient() {
+  const { accessToken, loading, error, refresh } = useAccessToken();
+  
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!accessToken) return <div>Not authenticated</div>;
+  
+  return (
+    <div>
+      <p>Token available: {accessToken.substring(0, 10)}...</p>
+      <button onClick={refresh}>Refresh token</button>
+    </div>
+  );
+}
+```
+
+##### API Reference
+
+| Property      | Type | Description |
+|---------------|------|-------------|
+| `accessToken`  | `string \| undefined` | The current access token |
+| `loading` | `boolean` | True when token is being fetched or refreshed |
+| `error` | `Error \| null` | Error during token fetch/refresh, or null |
+| `refresh` | `() => Promise<string \| undefined>` | Manually refresh the token |
+
+##### Integration with useAuth
+The `useAccessToken` hook automatically synchronizes with the main authentication session. When you call `refreshAuth()` from `useAuth`, the access token will update accordingly. Similarly, using the `refresh()` method from `useAccessToken` will update the entire authentication session.
+
+##### Security Considerations
+JWT tokens are sensitive credentials and should be handled carefully:
+
+- Only use the token where necessary
+- Don't store tokens in localStorage or sessionStorage
+- Be cautious about exposing tokens in your application state
+
 ### Middleware auth
 
 The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
