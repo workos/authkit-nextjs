@@ -686,6 +686,77 @@ describe('session.ts', () => {
       expect(response.authorizationUrl).toBeDefined();
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
+
+    it('should call onSessionRefreshSuccess when refresh succeeds', async () => {
+      // Setup invalid session
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      // Mock token verification to fail
+      (jwtVerify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const newAccessToken = await generateTestToken();
+      const mockSuccessCallback = jest.fn();
+
+      // Mock successful refresh
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: newAccessToken,
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      const request = new NextRequest(new URL('http://example.com/protected'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      await updateSession(request, {
+        debug: true,
+        onSessionRefreshSuccess: mockSuccessCallback,
+      });
+
+      expect(mockSuccessCallback).toHaveBeenCalledTimes(1);
+      expect(mockSuccessCallback).toHaveBeenCalledWith({
+        accessToken: newAccessToken,
+        user: mockSession.user,
+        impersonator: undefined,
+      });
+    });
+
+    it('should call onSessionRefreshError when refresh fails', async () => {
+      // Setup invalid session
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      // Mock token verification to fail
+      (jwtVerify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const mockError = new Error('Refresh failed');
+      const mockErrorCallback = jest.fn();
+
+      // Mock refresh failure
+      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(mockError);
+
+      const request = new NextRequest(new URL('http://example.com/protected'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      await updateSession(request, {
+        debug: true,
+        onSessionRefreshError: mockErrorCallback,
+      });
+
+      expect(mockErrorCallback).toHaveBeenCalledTimes(1);
+      expect(mockErrorCallback).toHaveBeenCalledWith({
+        error: mockError,
+        request,
+      });
+    });
   });
 
   describe('refreshSession', () => {

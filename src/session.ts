@@ -219,6 +219,8 @@ async function updateSession(
       entitlements,
     } = decodeJwt<AccessToken>(accessToken);
 
+    options.onSessionRefreshSuccess?.({ accessToken, user, impersonator });
+
     return {
       session: {
         sessionId,
@@ -240,6 +242,8 @@ async function updateSession(
     // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
     const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
     newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    options.onSessionRefreshError?.({ error: e, request });
 
     return {
       session: { user: null },
