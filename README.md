@@ -59,11 +59,10 @@ WORKOS_API_PORT=3000 # port to use for API calls
 WORKOS_COOKIE_SAMESITE='lax' # SameSite attribute for cookies: 'lax' (default), 'strict', or 'none'.
 ```
 
->[!WARNING]
->Setting `WORKOS_COOKIE_SAMESITE='none'` allows cookies to be sent in cross-origin contexts (like iframes), but reduces protection against CSRF attacks. This setting forces cookies to be secure (HTTPS only) and should only be used when absolutely necessary for your application architecture.
+> [!WARNING]
+> Setting `WORKOS_COOKIE_SAMESITE='none'` allows cookies to be sent in cross-origin contexts (like iframes), but reduces protection against CSRF attacks. This setting forces cookies to be secure (HTTPS only) and should only be used when absolutely necessary for your application architecture.
 
->[!TIP]
->`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains. Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains. Not needed for most use cases.
+> [!TIP] >`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains. Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains. Not needed for most use cases.
 
 ## Setup
 
@@ -311,11 +310,11 @@ Use this hook when you need direct access to the JWT token for:
 ```jsx
 function ApiClient() {
   const { accessToken, loading, error, refresh } = useAccessToken();
-  
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
   if (!accessToken) return <div>Not authenticated</div>;
-  
+
   return (
     <div>
       <p>Token available: {accessToken.substring(0, 10)}...</p>
@@ -327,17 +326,19 @@ function ApiClient() {
 
 ##### API Reference
 
-| Property      | Type | Description |
-|---------------|------|-------------|
-| `accessToken`  | `string \| undefined` | The current access token |
-| `loading` | `boolean` | True when token is being fetched or refreshed |
-| `error` | `Error \| null` | Error during token fetch/refresh, or null |
-| `refresh` | `() => Promise<string \| undefined>` | Manually refresh the token |
+| Property      | Type                                 | Description                                   |
+| ------------- | ------------------------------------ | --------------------------------------------- |
+| `accessToken` | `string \| undefined`                | The current access token                      |
+| `loading`     | `boolean`                            | True when token is being fetched or refreshed |
+| `error`       | `Error \| null`                      | Error during token fetch/refresh, or null     |
+| `refresh`     | `() => Promise<string \| undefined>` | Manually refresh the token                    |
 
 ##### Integration with useAuth
+
 The `useAccessToken` hook automatically synchronizes with the main authentication session. When you call `refreshAuth()` from `useAuth`, the access token will update accordingly. Similarly, using the `refresh()` method from `useAccessToken` will update the entire authentication session.
 
 ##### Security Considerations
+
 JWT tokens are sensitive credentials and should be handled carefully:
 
 - Only use the token where necessary
@@ -358,11 +359,11 @@ const { session, headers } = await authkit(request, {
     // Log refresh failure
     console.error('Session refresh failed:', error);
     // Notify monitoring system
-    await notifyMonitoring('session_refresh_failed', { 
+    await notifyMonitoring('session_refresh_failed', {
       url: request.url,
-      error: error.message
+      error: error.message,
     });
-  }
+  },
 });
 ```
 
@@ -509,7 +510,7 @@ const workos = getWorkOS();
 const organizations = await workos.organizations.listOrganizations({
   limit: 10,
 });
-````
+```
 
 ### Advanced: Custom authentication flows
 
@@ -532,19 +533,22 @@ async function handleEmailVerification(req) {
   });
 
   // Save the session data to a cookie
-  await saveSession({
-    accessToken: authResponse.accessToken,
-    refreshToken: authResponse.refreshToken,
-    user: authResponse.user,
-    impersonator: authResponse.impersonator
-  }, req);
+  await saveSession(
+    {
+      accessToken: authResponse.accessToken,
+      refreshToken: authResponse.refreshToken,
+      user: authResponse.user,
+      impersonator: authResponse.impersonator,
+    },
+    req,
+  );
 
   return Response.redirect('/dashboard');
 }
 ```
 
->[!NOTE]
->This is an advanced API intended for specific integration scenarios, such as those users using self-hosted AuthKit. If you're using hosted AuthKit you should not need this.
+> [!NOTE]
+> This is an advanced API intended for specific integration scenarios, such as those users using self-hosted AuthKit. If you're using hosted AuthKit you should not need this.
 
 The `saveSession` function accepts either a `NextRequest` object or a URL string as its second parameter.
 
