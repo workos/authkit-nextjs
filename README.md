@@ -344,6 +344,35 @@ JWT tokens are sensitive credentials and should be handled carefully:
 - Don't store tokens in localStorage or sessionStorage
 - Be cautious about exposing tokens in your application state
 
+### Session Refresh Callbacks
+
+When using the `authkit` function directly, you can provide callbacks to be notified when a session is refreshed:
+
+```typescript
+const { session, headers } = await authkit(request, {
+  onSessionRefreshSuccess: async ({ accessToken, user, impersonator }) => {
+    // Log successful refresh
+    console.log(`Session refreshed for ${user.email}.`);
+  },
+  onSessionRefreshError: async ({ error, request }) => {
+    // Log refresh failure
+    console.error('Session refresh failed:', error);
+    // Notify monitoring system
+    await notifyMonitoring('session_refresh_failed', { 
+      url: request.url,
+      error: error.message
+    });
+  }
+});
+```
+
+These callbacks provide a way to perform side effects when sessions are refreshed in the middleware. Common use cases include:
+
+- Logging authentication events
+- Updating last activity timestamps
+- Triggering organization-specific data prefetching
+- Recording failed refresh attempts
+
 ### Middleware auth
 
 The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
