@@ -5,6 +5,8 @@ import {
   getAuthAction,
   refreshAuthAction,
   switchToOrganizationAction,
+  getAccessTokenAction,
+  refreshAccessTokenAction,
 } from '../src/actions.js';
 import { signOut, switchToOrganization } from '../src/auth.js';
 import { getWorkOS } from '../src/workos.js';
@@ -25,8 +27,8 @@ jest.mock('../src/workos.js', () => ({
 }));
 
 jest.mock('../src/session.js', () => ({
-  withAuth: jest.fn().mockResolvedValue({ user: 'testUser' }),
-  refreshSession: jest.fn().mockResolvedValue({ session: 'newSession' }),
+  withAuth: jest.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
+  refreshSession: jest.fn().mockResolvedValue({ session: 'newSession', accessToken: 'refreshed_token' }),
 }));
 
 describe('actions', () => {
@@ -77,6 +79,22 @@ describe('actions', () => {
       const result = await switchToOrganizationAction('org_123', options);
       expect(switchToOrganization).toHaveBeenCalledWith('org_123', options);
       expect(result).toEqual({ organizationId: 'org_123' });
+    });
+  });
+
+  describe('getAccessTokenAction', () => {
+    it('should return access token', async () => {
+      const result = await getAccessTokenAction();
+      expect(withAuth).toHaveBeenCalled();
+      expect(result).toEqual('access_token');
+    });
+  });
+
+  describe('refreshAccessTokenAction', () => {
+    it('should refresh access token', async () => {
+      const result = await refreshAccessTokenAction();
+      expect(refreshSession).toHaveBeenCalled();
+      expect(result).toEqual('refreshed_token');
     });
   });
 });
