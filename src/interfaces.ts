@@ -76,6 +76,12 @@ export interface AuthkitOptions {
   debug?: boolean;
   redirectUri?: string;
   screenHint?: 'sign-up' | 'sign-in';
+  onSessionRefreshSuccess?: (data: {
+    accessToken: string;
+    user: User;
+    impersonator?: Impersonator;
+  }) => void | Promise<void>;
+  onSessionRefreshError?: (params: { error?: unknown; request: NextRequest }) => void | Promise<void>;
 }
 
 export interface AuthkitResponse {
