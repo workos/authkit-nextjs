@@ -722,6 +722,7 @@ describe('session.ts', () => {
         accessToken: newAccessToken,
         user: mockSession.user,
         impersonator: undefined,
+        organizationId: 'org_123',
       });
     });
 

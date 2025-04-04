@@ -80,6 +80,7 @@ export interface AuthkitOptions {
     accessToken: string;
     user: User;
     impersonator?: Impersonator;
+    organizationId?: string;
   }) => void | Promise<void>;
   onSessionRefreshError?: (params: { error?: unknown; request: NextRequest }) => void | Promise<void>;
 }
