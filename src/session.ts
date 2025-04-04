@@ -220,7 +220,7 @@ async function updateSession(
       entitlements,
     } = decodeJwt<AccessToken>(accessToken);
 
-    options.onSessionRefreshSuccess?.({ accessToken, user, impersonator });
+    options.onSessionRefreshSuccess?.({ accessToken, user, impersonator, organizationId });
 
     return {
       session: {
