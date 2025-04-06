@@ -103,7 +103,6 @@ async function updateSessionMiddleware(
   }
 
   return NextResponse.next({
-    request: { headers },
     headers,
   });
 }
