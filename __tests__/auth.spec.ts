@@ -8,7 +8,11 @@ import * as workosModule from '../src/workos.js';
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { generateSession } from './test-helpers.js';
+import { generateSession, generateTestToken } from './test-helpers.js';
+import { sealData } from 'iron-session';
+import { getWorkOS } from '../src/workos.js';
+
+const workos = getWorkOS();
 
 jest.mock('next/cache', () => {
   const actual = jest.requireActual<typeof cache>('next/cache');
@@ -25,6 +29,7 @@ const fakeWorkosInstance = {
     authenticateWithRefreshToken: jest.fn(),
     getAuthorizationUrl: jest.fn(),
     getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    getLogoutUrl: jest.fn(),
   },
 };
 
@@ -40,7 +45,6 @@ jest.mock('../src/session', () => {
   return {
     ...actual,
     refreshSession: jest.fn(actual.refreshSession),
-    terminateSession: jest.fn(actual.terminateSession),
   };
 });
 
@@ -221,16 +225,32 @@ describe('auth.ts', () => {
     });
 
     describe('when given a `returnTo` parameter', () => {
-      it('passes the `returnTo` through to `terminateSession`', async () => {
+      it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
+        jest
+          .spyOn(workos.userManagement, 'getLogoutUrl')
+          .mockReturnValue('https://user-management-logout.com/signed-out');
+        const mockSession = {
+          accessToken: await generateTestToken(),
+          sessionId: 'session_123',
+        } as const;
+
         const nextHeaders = await headers();
+        nextHeaders.set(
+          'x-workos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
 
         nextHeaders.set('x-workos-middleware', 'true');
 
         await signOut({ returnTo: 'https://example.com/signed-out' });
 
         expect(redirect).toHaveBeenCalledTimes(1);
-        expect(redirect).toHaveBeenCalledWith('https://example.com/signed-out');
-        expect(session.terminateSession).toHaveBeenCalledWith({ returnTo: 'https://example.com/signed-out' });
+        expect(redirect).toHaveBeenCalledWith('https://user-management-logout.com/signed-out');
+        expect(workos.userManagement.getLogoutUrl).toHaveBeenCalledWith(
+          expect.objectContaining({
+            returnTo: 'https://example.com/signed-out',
+          }),
+        );
       });
 
       describe('when there is no session', () => {
