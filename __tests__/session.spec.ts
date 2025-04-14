@@ -839,7 +839,7 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
-      expect(refreshSession()).rejects.toThrow('error');
+      await expect(refreshSession()).rejects.toThrow('error');
     });
   });
 });
