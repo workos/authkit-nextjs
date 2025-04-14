@@ -386,15 +386,6 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
   };
 }
 
-async function terminateSession({ returnTo }: { returnTo?: string } = {}) {
-  const { sessionId } = await withAuth();
-  if (sessionId) {
-    redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
-  } else {
-    redirect(returnTo ?? '/');
-  }
-}
-
 async function verifyAccessToken(accessToken: string) {
   try {
     await jwtVerify(accessToken, JWKS());
@@ -495,4 +486,4 @@ export async function saveSession(
   nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 }
 
-export { encryptSession, refreshSession, terminateSession, updateSession, updateSessionMiddleware, withAuth };
+export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };
