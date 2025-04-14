@@ -3,11 +3,11 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { WORKOS_COOKIE_NAME } from './env-variables.js';
+import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
-import { refreshSession, terminateSession } from './session.js';
-import { getCookieOptions } from './cookie.js';
+import { refreshSession, withAuth } from './session.js';
+import { getWorkOS } from './workos.js';
 export async function getSignInUrl({
   organizationId,
   loginHint,
@@ -24,12 +24,29 @@ export async function getSignUpUrl({
   return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri });
 }
 
+/**
+ * Sign out the user and delete the session cookie.
+ * @param options Options for signing out.
+ * @param options.returnTo The URL to redirect to after signing out.
+ */
 export async function signOut({ returnTo }: { returnTo?: string } = {}) {
-  const cookieOptions = getCookieOptions();
-  const nextCookies = await cookies();
-  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  nextCookies.delete({ name: cookieName, ...cookieOptions });
-  await terminateSession({ returnTo });
+  let sessionId: string | undefined;
+
+  try {
+    const { sessionId: sid } = await withAuth();
+    sessionId = sid;
+  } finally {
+    const nextCookies = await cookies();
+    const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+    const domain = WORKOS_COOKIE_DOMAIN || /* istanbul ignore next */ undefined;
+    nextCookies.delete({ name: cookieName, domain, path: '/' });
+
+    if (sessionId) {
+      redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
+    } else {
+      redirect(returnTo ?? '/');
+    }
+  }
 }
 
 export async function switchToOrganization(
