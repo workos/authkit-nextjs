@@ -3,6 +3,7 @@ import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { useAuth } from './authkit-provider.js';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
+const MIN_REFRESH_DELAY = 15_000; // minimum delay before refreshing token
 const RETRY_DELAY = 5 * 60 * 1000;
 
 interface TokenState {
@@ -103,7 +104,7 @@ export function useAccessToken() {
       if (token) {
         const tokenData = parseToken(token);
         if (tokenData) {
-          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, 0);
+          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, MIN_REFRESH_DELAY);
           clearRefreshTimeout();
           refreshTimeoutRef.current = setTimeout(updateToken, delay);
         }
@@ -133,7 +134,7 @@ export function useAccessToken() {
       if (token) {
         const tokenData = parseToken(token);
         if (tokenData) {
-          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, 0);
+          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, MIN_REFRESH_DELAY);
           clearRefreshTimeout();
           refreshTimeoutRef.current = setTimeout(updateToken, delay);
         }
