@@ -3,7 +3,8 @@ import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { useAuth } from './authkit-provider.js';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
-const RETRY_DELAY = 5 * 60 * 1000;
+const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
+const RETRY_DELAY_SECONDS = 300; // 5 minutes
 
 interface TokenState {
   token: string | undefined;
@@ -31,6 +32,10 @@ function tokenReducer(state: TokenState, action: TokenAction): TokenState {
     default:
       return state;
   }
+}
+
+function getRefreshDelay(timeUntilExpiry: number) {
+  return Math.max((timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, MIN_REFRESH_DELAY_SECONDS * 1000);
 }
 
 function parseToken(token: string | undefined) {
@@ -103,7 +108,7 @@ export function useAccessToken() {
       if (token) {
         const tokenData = parseToken(token);
         if (tokenData) {
-          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, 0);
+          const delay = getRefreshDelay(tokenData.timeUntilExpiry);
           clearRefreshTimeout();
           refreshTimeoutRef.current = setTimeout(updateToken, delay);
         }
@@ -112,14 +117,16 @@ export function useAccessToken() {
       return token;
     } catch (error) {
       dispatch({ type: 'FETCH_ERROR', error: error instanceof Error ? error : new Error(String(error)) });
-      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY);
+      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
     }
   }, [clearRefreshTimeout]);
 
   const refresh = useCallback(async () => {
-    if (fetchingRef.current) return;
+    if (fetchingRef.current) {
+      return;
+    }
 
     fetchingRef.current = true;
     dispatch({ type: 'FETCH_START' });
@@ -133,7 +140,7 @@ export function useAccessToken() {
       if (token) {
         const tokenData = parseToken(token);
         if (tokenData) {
-          const delay = Math.max((tokenData.timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, 0);
+          const delay = getRefreshDelay(tokenData.timeUntilExpiry);
           clearRefreshTimeout();
           refreshTimeoutRef.current = setTimeout(updateToken, delay);
         }
@@ -143,7 +150,7 @@ export function useAccessToken() {
     } catch (error) {
       const typedError = error instanceof Error ? error : new Error(String(error));
       dispatch({ type: 'FETCH_ERROR', error: typedError });
-      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY);
+      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
     }
