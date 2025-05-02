@@ -1,10 +1,30 @@
 module.exports = {
   root: true,
   extends: [
-		'eslint:recommended',
-		'prettier',
+    'eslint:recommended',
+    'prettier',
     'plugin:@typescript-eslint/recommended',
-    'plugin:require-extensions/recommended',
+    'plugin:import/recommended',
+    'plugin:import/typescript',
   ],
-  plugins: ['require-extensions'],
+  settings: {
+    'import/resolver': {
+      typescript: {
+        extensions: ['.js'],
+      },
+      node: {
+        extensions: ['.js'],
+      },
+    },
+  },
+  rules: {
+    'import/extensions': [
+      'error',
+      'always',
+      {
+        ts: 'never',
+        tsx: 'never',
+      },
+    ],
+  },
 };

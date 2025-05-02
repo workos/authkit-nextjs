@@ -2,20 +2,20 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from '../src/auth.js';
 import * as session from '../src/session.js';
-import * as cache from 'next/cache';
+import * as cache from 'next/cache.js';
 import * as workosModule from '../src/workos.js';
 
 // These are mocked in jest.setup.ts
-import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { cookies, headers } from 'next/headers.js';
+import { redirect } from 'next/navigation.js';
 import { generateSession, generateTestToken } from './test-helpers.js';
 import { sealData } from 'iron-session';
 import { getWorkOS } from '../src/workos.js';
 
 const workos = getWorkOS();
 
-jest.mock('next/cache', () => {
-  const actual = jest.requireActual<typeof cache>('next/cache');
+jest.mock('next/cache.js', () => {
+  const actual = jest.requireActual<typeof cache>('next/cache.js');
   return {
     ...actual,
     revalidateTag: jest.fn(),
