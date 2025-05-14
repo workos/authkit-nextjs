@@ -33,6 +33,7 @@ describe('authkit-callback-route', () => {
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
+    organizationId: 'org_123',
     oauthTokens: {
       accessToken: 'access123',
       refreshToken: 'refresh123',
