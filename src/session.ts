@@ -250,6 +250,7 @@ async function updateSession(
       headers: newRequestHeaders,
       authorizationUrl: await getAuthorizationUrl({
         returnPathname: getReturnPathname(request.url),
+        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
       }),
     };
   }
