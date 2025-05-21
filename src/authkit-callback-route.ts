@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { saveSession } from './session.js';

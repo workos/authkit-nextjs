@@ -1,4 +1,4 @@
-import { NextMiddleware, NextRequest } from 'next/server';
+import { NextMiddleware, NextRequest } from 'next/server.js';
 import { updateSessionMiddleware, updateSession } from './session.js';
 import { AuthkitMiddlewareOptions, AuthkitOptions, AuthkitResponse } from './interfaces.js';
 import { WORKOS_REDIRECT_URI } from './env-variables.js';
