@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { useAuth } from './authkit-provider.js';
+import { decodeJwt } from 'jose';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
@@ -173,4 +174,21 @@ export function useAccessToken() {
     error: state.error,
     refresh,
   };
+}
+
+export function useCustomClaims<T = Record<string, unknown>>() {
+  const { accessToken } = useAccessToken();
+
+  return useMemo(() => {
+    if (!accessToken) {
+      return null;
+    }
+
+    const decoded = decodeJwt(accessToken);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { aud, exp, iat, iss, sub, sid, org_id, role, permissions, entitlements, jti, nbf, ...custom } = decoded;
+
+    return custom as T;
+  }, [accessToken]);
 }
