@@ -1,9 +1,9 @@
-import React from 'react';
-import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { useAccessToken } from '../src/components/useAccessToken.js';
+import { act, render, waitFor } from '@testing-library/react';
+import React from 'react';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../src/actions.js';
 import { useAuth } from '../src/components/authkit-provider.js';
+import { useAccessToken } from '../src/components/useAccessToken.js';
 
 jest.mock('../src/actions.js', () => ({
   getAccessTokenAction: jest.fn(),

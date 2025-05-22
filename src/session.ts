@@ -355,6 +355,18 @@ async function redirectToSignIn() {
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
+export async function getCustomClaims<T = Record<string, unknown>>(accessToken?: string) {
+  const token = accessToken ?? (await withAuth()).accessToken;
+  if (!token) {
+    return null;
+  }
+
+  const decoded = decodeJwt(token);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { aud, exp, iat, iss, sub, sid, org_id, role, permissions, entitlements, jti, nbf, ...custom } = decoded;
+  return custom as T;
+}
+
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
 async function withAuth(options?: { ensureSignedIn?: true | false }): Promise<UserInfo | NoUserInfo>;
 async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInfo | NoUserInfo> {
