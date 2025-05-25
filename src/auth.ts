@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME, WORKOS_COOKIE_SAMESITE } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
@@ -38,8 +38,10 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   } finally {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+    const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
     const domain = WORKOS_COOKIE_DOMAIN || /* istanbul ignore next */ undefined;
-    nextCookies.delete({ name: cookieName, domain, path: '/' });
+    const secure = sameSite.toLowerCase() === 'none' ? true : undefined;
+    nextCookies.delete({ name: cookieName, domain, path: '/', sameSite, secure });
 
     if (sessionId) {
       redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
