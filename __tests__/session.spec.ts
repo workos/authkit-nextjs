@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server.js';
 import { cookies, headers } from 'next/headers.js';
 import { redirect } from 'next/navigation.js';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware } from '../src/session.js';
+import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getCustomClaims } from '../src/session.js';
 import { getWorkOS } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
@@ -840,6 +840,106 @@ describe('session.ts', () => {
       );
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
       await expect(refreshSession()).rejects.toThrow('error');
+    });
+  });
+
+  describe('getCustomClaims', () => {
+    beforeEach(async () => {
+      const nextCookies = await cookies();
+      // @ts-expect-error - _reset is part of the mock
+      nextCookies._reset();
+      jest.clearAllMocks();
+    });
+
+    it('should return custom claims when accessToken is provided', async () => {
+      const customClaims = { department: 'engineering', level: 5, metadata: { theme: 'dark' } };
+      const token = await generateTestToken({
+        sub: 'user_123',
+        org_id: 'org_123',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        entitlements: ['feature_a'],
+        ...customClaims,
+      });
+
+      const result = await getCustomClaims(token);
+
+      expect(result).toEqual(customClaims);
+    });
+
+    it('should return null when no accessToken is provided and no session exists', async () => {
+      const result = await getCustomClaims();
+
+      expect(result).toBeNull();
+    });
+
+    it('should return empty object when token has no custom claims', async () => {
+      const token = await generateTestToken({
+        sub: 'user_123',
+        org_id: 'org_123',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        entitlements: ['feature_a'],
+      });
+
+      const result = await getCustomClaims(token);
+
+      expect(result).toEqual({});
+    });
+
+    it('should filter out all standard JWT claims', async () => {
+      const customClaims = { customField: 'value', anotherCustom: 42 };
+      const token = await generateTestToken({
+        aud: 'audience',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+        iss: 'issuer',
+        sub: 'user_123',
+        sid: 'session_123',
+        org_id: 'org_123',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        entitlements: ['feature_a'],
+        jti: 'jwt_123',
+        nbf: Math.floor(Date.now() / 1000),
+        ...customClaims,
+      });
+
+      const result = await getCustomClaims(token);
+
+      expect(result).toEqual(customClaims);
+      expect(result).not.toHaveProperty('aud');
+      expect(result).not.toHaveProperty('exp');
+      expect(result).not.toHaveProperty('iat');
+      expect(result).not.toHaveProperty('iss');
+      expect(result).not.toHaveProperty('sub');
+      expect(result).not.toHaveProperty('sid');
+      expect(result).not.toHaveProperty('org_id');
+      expect(result).not.toHaveProperty('role');
+      expect(result).not.toHaveProperty('permissions');
+      expect(result).not.toHaveProperty('entitlements');
+      expect(result).not.toHaveProperty('jti');
+      expect(result).not.toHaveProperty('nbf');
+    });
+
+    it('should handle complex nested custom claims', async () => {
+      const customClaims = {
+        metadata: {
+          preferences: { theme: 'dark', language: 'en' },
+          settings: ['setting1', 'setting2'],
+        },
+        tags: ['tag1', 'tag2'],
+        permissions_custom: { read: true, write: false },
+      };
+      const token = await generateTestToken({
+        sub: 'user_123',
+        org_id: 'org_123',
+        ...customClaims,
+      });
+
+      const result = await getCustomClaims(token);
+
+      expect(result).toEqual(customClaims);
     });
   });
 });
