@@ -10,6 +10,7 @@ export interface HandleAuthOptions {
 
 export interface HandleAuthSuccessData extends Session {
   oauthTokens?: OauthTokens;
+  organizationId?: string;
   authenticationMethod?: AuthenticationResponse['authenticationMethod'];
 }
 
