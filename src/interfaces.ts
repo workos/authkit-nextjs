@@ -1,4 +1,4 @@
-import type { OauthTokens, User } from '@workos-inc/node';
+import type { AuthenticationResponse, OauthTokens, User } from '@workos-inc/node';
 import { type NextRequest } from 'next/server';
 
 export interface HandleAuthOptions {
@@ -10,6 +10,7 @@ export interface HandleAuthOptions {
 
 export interface HandleAuthSuccessData extends Session {
   oauthTokens?: OauthTokens;
+  authenticationMethod?: AuthenticationResponse['authenticationMethod'];
 }
 
 export interface Impersonator {
