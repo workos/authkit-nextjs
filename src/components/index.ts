@@ -1,6 +1,6 @@
 import { Impersonation } from './impersonation.js';
 import { AuthKitProvider, useAuth } from './authkit-provider.js';
 import { useAccessToken } from './useAccessToken.js';
-import { useCustomClaims } from './useCustomClaims.js';
+import { useTokenClaims } from './useTokenClaims.js';
 
-export { Impersonation, AuthKitProvider, useAuth, useAccessToken, useCustomClaims };
+export { Impersonation, AuthKitProvider, useAuth, useAccessToken, useTokenClaims };
