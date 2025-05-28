@@ -1,8 +1,8 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
-import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { revalidatePath, revalidateTag } from 'next/cache.js';
+import { cookies, headers } from 'next/headers.js';
+import { redirect } from 'next/navigation.js';
 import { WORKOS_COOKIE_DOMAIN, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';

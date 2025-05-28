@@ -1,5 +1,5 @@
 import type { AuthenticationResponse, OauthTokens, User } from '@workos-inc/node';
-import { type NextRequest } from 'next/server';
+import { type NextRequest } from 'next/server.js';
 
 export interface HandleAuthOptions {
   returnPathname?: string;
