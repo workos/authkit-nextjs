@@ -88,8 +88,11 @@ If your application needs to persist data upon a successful authentication, like
 
 ```ts
 export const GET = handleAuth({
-  onSuccess: async ({ oauthTokens }) => {
+  onSuccess: async ({ user, oauthTokens, authenticationMethod, organizationId }) => {
     await saveTokens(oauthTokens);
+    if (authenticationMethod) {
+      await saveAuthMethod(user.id, authenticationMethod);
+    }
   },
 });
 ```
@@ -102,6 +105,22 @@ export const GET = handleAuth({
 | `baseURL`        | `undefined` | The base URL to use for the redirect URI instead of the one in the request. Useful if the app is being run in a container like docker where the hostname can be different from the one in the request |
 | `onSuccess`      | `undefined` | A function that receives successful authentication data and can be used for side-effects like persisting tokens                                                                                       |
 | `onError`        | `undefined` | A function that can receive the error and the request and handle the error in its own way.                                                                                                            |
+
+#### onSuccess callback data
+
+The `onSuccess` callback receives the following data:
+
+| Property               | Type                        | Description                                                                                        |
+| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `user`                 | `User`                      | The authenticated user object                                                                      |
+| `accessToken`          | `string`                    | JWT access token                                                                                   |
+| `refreshToken`         | `string`                    | Refresh token for session renewal                                                                  |
+| `impersonator`         | `Impersonator \| undefined` | Present if user is being impersonated                                                              |
+| `oauthTokens`          | `OauthTokens \| undefined`  | OAuth tokens from upstream provider                                                                |
+| `authenticationMethod` | `string \| undefined`       | How the user authenticated (e.g., 'password', 'google-oauth'). Only available during initial login |
+| `organizationId`       | `string \| undefined`       | Organization context of authentication                                                             |
+
+**Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
 ### Middleware
 
