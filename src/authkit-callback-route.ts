@@ -25,7 +25,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     if (code) {
       try {
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
-        const { accessToken, refreshToken, user, impersonator, oauthTokens } =
+        const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
           await getWorkOS().userManagement.authenticateWithCode({
             clientId: WORKOS_CLIENT_ID,
             code,
@@ -62,7 +62,15 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
         if (onSuccess) {
-          await onSuccess({ accessToken, refreshToken, user, impersonator, oauthTokens });
+          await onSuccess({
+            accessToken,
+            refreshToken,
+            user,
+            impersonator,
+            oauthTokens,
+            authenticationMethod,
+            organizationId,
+          });
         }
 
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
