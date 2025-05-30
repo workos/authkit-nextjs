@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom';
 import { render, waitFor } from '@testing-library/react';
 import React from 'react';
-import { getAccessTokenAction } from '../src/actions.js';
 import { useAuth } from '../src/components/authkit-provider.js';
 
 jest.mock('../src/actions.js', () => ({
@@ -38,8 +37,8 @@ jest.mock('jose', () => ({
 }));
 
 // Import after mocks are set up
-import { useTokenClaims } from '../src/components/useTokenClaims.js';
 import { useAccessToken } from '../src/components/useAccessToken.js';
+import { useTokenClaims } from '../src/components/useTokenClaims.js';
 
 describe('useTokenClaims', () => {
   beforeEach(() => {
@@ -51,7 +50,7 @@ describe('useTokenClaims', () => {
       sessionId: 'session_123',
       refreshAuth: jest.fn().mockResolvedValue({}),
     }));
-    
+
     // Reset useAccessToken mock to default
     (useAccessToken as jest.Mock).mockReturnValue({ accessToken: undefined });
   });
