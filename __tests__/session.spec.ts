@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server.js';
 import { cookies, headers } from 'next/headers.js';
 import { redirect } from 'next/navigation.js';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getCustomClaims } from '../src/session.js';
+import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from '../src/session.js';
 import { getWorkOS } from '../src/workos.js';
 import * as envVariables from '../src/env-variables.js';
 
@@ -843,7 +843,7 @@ describe('session.ts', () => {
     });
   });
 
-  describe('getCustomClaims', () => {
+  describe('getTokenClaims', () => {
     beforeEach(async () => {
       const nextCookies = await cookies();
       // @ts-expect-error - _reset is part of the mock
@@ -851,49 +851,52 @@ describe('session.ts', () => {
       jest.clearAllMocks();
     });
 
-    it('should return custom claims when accessToken is provided', async () => {
-      const customClaims = { department: 'engineering', level: 5, metadata: { theme: 'dark' } };
-      const token = await generateTestToken({
+    it('should return all token claims when accessToken is provided', async () => {
+      const tokenPayload = {
         sub: 'user_123',
         org_id: 'org_123',
         role: 'admin',
         permissions: ['read', 'write'],
         entitlements: ['feature_a'],
-        ...customClaims,
-      });
+        department: 'engineering',
+        level: 5,
+        metadata: { theme: 'dark' },
+      };
+      const token = await generateTestToken(tokenPayload);
 
-      const result = await getCustomClaims(token);
+      const result = await getTokenClaims(token);
 
-      expect(result).toEqual(customClaims);
+      expect(result).toMatchObject(tokenPayload);
     });
 
-    it('should return null when no accessToken is provided and no session exists', async () => {
-      const result = await getCustomClaims();
-
-      expect(result).toBeNull();
-    });
-
-    it('should return empty object when token has no custom claims', async () => {
-      const token = await generateTestToken({
-        sub: 'user_123',
-        org_id: 'org_123',
-        role: 'admin',
-        permissions: ['read', 'write'],
-        entitlements: ['feature_a'],
-      });
-
-      const result = await getCustomClaims(token);
+    it('should return empty object when no accessToken is provided and no session exists', async () => {
+      const result = await getTokenClaims();
 
       expect(result).toEqual({});
     });
 
-    it('should filter out all standard JWT claims', async () => {
-      const customClaims = { customField: 'value', anotherCustom: 42 };
-      const token = await generateTestToken({
+    it('should return all standard claims when token has only standard claims', async () => {
+      const tokenPayload = {
+        sub: 'user_123',
+        org_id: 'org_123',
+        role: 'admin',
+        permissions: ['read', 'write'],
+        entitlements: ['feature_a'],
+      };
+      const token = await generateTestToken(tokenPayload);
+
+      const result = await getTokenClaims(token);
+
+      expect(result).toMatchObject(tokenPayload);
+    });
+
+    it('should return all claims including standard JWT claims', async () => {
+      const customClaims = {
+        customField: 'value',
+        anotherCustom: 42,
+      };
+      const standardClaims = {
         aud: 'audience',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        iat: Math.floor(Date.now() / 1000),
-        iss: 'issuer',
         sub: 'user_123',
         sid: 'session_123',
         org_id: 'org_123',
@@ -901,29 +904,21 @@ describe('session.ts', () => {
         permissions: ['read', 'write'],
         entitlements: ['feature_a'],
         jti: 'jwt_123',
-        nbf: Math.floor(Date.now() / 1000),
-        ...customClaims,
-      });
+      };
+      const token = await generateTestToken({ ...standardClaims, ...customClaims });
 
-      const result = await getCustomClaims(token);
+      const result = await getTokenClaims(token);
 
-      expect(result).toEqual(customClaims);
-      expect(result).not.toHaveProperty('aud');
-      expect(result).not.toHaveProperty('exp');
-      expect(result).not.toHaveProperty('iat');
-      expect(result).not.toHaveProperty('iss');
-      expect(result).not.toHaveProperty('sub');
-      expect(result).not.toHaveProperty('sid');
-      expect(result).not.toHaveProperty('org_id');
-      expect(result).not.toHaveProperty('role');
-      expect(result).not.toHaveProperty('permissions');
-      expect(result).not.toHaveProperty('entitlements');
-      expect(result).not.toHaveProperty('jti');
-      expect(result).not.toHaveProperty('nbf');
+      expect(result).toMatchObject({ ...standardClaims, ...customClaims });
+      expect(result).toHaveProperty('exp');
+      expect(result).toHaveProperty('iat');
+      expect(result).toHaveProperty('iss');
     });
 
-    it('should handle complex nested custom claims', async () => {
-      const customClaims = {
+    it('should handle complex nested claims', async () => {
+      const tokenPayload = {
+        sub: 'user_123',
+        org_id: 'org_123',
         metadata: {
           preferences: { theme: 'dark', language: 'en' },
           settings: ['setting1', 'setting2'],
@@ -931,15 +926,11 @@ describe('session.ts', () => {
         tags: ['tag1', 'tag2'],
         permissions_custom: { read: true, write: false },
       };
-      const token = await generateTestToken({
-        sub: 'user_123',
-        org_id: 'org_123',
-        ...customClaims,
-      });
+      const token = await generateTestToken(tokenPayload);
 
-      const result = await getCustomClaims(token);
+      const result = await getTokenClaims(token);
 
-      expect(result).toEqual(customClaims);
+      expect(result).toMatchObject(tokenPayload);
     });
   });
 });

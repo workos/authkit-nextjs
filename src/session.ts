@@ -1,7 +1,7 @@
 'use server';
 
 import { sealData, unsealData } from 'iron-session';
-import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
+import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers.js';
 import { redirect } from 'next/navigation.js';
 import { NextRequest, NextResponse } from 'next/server.js';
@@ -355,16 +355,15 @@ async function redirectToSignIn() {
   redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
 }
 
-export async function getCustomClaims<T = Record<string, unknown>>(accessToken?: string) {
+export async function getTokenClaims<T = Record<string, unknown>>(
+  accessToken?: string,
+): Promise<Partial<JWTPayload & T>> {
   const token = accessToken ?? (await withAuth()).accessToken;
   if (!token) {
-    return null;
+    return {};
   }
 
-  const decoded = decodeJwt(token);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { aud, exp, iat, iss, sub, sid, org_id, role, permissions, entitlements, jti, nbf, ...custom } = decoded;
-  return custom as T;
+  return decodeJwt<T>(token);
 }
 
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;

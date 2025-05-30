@@ -1,9 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, waitFor } from '@testing-library/react';
 import React from 'react';
-import { getAccessTokenAction } from '../src/actions.js';
 import { useAuth } from '../src/components/authkit-provider.js';
-import { useCustomClaims } from '../src/components/useCustomClaims.js';
 
 jest.mock('../src/actions.js', () => ({
   getAccessTokenAction: jest.fn(),
@@ -18,20 +16,31 @@ jest.mock('../src/components/authkit-provider.js', () => {
   };
 });
 
+jest.mock('../src/components/useAccessToken.js', () => ({
+  useAccessToken: jest.fn(() => ({ accessToken: undefined })),
+}));
+
 jest.mock('jose', () => ({
   decodeJwt: jest.fn((token: string) => {
+    if (token === 'malformed-token' || token === 'throw-error-token') {
+      throw new Error('Invalid JWT');
+    }
     try {
       const parts = token.split('.');
-      if (parts.length !== 3) return null;
+      if (parts.length !== 3) throw new Error('Invalid JWT');
       const payload = JSON.parse(atob(parts[1]));
       return payload;
     } catch {
-      return null;
+      throw new Error('Invalid JWT');
     }
   }),
 }));
 
-describe('useCustomClaims', () => {
+// Import after mocks are set up
+import { useAccessToken } from '../src/components/useAccessToken.js';
+import { useTokenClaims } from '../src/components/useTokenClaims.js';
+
+describe('useTokenClaims', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -41,32 +50,35 @@ describe('useCustomClaims', () => {
       sessionId: 'session_123',
       refreshAuth: jest.fn().mockResolvedValue({}),
     }));
+
+    // Reset useAccessToken mock to default
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: undefined });
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  const CustomClaimsTestComponent = () => {
-    const customClaims = useCustomClaims();
+  const TokenClaimsTestComponent = () => {
+    const tokenClaims = useTokenClaims();
     return (
       <div>
-        <div data-testid="claims">{JSON.stringify(customClaims)}</div>
+        <div data-testid="claims">{JSON.stringify(tokenClaims)}</div>
       </div>
     );
   };
 
-  it('should return null when no access token is available', async () => {
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(undefined);
+  it('should return empty object when no access token is available', async () => {
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: undefined });
 
-    const { getByTestId } = render(<CustomClaimsTestComponent />);
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
 
     await waitFor(() => {
-      expect(getByTestId('claims')).toHaveTextContent('null');
+      expect(getByTestId('claims')).toHaveTextContent('{}');
     });
   });
 
-  it('should return custom claims when access token is available', async () => {
+  it('should return all token claims when access token is available', async () => {
     const payload = {
       aud: 'audience',
       exp: 9999999999,
@@ -87,21 +99,16 @@ describe('useCustomClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(token);
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
 
-    const { getByTestId } = render(<CustomClaimsTestComponent />);
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
 
     await waitFor(() => {
-      const expectedCustomClaims = {
-        customField1: 'value1',
-        customField2: 42,
-        customObject: { nested: 'data' },
-      };
-      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(expectedCustomClaims));
+      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(payload));
     });
   });
 
-  it('should return empty object when token has no custom claims', async () => {
+  it('should return all standard claims when token has only standard claims', async () => {
     const payload = {
       aud: 'audience',
       exp: 9999999999,
@@ -118,16 +125,16 @@ describe('useCustomClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(token);
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
 
-    const { getByTestId } = render(<CustomClaimsTestComponent />);
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
 
     await waitFor(() => {
-      expect(getByTestId('claims')).toHaveTextContent('{}');
+      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(payload));
     });
   });
 
-  it('should handle partial standard claims', async () => {
+  it('should handle partial claims', async () => {
     const payload = {
       sub: 'user_123',
       exp: 9999999999,
@@ -136,20 +143,16 @@ describe('useCustomClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(token);
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
 
-    const { getByTestId } = render(<CustomClaimsTestComponent />);
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
 
     await waitFor(() => {
-      const expectedCustomClaims = {
-        customField: 'value',
-        anotherCustom: true,
-      };
-      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(expectedCustomClaims));
+      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(payload));
     });
   });
 
-  it('should handle complex nested custom claims', async () => {
+  it('should handle complex nested claims', async () => {
     const payload = {
       sub: 'user_123',
       exp: 9999999999,
@@ -168,26 +171,22 @@ describe('useCustomClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(token);
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
 
-    const { getByTestId } = render(<CustomClaimsTestComponent />);
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
 
     await waitFor(() => {
-      const expectedCustomClaims = {
-        metadata: {
-          preferences: {
-            theme: 'dark',
-            language: 'en',
-          },
-          settings: ['setting1', 'setting2'],
-        },
-        tags: ['tag1', 'tag2'],
-        permissions_custom: {
-          read: true,
-          write: false,
-        },
-      };
-      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(expectedCustomClaims));
+      expect(getByTestId('claims')).toHaveTextContent(JSON.stringify(payload));
+    });
+  });
+
+  it('should return empty object when decodeJwt throws an error', async () => {
+    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: 'malformed-token' });
+
+    const { getByTestId } = render(<TokenClaimsTestComponent />);
+
+    await waitFor(() => {
+      expect(getByTestId('claims')).toHaveTextContent('{}');
     });
   });
 });
