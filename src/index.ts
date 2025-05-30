@@ -1,7 +1,7 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
 import { authkit, authkitMiddleware } from './middleware.js';
-import { getCustomClaims, refreshSession, saveSession, withAuth } from './session.js';
+import { getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
@@ -18,5 +18,5 @@ export {
   signOut,
   switchToOrganization,
   withAuth,
-  getCustomClaims,
+  getTokenClaims,
 };
