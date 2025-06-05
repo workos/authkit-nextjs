@@ -17,15 +17,27 @@
       "types": "./dist/esm/types/components/index.d.ts",
       "import": "./dist/esm/components/index.js"
     },
+    "./pages": {
+      "types": "./dist/pages-router/types/index.d.ts",
+      "import": "./dist/pages-router/index.js"
+    },
     ".": {
-      "types": "./dist/esm/types/index.d.ts",
-      "import": "./dist/esm/index.js"
+      "react-server": {
+        "types": "./dist/esm/types/index.d.ts",
+        "import": "./dist/esm/index.js"
+      },
+      "default": {
+        "types": "./dist/pages-router/types/index.d.ts", 
+        "import": "./dist/pages-router/index.js"
+      }
     }
   },
   "scripts": {
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "build": "tsc --project tsconfig.json",
+    "build": "npm run build:app-router && npm run build:pages-router",
+    "build:app-router": "tsc --project tsconfig.json",
+    "build:pages-router": "tsc --project tsconfig.pages-router.json",
     "prepublishOnly": "npm run lint",
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "jest",

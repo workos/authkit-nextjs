@@ -15,7 +15,10 @@
     "declarationDir": "./dist/esm/types",
     "module": "ES2020",
     "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "#auth-implementation": ["./src/index.ts"]
+    }
   },
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts", "/dist/**/*", "__tests__/**/*"]
 }

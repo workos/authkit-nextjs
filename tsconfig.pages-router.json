@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/pages-router",
+    "declarationDir": "./dist/pages-router/types",
+    "paths": {
+      "#auth-implementation": ["./src/pages-router/index.ts"]
+    }
+  },
+  "include": ["src/pages-router/**/*", "src/env-variables.ts", "src/workos.ts", "src/get-authorization-url.ts", "src/cookie.ts", "src/interfaces.ts", "src/utils.ts"],
+  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts", "/dist/**/*", "__tests__/**/*"]
+}

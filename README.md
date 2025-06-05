@@ -2,7 +2,7 @@
 
 The AuthKit library for Next.js provides convenient helpers for authentication and session management using WorkOS & AuthKit with Next.js.
 
-> Note: This library is intended for use with the Next.js App Router.
+This library supports both Next.js App Router and Pages Router. The library automatically detects which router you're using and provides the appropriate implementation.
 
 ## Installation
 
@@ -598,3 +598,138 @@ Wrapping a `withAuth({ ensureSignedIn: true })` call in a try/catch block will c
 #### Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins (Unhandled scheme).
 
 You may encounter this error if you attempt to import server side code from authkit-nextjs into a client component. Likely you are using `withAuth` in a client component instead of the `useAuth` hook. Either move the code to a server component or use the `useAuth` hook.
+
+
+## Pages Router Support
+
+This library also supports Next.js Pages Router. The implementation automatically detects which router you are using.
+
+### Pages Router Setup
+
+#### 1. Create API Routes
+
+Create the following API routes for authentication:
+
+**`pages/api/auth/callback.ts`**
+```typescript
+import { handleAuth } from '@workos-inc/authkit-nextjs';
+
+export default handleAuth;
+```
+
+**`pages/api/auth/session.ts`**
+```typescript
+import { getAuth } from '@workos-inc/authkit-nextjs';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getAuth(req);
+  res.status(200).json(session);
+}
+```
+
+**`pages/api/auth/signout.ts`**
+```typescript
+import { signOut } from '@workos-inc/authkit-nextjs';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { returnTo } = req.body;
+  const logoutUrl = await signOut(req, res, { returnTo });
+  res.status(200).json({ logoutUrl });
+}
+```
+
+#### 2. Wrap your app with AuthKitProvider
+
+In `pages/_app.tsx`:
+```tsx
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
+import type { AppProps } from 'next/app';
+
+export default function App({ Component, pageProps }: AppProps) {
+  return (
+    <AuthKitProvider initialSession={pageProps.__workos_ssr_state}>
+      <Component {...pageProps} />
+    </AuthKitProvider>
+  );
+}
+```
+
+#### 3. Use withAuth in getServerSideProps
+
+```typescript
+import { withAuth, buildWorkOSProps } from '@workos-inc/authkit-nextjs';
+
+export const getServerSideProps = withAuth(async ({ auth }) => {
+  // auth is null if user is not signed in
+  if (\!auth) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: {
+      ...buildWorkOSProps({ session: auth }),
+      // Your other props
+    },
+  };
+});
+```
+
+For pages that require authentication:
+```typescript
+export const getServerSideProps = withAuth(
+  async ({ auth }) => {
+    // auth is guaranteed to be non-null
+    return {
+      props: {
+        ...buildWorkOSProps({ session: auth }),
+        user: auth.user,
+      },
+    };
+  },
+  { ensureSignedIn: true }
+);
+```
+
+#### 4. Use hooks in components
+
+```tsx
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+
+export default function ProfilePage() {
+  const { user, loading, signOut } = useAuth();
+
+  if (loading) return <div>Loading...</div>;
+  if (\!user) return <div>Not signed in</div>;
+
+  return (
+    <div>
+      <h1>Welcome {user.email}</h1>
+      <button onClick={() => signOut()}>Sign out</button>
+    </div>
+  );
+}
+```
+
+### Pages Router API
+
+#### Server-side functions
+
+- `withAuth(handler, options?)` - HOC for getServerSideProps
+- `getAuth(req)` - Get auth from API routes
+- `withApiAuth(handler)` - HOC for API routes
+- `buildWorkOSProps({ session })` - Build props for client hydration
+
+#### Client-side hooks
+
+- `useAuth()` - Get current auth state
+- `useAccessToken()` - Get and manage access tokens
+- `useTokenClaims()` - Get claims from access token
+
+The Pages Router implementation provides the same functionality as the App Router version but adapted for the Pages Router architecture.
