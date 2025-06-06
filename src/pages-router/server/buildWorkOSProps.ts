@@ -1,4 +1,4 @@
-import type { BuildWorkOSPropsOptions } from '../types.js';
+import type { BuildWorkOSPropsOptions, Session } from '../types.js';
 
 /**
  * Builds props to pass WorkOS auth state to client components
@@ -6,7 +6,14 @@ import type { BuildWorkOSPropsOptions } from '../types.js';
  * @param options Configuration options including the session
  * @returns Serializable props for Next.js pages
  */
-export function buildWorkOSProps(options: BuildWorkOSPropsOptions): any {
+export function buildWorkOSProps(options: BuildWorkOSPropsOptions): {
+  __workos_ssr_state: {
+    accessToken: string;
+    refreshToken: string;
+    user: Session['user'];
+    impersonator: Session['impersonator'] | null;
+  } | null;
+} {
   const { session } = options;
   
   // Return props in a format that matches the existing pattern

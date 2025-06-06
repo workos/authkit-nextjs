@@ -1,6 +1,7 @@
 import { NextJSPagesAdapter } from './NextJSPagesAdapter.js';
 import { createAuthKitFactory, configure, type AuthKitConfig } from '@workos-inc/authkit-ssr';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { AuthKitFactory, Session } from '../types.js';
 import {
   WORKOS_CLIENT_ID,
   WORKOS_API_KEY,
@@ -12,7 +13,7 @@ import {
 export { NextJSPagesAdapter };
 
 // Initialize authkit-ssr configuration from environment variables
-if (!(globalThis as any).__authkitSSRConfigured) {
+if (!((globalThis as typeof globalThis & { __authkitSSRConfigured?: boolean }).__authkitSSRConfigured)) {
   configure({
     clientId: WORKOS_CLIENT_ID,
     apiKey: WORKOS_API_KEY,
@@ -20,13 +21,13 @@ if (!(globalThis as any).__authkitSSRConfigured) {
     cookiePassword: WORKOS_COOKIE_PASSWORD,
     cookieName: WORKOS_COOKIE_NAME || 'wos-session',
   });
-  (globalThis as any).__authkitSSRConfigured = true;
+  (globalThis as typeof globalThis & { __authkitSSRConfigured?: boolean }).__authkitSSRConfigured = true;
 }
 
 /**
  * Factory function that creates a configured NextJS Pages adapter
  */
-export function createPagesAdapter(): any {
+export function createPagesAdapter(): AuthKitFactory {
   const authKit = createAuthKitFactory<NextApiRequest, NextApiResponse>({
     sessionStorageFactory: (config) => {
       return new NextJSPagesAdapter(config);
@@ -47,8 +48,8 @@ export function createPagesAdapter(): any {
       return {
         accessToken: authResult.accessToken || '',
         refreshToken: authResult.refreshToken || '',
-        user: authResult.user as any,
-        impersonator: authResult.impersonator as any,
+        user: authResult.user,
+        impersonator: authResult.impersonator,
         sessionId: authResult.sessionId,
         organizationId: authResult.claims?.org_id,
         role: authResult.claims?.role,

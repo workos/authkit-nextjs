@@ -20,8 +20,8 @@ export function withApiAuth(
     const auth = authResult.user ? {
       accessToken: authResult.accessToken || '',
       refreshToken: authResult.refreshToken || '',
-      user: authResult.user as any,
-      impersonator: authResult.impersonator as any,
+      user: authResult.user,
+      impersonator: authResult.impersonator,
       sessionId: authResult.sessionId,
       organizationId: authResult.claims?.org_id,
       role: authResult.claims?.role,
@@ -43,7 +43,7 @@ export function withApiAuth(
  * @param req The API request
  * @returns The session or null
  */
-export async function getAuth(req: NextApiRequest): Promise<any | null> {
+export async function getAuth(req: NextApiRequest): Promise<Session | null> {
   const authKit = createPagesAdapter();
   
   const authResult = await authKit.withAuth(req);
@@ -57,8 +57,8 @@ export async function getAuth(req: NextApiRequest): Promise<any | null> {
   return {
     accessToken: authResult.accessToken || '',
     refreshToken: authResult.refreshToken || '',
-    user: authResult.user as any,
-    impersonator: authResult.impersonator as any,
+    user: authResult.user,
+    impersonator: authResult.impersonator,
     sessionId: authResult.sessionId,
     organizationId: authResult.claims?.org_id,
     role: authResult.claims?.role,

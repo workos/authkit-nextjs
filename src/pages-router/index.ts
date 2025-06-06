@@ -3,6 +3,20 @@ import { WORKOS_CLIENT_ID } from '../env-variables.js';
 import { getWorkOS as authKitGetWorkOS } from '@workos-inc/authkit-ssr';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { Session } from './types.js';
+import type { Session as AuthKitSession } from '@workos-inc/authkit-ssr';
+
+// Define types that mirror authkit-ssr but aren't exported
+type User = AuthKitSession['user'];
+type Impersonator = AuthKitSession['impersonator'];
+type AuthenticationResponse = {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  impersonator?: Impersonator;
+  organizationId?: string;
+  authenticationMethod?: string;
+};
 
 // Re-export components
 export * from './components/index.js';
@@ -17,7 +31,7 @@ export * from './types.js';
 export { getWorkOS as authKitGetWorkOS } from '@workos-inc/authkit-ssr';
 
 // Legacy compatibility export
-export const getWorkOS: () => any = authKitGetWorkOS;
+export const getWorkOS: () => ReturnType<typeof authKitGetWorkOS> = authKitGetWorkOS;
 
 // Re-export adapter factory
 export { createPagesAdapter };
@@ -145,7 +159,7 @@ export async function switchToOrganization(
   req: NextApiRequest,
   res: NextApiResponse,
   organizationId: string,
-): Promise<{ user: any; organizationId: string }> {
+): Promise<{ user: User; organizationId: string }> {
   const authKit = createPagesAdapter();
 
   const authResult = await authKit.withAuth(req);
@@ -187,7 +201,7 @@ export async function refreshSession(
   req: NextApiRequest,
   res: NextApiResponse,
   options?: { organizationId?: string },
-): Promise<any> {
+): Promise<AuthenticationResponse & { sealedSession?: string }> {
   const authKit = createPagesAdapter();
 
   const authResult = await authKit.withAuth(req);
