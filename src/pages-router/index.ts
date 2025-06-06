@@ -60,14 +60,14 @@ export async function getSignUpUrl({
  */
 export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
   const authKit = createPagesAdapter();
-  
+
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   const { code, state, error } = req.query;
-  
+
   if (error || !code) {
     const returnTo = state ? JSON.parse(state as string).returnPathname : '/';
     res.redirect(returnTo);
@@ -75,26 +75,33 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Exchange code for tokens
     const result = await authKitGetWorkOS().userManagement.authenticateWithCode({
       clientId: WORKOS_CLIENT_ID,
       code: code as string,
-      session: {
-        sealSession: true,
-        cookiePassword: undefined, // Uses default from config
-      },
     });
 
-    // Create session from authentication response
-    if (result.sealedSession) {
-      await authKit.saveSession(res, result.sealedSession);
-    } else {
-      throw new Error('No sealed session returned from authentication');
-    }
+    // Create session object and encrypt it using authkit-ssr's encryption
+    const session = {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      user: result.user,
+      impersonator: result.impersonator,
+    };
+
+    // Use iron-session (same as authkit-ssr) to encrypt the session
+    const { sealData } = await import('iron-session');
+    const { WORKOS_COOKIE_PASSWORD } = await import('../env-variables.js');
+
+    const encryptedSession = await sealData(session, {
+      password: WORKOS_COOKIE_PASSWORD,
+      ttl: 0,
+    });
+
+    const updatedRes = await authKit.saveSession(res, encryptedSession);
 
     // Redirect to return path or home
     const returnTo = state ? JSON.parse(state as string).returnPathname : '/';
-    res.redirect(returnTo);
+    updatedRes.redirect(returnTo);
   } catch (error) {
     console.error('Failed to authenticate with code:', error);
     res.redirect('/');
@@ -107,10 +114,10 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
  */
 export async function signOut(req: NextApiRequest, res: NextApiResponse, { returnTo }: { returnTo?: string } = {}) {
   const authKit = createPagesAdapter();
-  
+
   // Get current session
   const authResult = await authKit.withAuth(req);
-  
+
   if (authResult.refreshToken && authResult.user) {
     // Create a minimal session object for logout
     const session = {
@@ -119,12 +126,12 @@ export async function signOut(req: NextApiRequest, res: NextApiResponse, { retur
       user: authResult.user,
       impersonator: authResult.impersonator,
     };
-    
+
     // Get logout URL and clear session
     const { logoutUrl } = await authKit.getLogoutUrl(session, res, { returnTo });
     return logoutUrl;
   }
-  
+
   // Just clear the session if no valid session
   const sessionStorage = new NextJSPagesAdapter();
   await sessionStorage.clearSession(res);
@@ -137,10 +144,10 @@ export async function signOut(req: NextApiRequest, res: NextApiResponse, { retur
 export async function switchToOrganization(
   req: NextApiRequest,
   res: NextApiResponse,
-  organizationId: string
+  organizationId: string,
 ): Promise<{ user: any; organizationId: string }> {
   const authKit = createPagesAdapter();
-  
+
   const authResult = await authKit.withAuth(req);
   if (!authResult.refreshToken) {
     throw new Error('No active session');
@@ -154,7 +161,6 @@ export async function switchToOrganization(
       organizationId,
       session: {
         sealSession: true,
-        cookiePassword: undefined, // Uses default from config
       },
     });
 
@@ -180,10 +186,10 @@ export async function switchToOrganization(
 export async function refreshSession(
   req: NextApiRequest,
   res: NextApiResponse,
-  options?: { organizationId?: string }
+  options?: { organizationId?: string },
 ): Promise<any> {
   const authKit = createPagesAdapter();
-  
+
   const authResult = await authKit.withAuth(req);
   if (!authResult.refreshToken || !authResult.user) {
     throw new Error('No active session');
@@ -197,9 +203,9 @@ export async function refreshSession(
       user: authResult.user,
       impersonator: authResult.impersonator,
     };
-    
+
     const refreshResult = await authKit.refreshSession(session);
-    
+
     // Save the sealed session data
     await authKit.saveSession(res, refreshResult.sessionData);
 
@@ -222,21 +228,26 @@ export async function refreshSession(
  */
 export async function getTokenClaims(req: NextApiRequest) {
   const authKit = createPagesAdapter();
-  
+
   const authResult = await authKit.withAuth(req);
   return authResult.claims || null;
 }
 
 // For middleware compatibility - Pages Router doesn't use middleware auth
 export function authkitMiddleware() {
-  throw new Error('authkitMiddleware is not supported in Pages Router. Use withAuth() or getAuth() in your pages and API routes instead.');
+  throw new Error(
+    'authkitMiddleware is not supported in Pages Router. Use withAuth() or getAuth() in your pages and API routes instead.',
+  );
 }
 
 export function authkit() {
-  throw new Error('authkit() is not supported in Pages Router. Use withAuth() or getAuth() in your pages and API routes instead.');
+  throw new Error(
+    'authkit() is not supported in Pages Router. Use withAuth() or getAuth() in your pages and API routes instead.',
+  );
 }
 
 // saveSession is internal and handled by the adapter
 export async function saveSession() {
   throw new Error('saveSession is handled internally in Pages Router. Use the auth helpers instead.');
 }
+
