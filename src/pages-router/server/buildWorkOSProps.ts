@@ -15,7 +15,7 @@ export function buildWorkOSProps(options: BuildWorkOSPropsOptions) {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
       user: session.user,
-      impersonator: session.impersonator,
+      impersonator: session.impersonator || null,
     } : null,
   };
 }

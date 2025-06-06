@@ -43,7 +43,7 @@ export class NextJSPagesAdapter {
       cookieParts.push(`Max-Age=${cookieOptions.maxAge}`);
     }
 
-    if (cookieOptions.domain) {
+    if (cookieOptions.domain && cookieOptions.domain !== '') {
       cookieParts.push(`Domain=${cookieOptions.domain}`);
     }
 
@@ -71,7 +71,7 @@ export class NextJSPagesAdapter {
       cookieParts.push(`SameSite=${cookieOptions.sameSite}`);
     }
 
-    if (cookieOptions.domain) {
+    if (cookieOptions.domain && cookieOptions.domain !== '') {
       cookieParts.push(`Domain=${cookieOptions.domain}`);
     }
 

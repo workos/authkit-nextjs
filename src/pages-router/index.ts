@@ -2,7 +2,7 @@ import { createPagesAdapter } from './adapters/index.js';
 import { parseAccessToken } from './config.js';
 import { WORKOS_CLIENT_ID } from '../env-variables.js';
 import { getWorkOS } from '../workos.js';
-import { getAuthorizationUrl } from '../get-authorization-url.js';
+import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 // Re-export components
@@ -16,6 +16,9 @@ export * from './types.js';
 
 // Re-export getWorkOS from main package
 export { getWorkOS };
+
+// Re-export adapter factory
+export { createPagesAdapter };
 
 /**
  * Get sign-in URL for Pages Router
@@ -64,7 +67,7 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
   const { code, state, error } = req.query;
   
   if (error || !code) {
-    const returnTo = state ? JSON.parse(state as string).returnTo : '/';
+    const returnTo = state ? JSON.parse(state as string).returnPathname : '/';
     res.redirect(returnTo);
     return;
   }
@@ -85,7 +88,7 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
     });
 
     // Redirect to return path or home
-    const returnTo = state ? JSON.parse(state as string).returnTo : '/';
+    const returnTo = state ? JSON.parse(state as string).returnPathname : '/';
     res.redirect(returnTo);
   } catch (error) {
     console.error('Failed to authenticate with code:', error);

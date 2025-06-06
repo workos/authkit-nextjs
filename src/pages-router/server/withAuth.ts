@@ -1,7 +1,7 @@
 import type { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult, NextApiRequest } from 'next';
 import { createPagesAdapter } from '../adapters/index.js';
 import type { GetServerSidePropsContextWithAuth, WithAuthOptions } from '../types.js';
-import { getAuthorizationUrl } from '../../get-authorization-url.js';
+import { getAuthorizationUrl } from '../get-authorization-url.js';
 
 /**
  * Higher-order function that wraps getServerSideProps to automatically inject auth state

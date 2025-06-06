@@ -5,7 +5,7 @@ import { useRouter } from 'next/router.js';
 import type { User, Impersonator } from '@workos-inc/node';
 import type { Session } from '../types.js';
 import { WORKOS_REDIRECT_URI } from '../../env-variables.js';
-import { getAuthorizationUrl } from '../../get-authorization-url.js';
+import { getAuthorizationUrl } from '../get-authorization-url.js';
 
 type AuthContextType = {
   user: User | null;

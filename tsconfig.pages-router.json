@@ -3,10 +3,18 @@
   "compilerOptions": {
     "outDir": "./dist/pages-router",
     "declarationDir": "./dist/pages-router/types",
+    "rootDir": "./src",
     "paths": {
       "#auth-implementation": ["./src/pages-router/index.ts"]
     }
   },
-  "include": ["src/pages-router/**/*", "src/env-variables.ts", "src/workos.ts", "src/get-authorization-url.ts", "src/cookie.ts", "src/interfaces.ts", "src/utils.ts"],
+  "include": [
+    "src/pages-router/**/*",
+    "src/env-variables.ts",
+    "src/interfaces.ts",
+    "src/workos.ts",
+    "src/utils.ts",
+    "src/cookie.ts"
+  ],
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "jest.config.ts", "jest.setup.ts", "/dist/**/*", "__tests__/**/*"]
 }

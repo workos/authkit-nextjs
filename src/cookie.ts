@@ -50,6 +50,6 @@ export function getCookieOptions(
         // It's fine to have a long cookie expiry date as the access/refresh tokens
         // act as the actual time-limited aspects of the session.
         maxAge,
-        domain: WORKOS_COOKIE_DOMAIN || '',
+        domain: WORKOS_COOKIE_DOMAIN || undefined,
       };
 }

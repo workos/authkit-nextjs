@@ -18,8 +18,8 @@
       "import": "./dist/esm/components/index.js"
     },
     "./pages": {
-      "types": "./dist/pages-router/types/index.d.ts",
-      "import": "./dist/pages-router/index.js"
+      "types": "./dist/pages-router/types/pages-router/index.d.ts",
+      "import": "./dist/pages-router/pages-router/index.js"
     },
     ".": {
       "react-server": {
@@ -27,8 +27,8 @@
         "import": "./dist/esm/index.js"
       },
       "default": {
-        "types": "./dist/pages-router/types/index.d.ts", 
-        "import": "./dist/pages-router/index.js"
+        "types": "./dist/pages-router/types/pages-router/index.d.ts", 
+        "import": "./dist/pages-router/pages-router/index.js"
       }
     }
   },
