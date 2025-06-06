@@ -12,17 +12,15 @@ import {
 
 export { NextJSPagesAdapter };
 
-// Initialize authkit-ssr configuration from environment variables
-if (!((globalThis as typeof globalThis & { __authkitSSRConfigured?: boolean }).__authkitSSRConfigured)) {
-  configure({
-    clientId: WORKOS_CLIENT_ID,
-    apiKey: WORKOS_API_KEY,
-    redirectUri: WORKOS_REDIRECT_URI,
-    cookiePassword: WORKOS_COOKIE_PASSWORD,
-    cookieName: WORKOS_COOKIE_NAME || 'wos-session',
-  });
-  (globalThis as typeof globalThis & { __authkitSSRConfigured?: boolean }).__authkitSSRConfigured = true;
-}
+// Configure authkit-ssr with environment variables
+// Multiple calls are safe - authkit-ssr uses singleton pattern and merges config
+configure({
+  clientId: WORKOS_CLIENT_ID,
+  apiKey: WORKOS_API_KEY,
+  redirectUri: WORKOS_REDIRECT_URI,
+  cookiePassword: WORKOS_COOKIE_PASSWORD,
+  cookieName: WORKOS_COOKIE_NAME || 'wos-session',
+});
 
 /**
  * Factory function that creates a configured NextJS Pages adapter
