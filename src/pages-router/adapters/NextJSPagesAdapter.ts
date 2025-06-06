@@ -1,32 +1,31 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { SessionStorage, getConfig, type AuthKitConfig } from '@workos-inc/authkit-ssr';
 import { getCookieOptions } from '../../cookie.js';
 import { WORKOS_COOKIE_NAME } from '../../env-variables.js';
-import { encryptSession, decryptSession, parseAccessToken } from '../config.js';
-import type { Session } from '../types.js';
 
 /**
- * NextJS Pages Router session management
- * Handles cookie reading from NextApiRequest and writing to NextApiResponse
+ * NextJS Pages Router session storage adapter for authkit-ssr
+ * Implements the SessionStorage interface for Next.js Pages Router
  */
-export class NextJSPagesAdapter {
+export class NextJSPagesAdapter implements SessionStorage<NextApiRequest, NextApiResponse> {
   private cookieName: string;
 
-  constructor(cookieName?: string) {
-    this.cookieName = cookieName || WORKOS_COOKIE_NAME || 'wos-authkit';
+  constructor(config?: AuthKitConfig) {
+    this.cookieName = config?.cookieName || WORKOS_COOKIE_NAME || 'wos-session';
   }
 
-  async getCookie(req: NextApiRequest): Promise<string | undefined> {
+  async getSession(req: NextApiRequest): Promise<string | null> {
     // In Pages Router, cookies are available in req.cookies
-    return req.cookies[this.cookieName];
+    return req.cookies[this.cookieName] || null;
   }
 
-  async setCookie(res: NextApiResponse, value: string): Promise<void> {
+  async saveSession(res: NextApiResponse, sessionData: string): Promise<NextApiResponse> {
     // Get cookie options that match existing implementation
     const cookieOptions = getCookieOptions();
     
     // Build cookie string for Set-Cookie header
     const cookieParts = [
-      `${this.cookieName}=${value}`,
+      `${this.cookieName}=${sessionData}`,
       `Path=${cookieOptions.path}`,
       'HttpOnly',
     ];
@@ -49,9 +48,10 @@ export class NextJSPagesAdapter {
 
     // Set the cookie header
     res.setHeader('Set-Cookie', cookieParts.join('; '));
+    return res;
   }
 
-  async deleteCookie(res: NextApiResponse): Promise<void> {
+  async clearSession(res: NextApiResponse): Promise<NextApiResponse> {
     // Get expired cookie options
     const cookieOptions = getCookieOptions(null, false, true);
     
@@ -77,30 +77,6 @@ export class NextJSPagesAdapter {
 
     // Set the expired cookie
     res.setHeader('Set-Cookie', cookieParts.join('; '));
-  }
-
-  async getSession(req: NextApiRequest): Promise<Session | null> {
-    const sessionCookie = await this.getCookie(req);
-    if (!sessionCookie) {
-      return null;
-    }
-
-    const session = await decryptSession(sessionCookie);
-    if (!session) {
-      return null;
-    }
-
-    // Parse additional data from access token
-    const tokenData = parseAccessToken(session.accessToken);
-    
-    return {
-      ...session,
-      ...tokenData,
-    };
-  }
-
-  async saveSession(res: NextApiResponse, session: Session): Promise<void> {
-    const encryptedSession = await encryptSession(session);
-    await this.setCookie(res, encryptedSession);
+    return res;
   }
 }

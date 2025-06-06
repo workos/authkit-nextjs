@@ -16,13 +16,13 @@ export function withAuth<
   options: WithAuthOptions = {}
 ): GetServerSideProps<P, Q> {
   return async (context: GetServerSidePropsContext<Q>) => {
-    const adapter = createPagesAdapter();
+    const authKit = createPagesAdapter();
     
-    // Get the session from the request - context.req has cookies property needed
-    const session = await adapter.getSession(context.req as NextApiRequest);
+    // Get the auth result from the request
+    const authResult = await authKit.withAuth(context.req as NextApiRequest);
     
     // If ensureSignedIn is true and there's no session, redirect to sign in
-    if (options.ensureSignedIn && !session) {
+    if (options.ensureSignedIn && !authResult.user) {
       const returnToPath = options.returnToPath || context.resolvedUrl;
       const signInUrl = await getAuthorizationUrl({
         screenHint: 'sign-in',
@@ -37,11 +37,24 @@ export function withAuth<
       };
     }
     
+    // Create auth object compatible with existing API
+    const auth = authResult.user ? {
+      accessToken: authResult.accessToken || '',
+      refreshToken: authResult.refreshToken || '',
+      user: authResult.user,
+      impersonator: authResult.impersonator,
+      sessionId: authResult.sessionId,
+      organizationId: authResult.claims?.org_id,
+      role: authResult.claims?.role,
+      permissions: authResult.claims?.permissions,
+      entitlements: authResult.claims?.entitlements,
+    } : null;
+    
     // Create context with auth - safely cast the context
     const contextWithAuth = {
       ...context,
       req: context.req as NextApiRequest,
-      auth: session,
+      auth,
     } as GetServerSidePropsContextWithAuth<Q>;
     
     // Call the wrapped handler

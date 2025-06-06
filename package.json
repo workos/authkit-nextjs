@@ -27,7 +27,7 @@
         "import": "./dist/esm/index.js"
       },
       "default": {
-        "types": "./dist/pages-router/types/pages-router/index.d.ts", 
+        "types": "./dist/pages-router/types/pages-router/index.d.ts",
         "import": "./dist/pages-router/pages-router/index.js"
       }
     }
@@ -46,6 +46,7 @@
     "format": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --write"
   },
   "dependencies": {
+    "@workos-inc/authkit-ssr": "^0.0.1-alpha.0",
     "@workos-inc/node": "^7.37.1",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3",

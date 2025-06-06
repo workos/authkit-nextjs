@@ -1,8 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { Session as AuthKitSession } from '@workos-inc/authkit-ssr';
 
-// Import the main Session interface to maintain compatibility
-import type { Session } from '../interfaces.js';
-export type { Session };
+// Pages Router specific Session type extending authkit-ssr Session
+export interface Session extends AuthKitSession {
+  sessionId?: string;
+  organizationId?: string;
+  role?: string;
+  permissions?: string[];
+  entitlements?: string[];
+}
 
 // Pages Router specific types
 export interface GetServerSidePropsContextWithAuth<Q extends Record<string, string> = Record<string, string>> {

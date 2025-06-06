@@ -5,11 +5,11 @@ import type { GetServerSidePropsContextWithAuth } from '../../src/pages-router/t
 // Mock the adapter
 jest.mock('../../src/pages-router/adapters', () => ({
   createPagesAdapter: jest.fn(() => ({
-    getSession: jest.fn(),
+    withAuth: jest.fn(),
   })),
 }));
 
-jest.mock('../../src/get-authorization-url', () => ({
+jest.mock('../../src/pages-router/get-authorization-url', () => ({
   getAuthorizationUrl: jest.fn(),
 }));
 
@@ -27,7 +27,18 @@ describe('withAuth (Pages Router)', () => {
 
     const { createPagesAdapter } = require('../../src/pages-router/adapters');
     createPagesAdapter.mockReturnValue({
-      getSession: jest.fn().mockResolvedValue(mockSession),
+      withAuth: jest.fn().mockResolvedValue({
+        user: mockSession.user,
+        accessToken: mockSession.accessToken,
+        refreshToken: mockSession.refreshToken,
+        claims: {
+          org_id: 'org-123',
+          role: 'admin',
+          permissions: ['read', 'write'],
+          entitlements: ['feature1'],
+        },
+        sessionId: 'session-123',
+      }),
     });
 
     const handler = jest.fn().mockResolvedValue({ props: { test: 'value' } });
@@ -44,7 +55,17 @@ describe('withAuth (Pages Router)', () => {
 
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
-        auth: mockSession,
+        auth: {
+          accessToken: mockSession.accessToken,
+          refreshToken: mockSession.refreshToken,
+          user: mockSession.user,
+          impersonator: undefined,
+          sessionId: 'session-123',
+          organizationId: 'org-123',
+          role: 'admin',
+          permissions: ['read', 'write'],
+          entitlements: ['feature1'],
+        },
       })
     );
     expect(result).toEqual({ props: { test: 'value' } });
@@ -52,10 +73,15 @@ describe('withAuth (Pages Router)', () => {
 
   it('should redirect to sign in when ensureSignedIn is true and no session', async () => {
     const { createPagesAdapter } = require('../../src/pages-router/adapters');
-    const { getAuthorizationUrl } = require('../../src/get-authorization-url');
+    const { getAuthorizationUrl } = require('../../src/pages-router/get-authorization-url');
     
     createPagesAdapter.mockReturnValue({
-      getSession: jest.fn().mockResolvedValue(null),
+      withAuth: jest.fn().mockResolvedValue({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        claims: null,
+      }),
     });
     
     getAuthorizationUrl.mockResolvedValue('https://auth.example.com/signin');
@@ -84,7 +110,12 @@ describe('withAuth (Pages Router)', () => {
   it('should pass null auth when no session and ensureSignedIn is false', async () => {
     const { createPagesAdapter } = require('../../src/pages-router/adapters');
     createPagesAdapter.mockReturnValue({
-      getSession: jest.fn().mockResolvedValue(null),
+      withAuth: jest.fn().mockResolvedValue({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        claims: null,
+      }),
     });
 
     const handler = jest.fn().mockResolvedValue({ props: {} });

@@ -6,7 +6,7 @@ import type { BuildWorkOSPropsOptions } from '../types.js';
  * @param options Configuration options including the session
  * @returns Serializable props for Next.js pages
  */
-export function buildWorkOSProps(options: BuildWorkOSPropsOptions) {
+export function buildWorkOSProps(options: BuildWorkOSPropsOptions): any {
   const { session } = options;
   
   // Return props in a format that matches the existing pattern

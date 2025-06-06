@@ -1,7 +1,6 @@
-import { createPagesAdapter } from './adapters/index.js';
-import { parseAccessToken } from './config.js';
+import { createPagesAdapter, NextJSPagesAdapter } from './adapters/index.js';
 import { WORKOS_CLIENT_ID } from '../env-variables.js';
-import { getWorkOS } from '../workos.js';
+import { getWorkOS as authKitGetWorkOS } from '@workos-inc/authkit-ssr';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
@@ -14,8 +13,11 @@ export * from './server/index.js';
 // Re-export types
 export * from './types.js';
 
-// Re-export getWorkOS from main package
-export { getWorkOS };
+// Re-export getWorkOS function from authkit-ssr
+export { getWorkOS as authKitGetWorkOS } from '@workos-inc/authkit-ssr';
+
+// Legacy compatibility export
+export const getWorkOS: () => any = authKitGetWorkOS;
 
 // Re-export adapter factory
 export { createPagesAdapter };
@@ -57,7 +59,7 @@ export async function getSignUpUrl({
  * This should be used in /api/auth/callback
  */
 export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
-  const adapter = createPagesAdapter();
+  const authKit = createPagesAdapter();
   
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -74,18 +76,21 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Exchange code for tokens
-    const result = await getWorkOS().userManagement.authenticateWithCode({
+    const result = await authKitGetWorkOS().userManagement.authenticateWithCode({
       clientId: WORKOS_CLIENT_ID,
       code: code as string,
+      session: {
+        sealSession: true,
+        cookiePassword: undefined, // Uses default from config
+      },
     });
 
-    // Save session using adapter
-    await adapter.saveSession(res, {
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      user: result.user,
-      impersonator: result.impersonator,
-    });
+    // Create session from authentication response
+    if (result.sealedSession) {
+      await authKit.saveSession(res, result.sealedSession);
+    } else {
+      throw new Error('No sealed session returned from authentication');
+    }
 
     // Redirect to return path or home
     const returnTo = state ? JSON.parse(state as string).returnPathname : '/';
@@ -101,26 +106,28 @@ export async function handleAuth(req: NextApiRequest, res: NextApiResponse) {
  * This should be called from an API route
  */
 export async function signOut(req: NextApiRequest, res: NextApiResponse, { returnTo }: { returnTo?: string } = {}) {
-  const adapter = createPagesAdapter();
+  const authKit = createPagesAdapter();
   
-  // Get current session to get sessionId
-  const session = await adapter.getSession(req);
+  // Get current session
+  const authResult = await authKit.withAuth(req);
   
-  // Clear the session cookie
-  await adapter.deleteCookie(res);
-  
-  // Parse access token to get sessionId
-  const sessionData = session ? parseAccessToken(session.accessToken) : null;
-  
-  if (sessionData?.sessionId) {
-    // Get logout URL from WorkOS
-    const logoutUrl = getWorkOS().userManagement.getLogoutUrl({ 
-      sessionId: sessionData.sessionId, 
-      returnTo: returnTo || '/' 
-    });
+  if (authResult.refreshToken && authResult.user) {
+    // Create a minimal session object for logout
+    const session = {
+      accessToken: authResult.accessToken || '',
+      refreshToken: authResult.refreshToken,
+      user: authResult.user,
+      impersonator: authResult.impersonator,
+    };
+    
+    // Get logout URL and clear session
+    const { logoutUrl } = await authKit.getLogoutUrl(session, res, { returnTo });
     return logoutUrl;
   }
   
+  // Just clear the session if no valid session
+  const sessionStorage = new NextJSPagesAdapter();
+  await sessionStorage.clearSession(res);
   return returnTo || '/';
 }
 
@@ -131,29 +138,32 @@ export async function switchToOrganization(
   req: NextApiRequest,
   res: NextApiResponse,
   organizationId: string
-) {
-  const adapter = createPagesAdapter();
+): Promise<{ user: any; organizationId: string }> {
+  const authKit = createPagesAdapter();
   
-  const session = await adapter.getSession(req);
-  if (!session) {
+  const authResult = await authKit.withAuth(req);
+  if (!authResult.refreshToken) {
     throw new Error('No active session');
   }
 
   try {
     // Refresh with new organization
-    const refreshResult = await getWorkOS().userManagement.authenticateWithRefreshToken({
+    const refreshResult = await authKitGetWorkOS().userManagement.authenticateWithRefreshToken({
       clientId: WORKOS_CLIENT_ID,
-      refreshToken: session.refreshToken,
+      refreshToken: authResult.refreshToken,
       organizationId,
+      session: {
+        sealSession: true,
+        cookiePassword: undefined, // Uses default from config
+      },
     });
 
     // Save updated session
-    await adapter.saveSession(res, {
-      accessToken: refreshResult.accessToken,
-      refreshToken: refreshResult.refreshToken,
-      user: refreshResult.user,
-      impersonator: refreshResult.impersonator,
-    });
+    if (refreshResult.sealedSession) {
+      await authKit.saveSession(res, refreshResult.sealedSession);
+    } else {
+      throw new Error('No sealed session returned from refresh');
+    }
 
     return {
       user: refreshResult.user,
@@ -171,30 +181,37 @@ export async function refreshSession(
   req: NextApiRequest,
   res: NextApiResponse,
   options?: { organizationId?: string }
-) {
-  const adapter = createPagesAdapter();
+): Promise<any> {
+  const authKit = createPagesAdapter();
   
-  const session = await adapter.getSession(req);
-  if (!session) {
+  const authResult = await authKit.withAuth(req);
+  if (!authResult.refreshToken || !authResult.user) {
     throw new Error('No active session');
   }
 
   try {
-    const refreshResult = await getWorkOS().userManagement.authenticateWithRefreshToken({
-      clientId: WORKOS_CLIENT_ID,
-      refreshToken: session.refreshToken,
-      organizationId: options?.organizationId,
-    });
+    // Create session object for refresh
+    const session = {
+      accessToken: authResult.accessToken || '',
+      refreshToken: authResult.refreshToken,
+      user: authResult.user,
+      impersonator: authResult.impersonator,
+    };
+    
+    const refreshResult = await authKit.refreshSession(session);
+    
+    // Save the sealed session data
+    await authKit.saveSession(res, refreshResult.sessionData);
 
-    // Save updated session
-    await adapter.saveSession(res, {
-      accessToken: refreshResult.accessToken,
-      refreshToken: refreshResult.refreshToken,
+    return {
       user: refreshResult.user,
-      impersonator: refreshResult.impersonator,
-    });
-
-    return refreshResult;
+      organizationId: refreshResult.organizationId,
+      accessToken: refreshResult.accessToken,
+      refreshToken: session.refreshToken, // Keep original refresh token
+      impersonator: refreshResult.imposionator,
+      authenticationMethod: undefined,
+      sealedSession: refreshResult.sessionData,
+    };
   } catch (error) {
     throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -204,19 +221,10 @@ export async function refreshSession(
  * Get token claims for Pages Router
  */
 export async function getTokenClaims(req: NextApiRequest) {
-  const adapter = createPagesAdapter();
+  const authKit = createPagesAdapter();
   
-  const session = await adapter.getSession(req);
-  if (!session) {
-    return null;
-  }
-
-  try {
-    const payload = JSON.parse(atob(session.accessToken.split('.')[1]));
-    return payload;
-  } catch {
-    return null;
-  }
+  const authResult = await authKit.withAuth(req);
+  return authResult.claims || null;
 }
 
 // For middleware compatibility - Pages Router doesn't use middleware auth

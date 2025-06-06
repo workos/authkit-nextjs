@@ -11,13 +11,26 @@ export function withApiAuth(
   handler: (req: ApiRouteRequestWithAuth, res: NextApiResponse) => void | Promise<void>
 ): NextApiHandler {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    const adapter = createPagesAdapter();
+    const authKit = createPagesAdapter();
     
-    // Get the session from the request
-    const session = await adapter.getSession(req);
+    // Get the auth result from the request
+    const authResult = await authKit.withAuth(req);
+    
+    // Create auth object compatible with existing API
+    const auth = authResult.user ? {
+      accessToken: authResult.accessToken || '',
+      refreshToken: authResult.refreshToken || '',
+      user: authResult.user as any,
+      impersonator: authResult.impersonator as any,
+      sessionId: authResult.sessionId,
+      organizationId: authResult.claims?.org_id,
+      role: authResult.claims?.role,
+      permissions: authResult.claims?.permissions,
+      entitlements: authResult.claims?.entitlements,
+    } : null;
     
     // Attach auth to request
-    (req as ApiRouteRequestWithAuth).auth = session;
+    (req as ApiRouteRequestWithAuth).auth = auth;
     
     // Call the wrapped handler
     return handler(req as ApiRouteRequestWithAuth, res);
@@ -30,8 +43,26 @@ export function withApiAuth(
  * @param req The API request
  * @returns The session or null
  */
-export async function getAuth(req: NextApiRequest): Promise<Session | null> {
-  const adapter = createPagesAdapter();
+export async function getAuth(req: NextApiRequest): Promise<any | null> {
+  const authKit = createPagesAdapter();
   
-  return adapter.getSession(req);
+  const authResult = await authKit.withAuth(req);
+  
+  // Return null if no user
+  if (!authResult.user) {
+    return null;
+  }
+  
+  // Create session object compatible with existing API
+  return {
+    accessToken: authResult.accessToken || '',
+    refreshToken: authResult.refreshToken || '',
+    user: authResult.user as any,
+    impersonator: authResult.impersonator as any,
+    sessionId: authResult.sessionId,
+    organizationId: authResult.claims?.org_id,
+    role: authResult.claims?.role,
+    permissions: authResult.claims?.permissions,
+    entitlements: authResult.claims?.entitlements,
+  };
 }
