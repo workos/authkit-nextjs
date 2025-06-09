@@ -1,4 +1,4 @@
-# AuthKit Next.js Pages Router Implementation Plan (Clerk-Aligned)
+# AuthKit Next.js Pages Router Implementation Plan (Clerk-Aligned + Incrementally Testable)
 
 ## Current State Analysis
 
@@ -74,12 +74,58 @@ import { ClerkProvider, useAuth } from '@workos-inc/authkit-nextjs'
 // Automatically provides correct implementation
 ```
 
+**🧪 Test Step 0.1:**
+```bash
+# Create minimal test apps
+mkdir test-app-router test-pages-router
+
+# Test imports work
+echo "import { useAuth } from '@workos-inc/authkit-nextjs'; console.log(useAuth)" > test.js
+```
+
+**✅ Success Criteria 0.1:**
+- [ ] Imports work in both router types without errors
+- [ ] TypeScript types resolve correctly
+- [ ] No "module not found" errors
+
+**🔄 Rollback 0.1:** If imports fail, debug conditional export logic in `src/index.ts`
+
 #### Step 0.2: Ensure Pages Router Components Export
 - **Files**: 
   - `src/pages-router/components/index.ts`
   - `src/pages-router/server/index.ts`
 - **Verify**: All necessary components and helpers are exported
 - **Add**: Any missing exports to match App Router API
+
+**🧪 Test Step 0.2:**
+```typescript
+// Test script to verify all exports exist
+import { 
+  AuthKitProvider, 
+  useAuth, 
+  useAccessToken, 
+  useTokenClaims,
+  withAuth,
+  buildWorkOSProps,
+  getAuth 
+} from '@workos-inc/authkit-nextjs'
+
+console.log('All exports found:', {
+  AuthKitProvider: !!AuthKitProvider,
+  useAuth: !!useAuth,
+  withAuth: !!withAuth,
+  // ... etc
+})
+```
+
+**✅ Success Criteria 0.2:**
+- [ ] All expected exports are available
+- [ ] TypeScript doesn't show "not exported" errors
+- [ ] Components can be imported without errors
+
+**🔄 Rollback 0.2:** Add missing exports to index files
+
+---
 
 ### Phase 1: Fix Core SSR State Flow (Critical Path)
 **Goal**: Fix the broken `useAuth()` following Clerk's SSR pattern
@@ -105,30 +151,209 @@ export function buildWorkOSProps(options: { session: Session | null }) {
 }
 ```
 
-#### Step 1.2: Fix withAuth HOC (Server-Side Props)
+**🧪 Test Step 1.1:**
+```typescript
+// Create test page to verify props structure
+export const getServerSideProps = withAuth(async ({ auth }) => {
+  const props = buildWorkOSProps({ session: auth });
+  
+  // Add debug logging
+  console.log('buildWorkOSProps output:', JSON.stringify(props, null, 2));
+  
+  return { props };
+});
+
+export default function TestPage(props) {
+  console.log('Client received props:', props);
+  return <div>Check console for props structure</div>;
+}
+```
+
+**✅ Success Criteria 1.1:**
+- [ ] `buildWorkOSProps` returns object with `__workos_ssr_state` key
+- [ ] When user is logged in, `__workos_ssr_state` contains user data
+- [ ] When user is logged out, `__workos_ssr_state` is null
+- [ ] Props are JSON-serializable (no functions/classes)
+
+**🔄 Rollback 1.1:** Revert to original structure if serialization fails
+
+#### Step 1.2: Fix Basic withAuth Data Flow (Before Enhancement)
 - **File**: `src/pages-router/server/withAuth.ts`
 - **Issue**: Not properly passing auth data through props
 - **Fix**: Ensure auth data flows to `buildWorkOSProps`
 
 ```typescript
+export function withAuth(handler, options = {}) {
+  return async (context) => {
+    const { req, res } = context;
+    const authKit = createPagesAdapter();
+    
+    // Get auth data (should work from existing implementation)
+    const authResult = await authKit.withAuth(req);
+    
+    // Create proper auth object for buildWorkOSProps
+    const auth = authResult.user ? {
+      user: authResult.user,
+      sessionId: authResult.sessionId,
+      organizationId: authResult.claims?.org_id,
+      role: authResult.claims?.role,
+      permissions: authResult.claims?.permissions,
+      entitlements: authResult.claims?.entitlements,
+      impersonator: authResult.impersonator,
+    } : null;
+    
+    // Call user's handler
+    return handler({ ...context, auth });
+  };
+}
+```
+
+**🧪 Test Step 1.2:**
+```typescript
+// Test page to verify auth data flow
 export const getServerSideProps = withAuth(async ({ auth }) => {
-  // auth should contain full session data from middleware
+  console.log('withAuth provided auth:', JSON.stringify(auth, null, 2));
+  
   return {
     props: {
+      authData: auth, // Direct pass-through for testing
       ...buildWorkOSProps({ session: auth }),
-      // user's other props
     },
   };
 });
+
+export default function TestPage({ authData, __workos_ssr_state }) {
+  return (
+    <div>
+      <h1>Auth Test</h1>
+      <pre>Auth Data: {JSON.stringify(authData, null, 2)}</pre>
+      <pre>SSR State: {JSON.stringify(__workos_ssr_state, null, 2)}</pre>
+    </div>
+  );
+}
 ```
 
-#### Step 1.3: Fix AuthKitProvider Hydration (UPDATED - ELIMINATE API CALLS)
+**✅ Success Criteria 1.2:**
+- [ ] Logged in: `auth` object contains user data
+- [ ] Logged out: `auth` is null
+- [ ] `buildWorkOSProps` receives correct session data
+- [ ] Server console shows proper auth data structure
+
+**🔄 Rollback 1.2:** Debug authKit.withAuth() call if auth data is incorrect
+
+#### Step 1.3: Fix AuthKitProvider Basic Hydration (Before API Removal)
 - **File**: `src/pages-router/components/AuthKitProvider.tsx`
-- **Issue**: Still makes API calls despite having SSR props, violates "zero API routes" principle
-- **Fix**: Initialize ALL state from SSR immediately, replace API calls with SSR refresh pattern
+- **Issue**: Not consuming `initialSession` from SSR props
+- **Fix**: Initialize state from SSR, test before removing API calls
 
 ```typescript
 export const AuthKitProvider = ({ children, initialSession }) => {
+  // Initialize from SSR state immediately (like Clerk)
+  const [user, setUser] = useState<User | null>(initialSession?.user || null);
+  const [sessionId, setSessionId] = useState(initialSession?.sessionId);
+  const [organizationId, setOrganizationId] = useState(initialSession?.organizationId);
+  const [role, setRole] = useState(initialSession?.role);
+  const [permissions, setPermissions] = useState(initialSession?.permissions);
+  const [entitlements, setEntitlements] = useState(initialSession?.entitlements);
+  const [impersonator, setImpersonator] = useState(initialSession?.impersonator);
+  const [loading, setLoading] = useState(false);
+
+  // KEEP existing API calls for now - we'll remove in Step 1.5
+  // This allows us to test SSR hydration vs API fallback
+  const getAuth = async ({ ensureSignedIn = false } = {}) => {
+    // ... existing implementation
+  };
+
+  // Add debug logging
+  useEffect(() => {
+    console.log('AuthKitProvider initialized with:', {
+      initialSession,
+      currentUser: user,
+      source: initialSession ? 'SSR' : 'will-fetch-from-API'
+    });
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{
+      user, sessionId, organizationId, role, permissions, entitlements, impersonator, loading,
+      getAuth, // ... other methods
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+**🧪 Test Step 1.3:**
+```typescript
+// Test _app.tsx setup
+export default function App({ Component, pageProps }) {
+  return (
+    <AuthKitProvider initialSession={pageProps.__workos_ssr_state}>
+      <Component {...pageProps} />
+    </AuthKitProvider>
+  );
+}
+
+// Test component
+function TestComponent() {
+  const { user, loading } = useAuth();
+  
+  useEffect(() => {
+    console.log('useAuth result:', { user: user?.email, loading });
+  }, [user, loading]);
+  
+  if (loading) return <div>Loading...</div>;
+  
+  return (
+    <div>
+      {user ? (
+        <div>✅ User: {user.email}</div>
+      ) : (
+        <div>❌ No user</div>
+      )}
+    </div>
+  );
+}
+```
+
+**✅ Success Criteria 1.3:**
+- [ ] When logged in: `useAuth()` immediately returns user (not null)
+- [ ] When logged out: `useAuth()` returns null
+- [ ] No "Loading..." state on initial render when SSR data exists
+- [ ] Console shows "source: SSR" when initialSession exists
+
+**🔄 Rollback 1.3:** Debug initialSession prop passing if useAuth still returns null
+
+#### Step 1.4: Test End-to-End Basic Flow
+**Goal**: Verify basic login → navigate → useAuth works before advanced features
+
+**🧪 Test Step 1.4:**
+```typescript
+// Test sequence:
+1. Start logged out → visit protected page → redirects to login ✅
+2. Complete login → returns to protected page → useAuth() returns user ✅  
+3. Navigate to another page → useAuth() still returns user ✅
+4. Refresh page → useAuth() still returns user ✅
+```
+
+**✅ Success Criteria 1.4:**
+- [ ] Full login flow works end-to-end
+- [ ] `useAuth()` never returns null when user is logged in
+- [ ] Session persists across page navigation
+- [ ] Session persists across page refresh
+
+**🔄 Rollback 1.4:** If any step fails, debug the specific step that broke
+
+#### Step 1.5: Remove API Calls and Implement SSR-Only Pattern
+- **File**: `src/pages-router/components/AuthKitProvider.tsx`
+- **Issue**: Still makes API calls despite having SSR props
+- **Fix**: Replace ALL API calls with SSR refresh pattern
+
+```typescript
+export const AuthKitProvider = ({ children, initialSession }) => {
+  const router = useRouter();
+  
   // Initialize ALL state from SSR state immediately (like Clerk)
   const [user, setUser] = useState<User | null>(initialSession?.user || null);
   const [sessionId, setSessionId] = useState(initialSession?.sessionId);
@@ -143,17 +368,21 @@ export const AuthKitProvider = ({ children, initialSession }) => {
   // REPLACE WITH: SSR refresh pattern (Clerk's approach)
   
   const refreshAuth = async () => {
+    setLoading(true);
     // Force SSR refresh by navigating to current page (Clerk pattern)
     router.replace(router.asPath);
+    // Loading state will be cleared by page refresh
   };
 
   const signOut = async ({ returnTo }: { returnTo?: string } = {}) => {
+    setLoading(true);
     // Set logout cookie/param, then refresh to let SSR handle logout
-    document.cookie = '__workos_logout=true; path=/';
+    document.cookie = '__workos_logout=true; path=/; SameSite=lax';
     router.replace(returnTo || '/');
   };
 
   const switchToOrganization = async (organizationId: string) => {
+    setLoading(true);
     // Set org switch param, then refresh to let SSR handle switch
     const currentUrl = new URL(router.asPath, window.location.origin);
     currentUrl.searchParams.set('__workos_switch_org', organizationId);
@@ -161,16 +390,56 @@ export const AuthKitProvider = ({ children, initialSession }) => {
   };
 
   // REMOVE: All useEffect API calls - no fetch fallbacks needed
+  // REMOVE: getAuth method that makes API calls
+
+  return (
+    <AuthContext.Provider value={{
+      user, sessionId, organizationId, role, permissions, entitlements, impersonator, loading,
+      refreshAuth, signOut, switchToOrganization,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 ```
 
-#### Step 1.4: Enhanced withAuth/Middleware for SSR Auth Operations (NEW)
+**🧪 Test Step 1.5:**
+```typescript
+// Test that no API calls are made
+1. Open browser dev tools → Network tab
+2. Load page with auth → verify no /api/auth/* requests
+3. Test signOut() → verify no API calls, only page refresh
+4. Test refreshAuth() → verify no API calls, only page refresh
+
+// Test functionality still works
+function TestComponent() {
+  const { user, signOut, refreshAuth } = useAuth();
+  
+  return (
+    <div>
+      <div>User: {user?.email || 'Not logged in'}</div>
+      <button onClick={() => signOut()}>Sign Out</button>
+      <button onClick={() => refreshAuth()}>Refresh</button>
+    </div>
+  );
+}
+```
+
+**✅ Success Criteria 1.5:**
+- [ ] No `/api/auth/*` requests in browser network tab
+- [ ] Sign out still works (via page refresh)
+- [ ] Refresh auth still works (via page refresh)
+- [ ] All functionality preserved from Step 1.4
+
+**🔄 Rollback 1.5:** If functionality breaks, revert to Step 1.4 implementation
+
+#### Step 1.6: Enhanced withAuth for SSR Auth Operations
 - **File**: `src/pages-router/server/withAuth.ts`
 - **Issue**: Need to handle auth operations (logout, org switch) through SSR instead of API routes
 - **Fix**: Detect auth operation params/cookies and handle in SSR
 
 ```typescript
-export function withAuth(handler, options) {
+export function withAuth(handler, options = {}) {
   return async (context) => {
     const { req, res } = context;
     
@@ -178,6 +447,8 @@ export function withAuth(handler, options) {
     if (req.cookies.__workos_logout) {
       // Clear session and redirect
       await clearSessionCookie(res);
+      // Clear the logout cookie
+      res.setHeader('Set-Cookie', '__workos_logout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT');
       return { redirect: { destination: '/', permanent: false } };
     }
     
@@ -192,45 +463,126 @@ export function withAuth(handler, options) {
     }
     
     // Get/refresh auth normally
+    const authKit = createPagesAdapter();
     const authResult = await authKit.withAuth(req);
-    // ... rest of existing logic with enhanced buildWorkOSProps integration
+    
+    // Create proper auth object
+    const auth = authResult.user ? {
+      user: authResult.user,
+      sessionId: authResult.sessionId,
+      organizationId: authResult.claims?.org_id,
+      role: authResult.claims?.role,
+      permissions: authResult.claims?.permissions,
+      entitlements: authResult.claims?.entitlements,
+      impersonator: authResult.impersonator,
+    } : null;
+    
+    // Call user's handler
+    return handler({ ...context, auth });
   };
 }
 ```
 
-#### Step 1.5: Fix useAuth Hook Context  
-- **File**: `src/pages-router/components/useAuth.ts`
-- **Issue**: May not be reading provider state correctly
-- **Fix**: Ensure proper context consumption
-
-### Phase 2: Complete Zero-API-Route Session Management (UPDATED)
-**Goal**: Handle ALL session lifecycle through SSR, eliminating user-created API routes
-
-#### Step 2.1: Remove Built-in API Utilities (UPDATED)
-- **REMOVE**: All references to users creating `/api/auth/*` routes
-- **REPLACE**: Document that no API routes are needed
-- **Pattern**: Everything handled through withAuth + SSR refresh
-
+**🧪 Test Step 1.6:**
 ```typescript
-// REMOVE: Export of handleAuth for API routes
-// REMOVE: Documentation suggesting API route creation
-// REPLACE WITH: Pure SSR pattern documentation
+// Test logout via cookie
+1. Login → set __workos_logout cookie → refresh page
+2. Should redirect to home and clear session
 
-// Users only need:
-// 1. withAuth in getServerSideProps
-// 2. AuthKitProvider with initialSession
-// 3. No API routes required
+// Test org switch via URL param  
+1. Login → visit page with ?__workos_switch_org=org_123
+2. Should switch org context and redirect to clean URL
+
+// Helper test functions
+async function testLogout() {
+  document.cookie = '__workos_logout=true; path=/';
+  window.location.reload();
+}
+
+async function testOrgSwitch(orgId) {
+  window.location.href = window.location.pathname + `?__workos_switch_org=${orgId}`;
+}
 ```
 
-#### Step 2.2: SSR-Only Session Operations (IMPLEMENTED IN STEP 1.3)
-- **File**: Already handled in AuthKitProvider fix above
-- **Pattern**: `router.replace(router.asPath)` for all operations
-- **Result**: Zero API route dependencies
+**✅ Success Criteria 1.6:**
+- [ ] Logout cookie triggers session clear and redirect
+- [ ] Org switch param triggers org context change
+- [ ] Clean URL after org switch (param removed)
+- [ ] Regular page loads still work normally
 
-#### Step 2.3: SSR-Only Organization Switching (IMPLEMENTED IN STEP 1.4)  
-- **File**: Already handled in withAuth enhancement above
-- **Pattern**: URL param + SSR redirect cycle
-- **Result**: No separate API route needed
+**🔄 Rollback 1.6:** If SSR operations break, implement as simpler middleware-only approach
+
+---
+
+### Phase 2: Complete Zero-API-Route Session Management
+**Goal**: Verify ALL session lifecycle works through SSR
+
+#### Step 2.1: Integration Testing - Full Flow
+**Goal**: Test complete auth lifecycle without any API routes
+
+**🧪 Test Step 2.1:**
+```typescript
+// Complete test sequence (no API routes should exist)
+1. ✅ Fresh app install → no /api/auth/* routes created
+2. ✅ Login flow → works via middleware + SSR
+3. ✅ useAuth() → returns user immediately  
+4. ✅ Navigate pages → state persists via SSR props
+5. ✅ Refresh page → state persists via SSR props
+6. ✅ Sign out → works via SSR cookie + refresh
+7. ✅ Org switch → works via SSR param + refresh
+8. ✅ Protected routes → redirect via withAuth SSR
+
+// Verification script
+function verifyNoAPIRoutes() {
+  const apiRoutes = [
+    '/api/auth/session',
+    '/api/auth/signout', 
+    '/api/auth/refresh',
+    '/api/auth/access-token',
+    '/api/auth/switch-organization'
+  ];
+  
+  // Verify these return 404 (don't exist)
+  apiRoutes.forEach(async route => {
+    const response = await fetch(route);
+    console.log(`${route}: ${response.status} (should be 404)`);
+  });
+}
+```
+
+**✅ Success Criteria 2.1:**
+- [ ] All auth operations work without custom API routes
+- [ ] Network tab shows no `/api/auth/*` requests during normal operation
+- [ ] User experience matches or exceeds Clerk's Pages Router UX
+
+**🔄 Rollback 2.1:** If any operation fails, debug the specific SSR implementation
+
+#### Step 2.2: Stress Testing SSR Pattern
+**Goal**: Ensure SSR pattern handles edge cases
+
+**🧪 Test Step 2.2:**
+```typescript
+// Edge case testing
+1. ✅ Multiple rapid sign out clicks → handles gracefully
+2. ✅ Multiple rapid org switches → handles gracefully  
+3. ✅ Browser back/forward with auth state changes → works
+4. ✅ Concurrent tabs → auth state syncs properly
+5. ✅ Network interruption during auth operation → recovers
+
+// Performance testing
+1. ✅ Auth state change latency vs API route approach
+2. ✅ Memory usage of SSR pattern vs API pattern
+3. ✅ Bundle size impact
+```
+
+**✅ Success Criteria 2.2:**
+- [ ] No race conditions in auth operations
+- [ ] Graceful handling of rapid state changes
+- [ ] Performance meets or exceeds API route approach
+
+**🔄 Rollback 2.2:** Optimize SSR pattern or add rate limiting if needed
+
+---
 
 ### Phase 3: Advanced Features (Defer to Clerk)
 **Goal**: Implement missing features using Clerk's patterns
@@ -240,139 +592,196 @@ export function withAuth(handler, options) {
 - **Implement**: Same pattern for `useAccessToken()`
 - **Avoid**: Separate API routes, use SSR state + client management
 
-#### Step 3.2: User Profile Management
-- **Research**: Clerk's `useUser().update()` pattern
-- **Implement**: If needed, use same approach
-- **Note**: May not be needed for WorkOS AuthKit scope
+**🧪 Test Step 3.1:**
+```typescript
+function TestAccessTokens() {
+  const { accessToken, loading, error, refresh } = useAccessToken();
+  
+  return (
+    <div>
+      <div>Token: {accessToken ? 'Present' : 'None'}</div>
+      <div>Loading: {loading.toString()}</div>
+      <div>Error: {error?.message || 'None'}</div>
+      <button onClick={refresh}>Refresh Token</button>
+    </div>
+  );
+}
+```
 
-#### Step 3.3: Multi-Domain Support
-- **Research**: Clerk's satellite app setup for Pages Router
-- **Test**: Current implementation against Clerk's patterns
-- **Fix**: Any discrepancies in proxy/domain handling
+**✅ Success Criteria 3.1:**
+- [ ] `useAccessToken()` returns valid tokens
+- [ ] Token refresh works without API routes
+- [ ] Automatic token refresh before expiry
 
-#### Step 3.4: Impersonation
-- **File**: `src/pages-router/components/Impersonation.tsx`
-- **Research**: How Clerk handles impersonation in Pages Router
-- **Test**: Current implementation
-- **Fix**: Any Pages Router specific issues
+#### Step 3.2: Token Claims Support
+**🧪 Test Step 3.2:**
+```typescript
+function TestTokenClaims() {
+  const claims = useTokenClaims();
+  
+  return (
+    <pre>{JSON.stringify(claims, null, 2)}</pre>
+  );
+}
+```
+
+**✅ Success Criteria 3.2:**
+- [ ] Claims decode properly from access tokens
+- [ ] Custom claims are included
+- [ ] Claims update when tokens refresh
+
+#### Step 3.3: Multi-Domain Support Testing
+**🧪 Test Step 3.3:**
+```typescript
+// Test satellite app configuration
+1. ✅ Primary domain auth works
+2. ✅ Satellite domain receives auth state
+3. ✅ Cross-domain organization switching
+4. ✅ Proxy URL handling
+```
+
+**✅ Success Criteria 3.3:**
+- [ ] Multi-domain apps work same as App Router
+- [ ] No additional configuration required
+
+#### Step 3.4: Impersonation Support
+**🧪 Test Step 3.4:**
+```typescript
+function TestImpersonation() {
+  const { impersonator } = useAuth();
+  
+  return (
+    <div>
+      {impersonator ? (
+        <>
+          <Impersonation />
+          <div>Impersonating: {impersonator.email}</div>
+        </>
+      ) : (
+        <div>Not impersonating</div>
+      )}
+    </div>
+  );
+}
+```
+
+**✅ Success Criteria 3.4:**
+- [ ] Impersonation detection works
+- [ ] Impersonation UI displays correctly
+- [ ] Stop impersonation works via SSR pattern
+
+---
 
 ### Phase 4: Developer Experience Polish
 **Goal**: Match Clerk's DX exactly
 
 #### Step 4.1: TypeScript Support
-- **Review**: Clerk's TypeScript patterns for Pages Router
-- **Implement**: Same type safety and overloads
-- **Test**: Type inference works correctly
+**🧪 Test Step 4.1:**
+```typescript
+// Type safety testing
+const auth = useAuth(); // Should infer correct types
+const { user } = await withAuth(({ auth }) => auth); // Should be typed
+const props = buildWorkOSProps({ session: null }); // Should accept Session | null
+```
+
+**✅ Success Criteria 4.1:**
+- [ ] Full type safety matches App Router
+- [ ] No TypeScript errors in usage
+- [ ] Proper type inference
 
 #### Step 4.2: Error Handling
-- **Research**: Clerk's error boundary patterns
-- **Implement**: Same error states and recovery
-- **Add**: Proper loading states
+**🧪 Test Step 4.2:**
+```typescript
+// Error scenarios
+1. ✅ Network errors during auth → graceful fallback
+2. ✅ Invalid session data → proper error state
+3. ✅ Middleware misconfiguration → helpful error messages
+```
+
+**✅ Success Criteria 4.2:**
+- [ ] Clear error messages for common issues
+- [ ] Graceful degradation
+- [ ] No uncaught promise rejections
 
 #### Step 4.3: Debug Support
-- **Research**: Clerk's debug modes for Pages Router
-- **Implement**: Same debugging capabilities
-- **Add**: Development-time warnings and guides
+**🧪 Test Step 4.3:**
+```typescript
+// Debug mode testing
+process.env.NODE_ENV = 'development';
+// Should show helpful logs about auth state, SSR data flow, etc.
+```
 
-## Implementation Priority
+**✅ Success Criteria 4.3:**
+- [ ] Useful debug information available
+- [ ] Clear auth state inspection
+- [ ] SSR data flow visibility
 
-### P0 - Critical (Eliminate API Dependencies)
-1. ✅ Fix AuthKitProvider to use only SSR state (Step 1.3)
-2. ✅ Replace all fetch calls with router.replace pattern (Step 1.3)  
-3. ✅ Enhance withAuth to handle logout/org-switch via SSR (Step 1.4)
-4. ✅ Fix `buildWorkOSProps` integration with enhanced withAuth
-5. ✅ Test: Full auth flow without any custom API routes
+---
 
-### P1 - Core Features (Match Clerk)
-6. ✅ Session refresh without API routes
-7. ✅ Organization switching through SSR
-8. ✅ Access token management (Clerk pattern)
-9. ✅ Protection patterns for Pages Router
+## Implementation Priority with Testing
+
+### P0 - Critical (Fix Broken State)
+1. ✅ **Step 0.1-0.2**: Verify exports work → **Test**: Import verification
+2. ✅ **Step 1.1**: Fix buildWorkOSProps → **Test**: Props structure in console
+3. ✅ **Step 1.2**: Fix withAuth data flow → **Test**: Auth data in page props
+4. ✅ **Step 1.3**: Fix initial hydration → **Test**: useAuth returns user immediately
+5. ✅ **Step 1.4**: Test end-to-end flow → **Test**: Login → navigate → refresh cycle
+6. ✅ **Step 1.5**: Remove API calls → **Test**: Network tab shows no API requests
+7. ✅ **Step 1.6**: SSR auth operations → **Test**: Logout/org switch via SSR
+
+### P1 - Core Features (Zero API Routes)
+8. ✅ **Step 2.1**: Integration testing → **Test**: Complete flow verification
+9. ✅ **Step 2.2**: Stress testing → **Test**: Edge cases and performance
 
 ### P2 - Advanced Features (Clerk Parity)
-10. ✅ Multi-domain support testing
-11. ✅ Impersonation component fixes
-12. ✅ Custom auth flow support
-13. ✅ TypeScript improvements
+10. ✅ **Step 3.1-3.4**: Advanced features → **Test**: Each feature independently
 
 ### P3 - Polish (DX Matching)
-14. ✅ Error handling patterns
-15. ✅ Debug logging
-16. ✅ Performance optimizations
-17. ✅ Documentation
-
-## Success Criteria
-
-### Must Work (Zero API Routes - Clerk Equivalent)
-- ✅ Users never create `/api/auth/*` routes
-- ✅ All auth operations work through SSR refresh  
-- ✅ `useAuth()` returns data immediately from SSR props
-- ✅ Login/logout/org-switch work without custom API routes
-- ✅ Session persists across navigation via SSR state
-
-### Should Work (Feature Parity)
-- ✅ Access tokens available through hooks
-- ✅ Organization switching works
-- ✅ All server helpers function correctly
-- ✅ TypeScript support matches App Router
-
-### Nice to Have (Advanced)
-- ✅ Debug mode available
-- ✅ Custom auth flows supported
-- ✅ Impersonation works correctly
-- ✅ Multi-domain apps supported
-
-## Research Tasks
-
-Before implementing each phase, research Clerk's exact approach:
-
-### Phase 1 Research
-- [ ] How does `buildClerkProps` serialize auth state?
-- [ ] What's in Clerk's `__clerk_ssr_state` object?
-- [ ] How does `ClerkProvider` consume SSR props?
-
-### Phase 2 Research  
-- [ ] How does Clerk handle session refresh in Pages Router?
-- [ ] Does Clerk require API routes or handle through SSR?
-- [ ] How does organization switching work?
-
-### Phase 3 Research
-- [ ] How does `useSession().getToken()` work internally?
-- [ ] What's Clerk's impersonation pattern for Pages Router?
-- [ ] How does multi-domain setup differ between routers?
+11. ✅ **Step 4.1-4.3**: DX improvements → **Test**: Developer experience quality
 
 ## Testing Strategy
 
-### Manual Testing Checklist (Zero API Routes Baseline)
-- [ ] Fresh install → login → `useAuth()` returns user (no API routes created)
-- [ ] Navigate between pages → state persists via SSR
-- [ ] Refresh page → state persists via SSR  
-- [ ] Logout → works via SSR refresh, no API route
-- [ ] Protected page when logged out → redirects via withAuth
-- [ ] Organization switching → works via SSR refresh, no API route
-- [ ] **Verify: No `/api/auth/*` routes exist in user's codebase**
+### Manual Testing Checklist (Incremental)
+- [ ] **After Step 1.3**: `useAuth()` returns user (not null)
+- [ ] **After Step 1.4**: Full login flow works
+- [ ] **After Step 1.5**: No API requests in network tab
+- [ ] **After Step 1.6**: Auth operations work via SSR
+- [ ] **After Step 2.1**: Complete auth lifecycle works
+- [ ] **After Phase 3**: All advanced features work
+- [ ] **After Phase 4**: Developer experience matches Clerk
 
-### Integration Testing
-- [ ] Test against Clerk's Pages Router example apps
-- [ ] Verify same user experience patterns
-- [ ] Ensure no additional setup required vs Clerk
+### Automated Testing Opportunities
+```typescript
+// Unit tests for each step
+describe('buildWorkOSProps', () => {
+  it('serializes session data correctly', () => {
+    const result = buildWorkOSProps({ session: mockSession });
+    expect(result.__workos_ssr_state).toEqual(expectedStructure);
+  });
+});
+
+describe('AuthKitProvider', () => {
+  it('initializes from SSR props', () => {
+    render(<AuthKitProvider initialSession={mockSession}><TestComponent /></AuthKitProvider>);
+    expect(screen.getByText(mockSession.user.email)).toBeInTheDocument();
+  });
+});
+```
+
+## Rollback Strategy
+
+Each step has clear rollback criteria:
+- **Step fails**: Revert that specific step, debug, retry
+- **Integration breaks**: Rollback to last working step
+- **Performance degrades**: Optimize or revert to API pattern temporarily
 
 ## Key Architectural Principles
 
 ### Follow Clerk's Lead
-1. **Minimal Setup**: Like Clerk, require minimal user configuration
-2. **SSR First**: Use server-side rendering for state, not API routes
-3. **Seamless Hydration**: Client should seamlessly pick up server state
-4. **Built-in Utilities**: Provide importable helpers, don't require user implementation
-5. **Conditional Logic**: Same import paths work for both routers
+1. **Minimal Setup**: Zero API routes, minimal configuration
+2. **SSR First**: All auth state through server-side rendering
+3. **Seamless Hydration**: Client picks up server state immediately
+4. **Incremental Testing**: Each step independently verifiable
+5. **Graceful Rollback**: Can revert any step without breaking others
 
-### Avoid Overengineering  
-- ❌ Don't create APIs users need to implement
-- ❌ Don't require complex setup procedures  
-- ❌ Don't reinvent patterns Clerk already solved
-- ❌ Don't make fetch calls when SSR state is available
-- ✅ Use SSR + withAuth for ALL state management
-- ✅ Provide "just works" experience with zero API routes
-- ✅ Follow Clerk's SSR-first patterns exactly
-
-This approach ensures we match Clerk's excellent developer experience while providing AuthKit's functionality.
+This approach ensures we can verify progress at each step while building toward Clerk-equivalent functionality.
