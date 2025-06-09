@@ -122,63 +122,115 @@ export const getServerSideProps = withAuth(async ({ auth }) => {
 });
 ```
 
-#### Step 1.3: Fix AuthKitProvider Hydration
+#### Step 1.3: Fix AuthKitProvider Hydration (UPDATED - ELIMINATE API CALLS)
 - **File**: `src/pages-router/components/AuthKitProvider.tsx`
-- **Issue**: Not consuming `initialSession` from SSR props
-- **Fix**: Initialize state from SSR, avoid unnecessary API calls
+- **Issue**: Still makes API calls despite having SSR props, violates "zero API routes" principle
+- **Fix**: Initialize ALL state from SSR immediately, replace API calls with SSR refresh pattern
 
 ```typescript
 export const AuthKitProvider = ({ children, initialSession }) => {
-  // Initialize from SSR state immediately
-  const [user, setUser] = useState(initialSession?.user || null);
+  // Initialize ALL state from SSR state immediately (like Clerk)
+  const [user, setUser] = useState<User | null>(initialSession?.user || null);
   const [sessionId, setSessionId] = useState(initialSession?.sessionId);
-  // ... other state from initialSession
+  const [organizationId, setOrganizationId] = useState(initialSession?.organizationId);
+  const [role, setRole] = useState(initialSession?.role);
+  const [permissions, setPermissions] = useState(initialSession?.permissions);
+  const [entitlements, setEntitlements] = useState(initialSession?.entitlements);
+  const [impersonator, setImpersonator] = useState(initialSession?.impersonator);
+  const [loading, setLoading] = useState(false);
+
+  // REMOVE: All fetch calls to /api/auth/* endpoints
+  // REPLACE WITH: SSR refresh pattern (Clerk's approach)
   
-  // Only fetch if no SSR data AND client-side
-  useEffect(() => {
-    if (!initialSession && typeof window !== 'undefined') {
-      getAuth(); // Only as fallback
-    }
-  }, []);
+  const refreshAuth = async () => {
+    // Force SSR refresh by navigating to current page (Clerk pattern)
+    router.replace(router.asPath);
+  };
+
+  const signOut = async ({ returnTo }: { returnTo?: string } = {}) => {
+    // Set logout cookie/param, then refresh to let SSR handle logout
+    document.cookie = '__workos_logout=true; path=/';
+    router.replace(returnTo || '/');
+  };
+
+  const switchToOrganization = async (organizationId: string) => {
+    // Set org switch param, then refresh to let SSR handle switch
+    const currentUrl = new URL(router.asPath, window.location.origin);
+    currentUrl.searchParams.set('__workos_switch_org', organizationId);
+    router.replace(currentUrl.pathname + currentUrl.search);
+  };
+
+  // REMOVE: All useEffect API calls - no fetch fallbacks needed
 };
 ```
 
-#### Step 1.4: Fix useAuth Hook Context
+#### Step 1.4: Enhanced withAuth/Middleware for SSR Auth Operations (NEW)
+- **File**: `src/pages-router/server/withAuth.ts`
+- **Issue**: Need to handle auth operations (logout, org switch) through SSR instead of API routes
+- **Fix**: Detect auth operation params/cookies and handle in SSR
+
+```typescript
+export function withAuth(handler, options) {
+  return async (context) => {
+    const { req, res } = context;
+    
+    // Handle logout request via cookie
+    if (req.cookies.__workos_logout) {
+      // Clear session and redirect
+      await clearSessionCookie(res);
+      return { redirect: { destination: '/', permanent: false } };
+    }
+    
+    // Handle org switch request via URL param
+    const switchOrgId = req.query.__workos_switch_org;
+    if (switchOrgId) {
+      // Switch org and refresh session
+      await switchToOrganizationSSR(req, res, switchOrgId);
+      // Redirect to clean URL (remove the param)
+      const cleanUrl = context.resolvedUrl.split('?')[0];
+      return { redirect: { destination: cleanUrl, permanent: false } };
+    }
+    
+    // Get/refresh auth normally
+    const authResult = await authKit.withAuth(req);
+    // ... rest of existing logic with enhanced buildWorkOSProps integration
+  };
+}
+```
+
+#### Step 1.5: Fix useAuth Hook Context  
 - **File**: `src/pages-router/components/useAuth.ts`
 - **Issue**: May not be reading provider state correctly
 - **Fix**: Ensure proper context consumption
 
-### Phase 2: Complete Session Management (Clerk Way)
-**Goal**: Handle session lifecycle without user-created API routes
+### Phase 2: Complete Zero-API-Route Session Management (UPDATED)
+**Goal**: Handle ALL session lifecycle through SSR, eliminating user-created API routes
 
-#### Step 2.1: Built-in Session Utilities
-- **Approach**: Provide importable handlers, don't require user routes
-- **Pattern**: Follow Clerk's `pages/api/auth/[...nextauth].ts` equivalent
-
-```typescript
-// Users can optionally create:
-// pages/api/auth/workos.ts
-export { handleAuth as default } from '@workos-inc/authkit-nextjs/pages'
-
-// Or library handles it internally through middleware + SSR
-```
-
-#### Step 2.2: Session Refresh Mechanism
-- **File**: `src/pages-router/components/AuthKitProvider.tsx`
-- **Approach**: Handle refresh through SSR cycle, not API calls
-- **Pattern**: Similar to how Clerk handles `router.push(router.asPath)`
+#### Step 2.1: Remove Built-in API Utilities (UPDATED)
+- **REMOVE**: All references to users creating `/api/auth/*` routes
+- **REPLACE**: Document that no API routes are needed
+- **Pattern**: Everything handled through withAuth + SSR refresh
 
 ```typescript
-const refreshAuth = async () => {
-  // Force SSR refresh by navigating to current page
-  router.push(router.asPath);
-};
+// REMOVE: Export of handleAuth for API routes
+// REMOVE: Documentation suggesting API route creation
+// REPLACE WITH: Pure SSR pattern documentation
+
+// Users only need:
+// 1. withAuth in getServerSideProps
+// 2. AuthKitProvider with initialSession
+// 3. No API routes required
 ```
 
-#### Step 2.3: Organization Switching
-- **File**: `src/pages-router/components/AuthKitProvider.tsx`
-- **Approach**: Use middleware + SSR refresh, not separate API route
-- **Pattern**: Trigger middleware re-evaluation with org context
+#### Step 2.2: SSR-Only Session Operations (IMPLEMENTED IN STEP 1.3)
+- **File**: Already handled in AuthKitProvider fix above
+- **Pattern**: `router.replace(router.asPath)` for all operations
+- **Result**: Zero API route dependencies
+
+#### Step 2.3: SSR-Only Organization Switching (IMPLEMENTED IN STEP 1.4)  
+- **File**: Already handled in withAuth enhancement above
+- **Pattern**: URL param + SSR redirect cycle
+- **Result**: No separate API route needed
 
 ### Phase 3: Advanced Features (Defer to Clerk)
 **Goal**: Implement missing features using Clerk's patterns
@@ -224,12 +276,12 @@ const refreshAuth = async () => {
 
 ## Implementation Priority
 
-### P0 - Critical (Fix Broken State)
-1. ✅ Fix conditional exports (ensure components available)
-2. ✅ Fix `buildWorkOSProps` SSR serialization
-3. ✅ Fix `AuthKitProvider` initial state hydration
-4. ✅ Fix `useAuth` context reading
-5. ✅ Test: Login → navigate → `useAuth()` returns user
+### P0 - Critical (Eliminate API Dependencies)
+1. ✅ Fix AuthKitProvider to use only SSR state (Step 1.3)
+2. ✅ Replace all fetch calls with router.replace pattern (Step 1.3)  
+3. ✅ Enhance withAuth to handle logout/org-switch via SSR (Step 1.4)
+4. ✅ Fix `buildWorkOSProps` integration with enhanced withAuth
+5. ✅ Test: Full auth flow without any custom API routes
 
 ### P1 - Core Features (Match Clerk)
 6. ✅ Session refresh without API routes
@@ -251,12 +303,12 @@ const refreshAuth = async () => {
 
 ## Success Criteria
 
-### Must Work (Clerk Equivalent)
-- ✅ `useAuth()` returns user data immediately after SSR
-- ✅ Login/logout flows work seamlessly
-- ✅ Protected pages redirect properly
-- ✅ Session persists across navigation
-- ✅ **Zero required API routes** for basic functionality
+### Must Work (Zero API Routes - Clerk Equivalent)
+- ✅ Users never create `/api/auth/*` routes
+- ✅ All auth operations work through SSR refresh  
+- ✅ `useAuth()` returns data immediately from SSR props
+- ✅ Login/logout/org-switch work without custom API routes
+- ✅ Session persists across navigation via SSR state
 
 ### Should Work (Feature Parity)
 - ✅ Access tokens available through hooks
@@ -291,14 +343,14 @@ Before implementing each phase, research Clerk's exact approach:
 
 ## Testing Strategy
 
-### Manual Testing Checklist (Clerk Baseline)
-- [ ] Fresh install → login → `useAuth()` returns user
-- [ ] Navigate between pages → state persists
-- [ ] Refresh page → state persists
-- [ ] Logout → state clears
-- [ ] Protected page when logged out → redirects
-- [ ] Organization switching → updates context
-- [ ] **No API routes required** for basic app
+### Manual Testing Checklist (Zero API Routes Baseline)
+- [ ] Fresh install → login → `useAuth()` returns user (no API routes created)
+- [ ] Navigate between pages → state persists via SSR
+- [ ] Refresh page → state persists via SSR  
+- [ ] Logout → works via SSR refresh, no API route
+- [ ] Protected page when logged out → redirects via withAuth
+- [ ] Organization switching → works via SSR refresh, no API route
+- [ ] **Verify: No `/api/auth/*` routes exist in user's codebase**
 
 ### Integration Testing
 - [ ] Test against Clerk's Pages Router example apps
@@ -314,12 +366,13 @@ Before implementing each phase, research Clerk's exact approach:
 4. **Built-in Utilities**: Provide importable helpers, don't require user implementation
 5. **Conditional Logic**: Same import paths work for both routers
 
-### Avoid Overengineering
+### Avoid Overengineering  
 - ❌ Don't create APIs users need to implement
 - ❌ Don't require complex setup procedures  
 - ❌ Don't reinvent patterns Clerk already solved
-- ✅ Use SSR + middleware for state management
-- ✅ Provide "just works" experience
-- ✅ Follow established Next.js patterns
+- ❌ Don't make fetch calls when SSR state is available
+- ✅ Use SSR + withAuth for ALL state management
+- ✅ Provide "just works" experience with zero API routes
+- ✅ Follow Clerk's SSR-first patterns exactly
 
 This approach ensures we match Clerk's excellent developer experience while providing AuthKit's functionality.
