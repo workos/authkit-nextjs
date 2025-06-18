@@ -225,6 +225,7 @@ describe('useAuth', () => {
       role: 'admin',
       permissions: ['read', 'write'],
       entitlements: ['feature1'],
+      featureFlags: ['test-flag'],
       impersonator: { email: 'admin@example.com' },
     });
 

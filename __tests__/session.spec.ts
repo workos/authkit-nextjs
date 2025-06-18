@@ -31,6 +31,7 @@ describe('session.ts', () => {
     role: 'member',
     permissions: ['posts:create', 'posts:delete'],
     entitlements: ['audit-logs'],
+    featureFlags: ['device-authorization-grant'],
     impersonator: undefined,
     user: {
       object: 'user',
@@ -858,6 +859,7 @@ describe('session.ts', () => {
         role: 'admin',
         permissions: ['read', 'write'],
         entitlements: ['feature_a'],
+        feature_flags: ['device-authorization-grant'],
         department: 'engineering',
         level: 5,
         metadata: { theme: 'dark' },
@@ -882,6 +884,7 @@ describe('session.ts', () => {
         role: 'admin',
         permissions: ['read', 'write'],
         entitlements: ['feature_a'],
+        feature_flags: ['device-authorization-grant'],
       };
       const token = await generateTestToken(tokenPayload);
 
@@ -903,6 +906,7 @@ describe('session.ts', () => {
         role: 'admin',
         permissions: ['read', 'write'],
         entitlements: ['feature_a'],
+        feature_flags: ['device-authorization-grant'],
         jti: 'jwt_123',
       };
       const token = await generateTestToken({ ...standardClaims, ...customClaims });

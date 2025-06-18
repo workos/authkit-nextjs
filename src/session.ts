@@ -163,6 +163,7 @@ async function updateSession(
       role,
       permissions,
       entitlements,
+      feature_flags: featureFlags,
     } = decodeJwt<AccessToken>(session.accessToken);
 
     return {
@@ -173,6 +174,7 @@ async function updateSession(
         role,
         permissions,
         entitlements,
+        featureFlags,
         impersonator: session.impersonator,
         accessToken: session.accessToken,
       },
@@ -217,6 +219,7 @@ async function updateSession(
       role,
       permissions,
       entitlements,
+      feature_flags: featureFlags,
     } = decodeJwt<AccessToken>(accessToken);
 
     options.onSessionRefreshSuccess?.({ accessToken, user, impersonator, organizationId });
@@ -229,6 +232,7 @@ async function updateSession(
         role,
         permissions,
         entitlements,
+        featureFlags,
         impersonator,
         accessToken,
       },
@@ -305,6 +309,7 @@ async function refreshSession({
     role,
     permissions,
     entitlements,
+    feature_flags: featureFlags,
   } = decodeJwt<AccessToken>(accessToken);
 
   return {
@@ -314,6 +319,7 @@ async function refreshSession({
     role,
     permissions,
     entitlements,
+    featureFlags,
     impersonator,
     accessToken,
   };
@@ -384,6 +390,7 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     role,
     permissions,
     entitlements,
+    feature_flags: featureFlags,
   } = decodeJwt<AccessToken>(session.accessToken);
 
   return {
@@ -393,6 +400,7 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     role,
     permissions,
     entitlements,
+    featureFlags,
     impersonator: session.impersonator,
     accessToken: session.accessToken,
   };
