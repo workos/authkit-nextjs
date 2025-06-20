@@ -90,6 +90,7 @@ describe('useTokenClaims', () => {
       role: 'admin',
       permissions: ['read', 'write'],
       entitlements: ['feature_a'],
+      feature_flags: ['device-authorization-grant'],
       jti: 'jwt_123',
       nbf: 1234567800,
       // Custom claims
@@ -120,6 +121,7 @@ describe('useTokenClaims', () => {
       role: 'admin',
       permissions: ['read', 'write'],
       entitlements: ['feature_a'],
+      feature_flags: ['device-authorization-grant'],
       jti: 'jwt_123',
       nbf: 1234567800,
     };

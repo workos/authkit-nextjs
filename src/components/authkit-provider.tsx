@@ -18,6 +18,7 @@ type AuthContextType = {
   role: string | undefined;
   permissions: string[] | undefined;
   entitlements: string[] | undefined;
+  featureFlags: string[] | undefined;
   impersonator: Impersonator | undefined;
   loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
@@ -47,6 +48,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [role, setRole] = useState<string | undefined>(undefined);
   const [permissions, setPermissions] = useState<string[] | undefined>(undefined);
   const [entitlements, setEntitlements] = useState<string[] | undefined>(undefined);
+  const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(undefined);
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +62,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setRole(auth.role);
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
+      setFeatureFlags(auth.featureFlags);
       setImpersonator(auth.impersonator);
     } catch (error) {
       setUser(null);
@@ -68,6 +71,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setRole(undefined);
       setPermissions(undefined);
       setEntitlements(undefined);
+      setFeatureFlags(undefined);
       setImpersonator(undefined);
     } finally {
       setLoading(false);
@@ -102,6 +106,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setRole(auth.role);
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
+      setFeatureFlags(auth.featureFlags);
       setImpersonator(auth.impersonator);
     } catch (error) {
       return error instanceof Error ? { error: error.message } : { error: String(error) };
@@ -174,6 +179,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         role,
         permissions,
         entitlements,
+        featureFlags,
         impersonator,
         loading,
         getAuth,

@@ -13,6 +13,7 @@ export async function generateTestToken(payload = {}, expired = false) {
     role: 'member',
     permissions: ['posts:create', 'posts:delete'],
     entitlements: ['audit-logs'],
+    feature_flags: ['device-authorization-grant'],
   };
 
   const mergedPayload = { ...defaultPayload, ...payload };

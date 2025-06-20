@@ -32,6 +32,7 @@ export interface UserInfo {
   role?: string;
   permissions?: string[];
   entitlements?: string[];
+  featureFlags?: string[];
   impersonator?: Impersonator;
   accessToken: string;
 }
@@ -42,6 +43,7 @@ export interface NoUserInfo {
   role?: undefined;
   permissions?: undefined;
   entitlements?: undefined;
+  featureFlags?: undefined;
   impersonator?: undefined;
   accessToken?: undefined;
 }
@@ -52,6 +54,7 @@ export interface AccessToken {
   role?: string;
   permissions?: string[];
   entitlements?: string[];
+  feature_flags?: string[];
 }
 
 export interface GetAuthURLOptions {
