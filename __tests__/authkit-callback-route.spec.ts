@@ -1,9 +1,9 @@
 import { getWorkOS } from '../src/workos.js';
 import { handleAuth } from '../src/authkit-callback-route.js';
-import { NextRequest, NextResponse } from 'next/server.js';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Mocked in jest.setup.ts
-import { cookies, headers } from 'next/headers.js';
+import { cookies, headers } from 'next/headers';
 
 // Mock dependencies
 const fakeWorkosInstance = {

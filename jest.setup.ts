@@ -5,7 +5,7 @@ process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI = 'http://localhost:3000/callback';
 process.env.WORKOS_COOKIE_DOMAIN = 'example.com';
 
 // Mock the next/headers module
-jest.mock('next/headers.js', () => {
+jest.mock('next/headers', () => {
   const cookieStore = new Map();
   const headersStore = new Map();
 
@@ -38,6 +38,6 @@ jest.mock('next/headers.js', () => {
   };
 });
 
-jest.mock('next/navigation.js', () => ({
+jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
 }));

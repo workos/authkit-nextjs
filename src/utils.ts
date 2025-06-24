@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server.js';
+import { NextResponse } from 'next/server';
 
 export function redirectWithFallback(redirectUri: string, headers?: Headers) {
   const newHeaders = headers ? new Headers(headers) : new Headers();

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server.js';
-import { cookies, headers } from 'next/headers.js';
-import { redirect } from 'next/navigation.js';
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
 import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from '../src/session.js';
 import { getWorkOS } from '../src/workos.js';
