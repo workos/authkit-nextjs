@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server.js';
+import { NextResponse } from 'next/server';
 import { redirectWithFallback, errorResponseWithFallback } from '../src/utils.js';
 
 describe('utils', () => {
@@ -37,7 +37,7 @@ describe('utils', () => {
 
       jest.resetModules();
 
-      jest.mock('next/server.js', () => ({
+      jest.mock('next/server', () => ({
         NextResponse: {
           // exists but has no redirect method
         },
@@ -58,7 +58,7 @@ describe('utils', () => {
       jest.resetModules();
 
       // Mock with undefined NextResponse
-      jest.mock('next/server.js', () => ({
+      jest.mock('next/server', () => ({
         NextResponse: undefined,
       }));
 
@@ -108,7 +108,7 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse exists but json is undefined', async () => {
       jest.resetModules();
 
-      jest.mock('next/server.js', () => ({
+      jest.mock('next/server', () => ({
         NextResponse: {
           // exists but has no json method
         },
@@ -126,7 +126,7 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse is undefined', async () => {
       jest.resetModules();
 
-      jest.mock('next/server.js', () => ({
+      jest.mock('next/server', () => ({
         NextResponse: undefined,
       }));
 

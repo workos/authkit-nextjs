@@ -188,7 +188,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user session from WorkOS.
 
 ```jsx
-import Link from 'next/link.js';
+import Link from 'next/link';
 import { getSignInUrl, getSignUpUrl, withAuth, signOut } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {

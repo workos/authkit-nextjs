@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { getAuthorizationUrl } from '../src/get-authorization-url.js';
-import { headers } from 'next/headers.js';
+import { headers } from 'next/headers';
 import { getWorkOS } from '../src/workos.js';
 
-jest.mock('next/headers.js');
+jest.mock('next/headers');
 
 // Mock dependencies
 const fakeWorkosInstance = {
