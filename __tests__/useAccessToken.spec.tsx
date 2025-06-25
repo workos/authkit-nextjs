@@ -31,6 +31,7 @@ describe('useAccessToken', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
@@ -355,6 +356,7 @@ describe('useAccessToken', () => {
 
   it('should prevent concurrent token fetches via updateToken', async () => {
     jest.clearAllMocks();
+    (getAccessTokenAction as jest.Mock).mockReset();
 
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
