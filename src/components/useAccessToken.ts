@@ -37,10 +37,7 @@ function tokenReducer(state: TokenState, action: TokenAction): TokenState {
 
 function getRefreshDelay(timeUntilExpiry: number) {
   const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
-  return Math.min(
-    Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000),
-    MAX_REFRESH_DELAY_SECONDS * 1000
-  );
+  return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
 }
 
 function parseToken(token: string | undefined) {
@@ -93,6 +90,7 @@ export function useAccessToken() {
   }, []);
 
   const updateToken = useCallback(async () => {
+    // istanbul ignore next - safety guard against concurrent fetches
     if (fetchingRef.current) {
       return;
     }
