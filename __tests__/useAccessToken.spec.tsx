@@ -335,7 +335,7 @@ describe('useAccessToken', () => {
       refreshAuth: jest.fn().mockResolvedValue({}),
     }));
 
-    const { rerender, unmount } = render(<TestComponent />);
+    const { rerender } = render(<TestComponent />);
 
     await waitFor(() => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
@@ -352,15 +352,10 @@ describe('useAccessToken', () => {
     await waitFor(() => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
     });
-
-    // Clean up to prevent test pollution
-    unmount();
-    jest.clearAllTimers();
   });
 
   it('should prevent concurrent token fetches via updateToken', async () => {
     jest.clearAllMocks();
-    jest.clearAllTimers();
     (getAccessTokenAction as jest.Mock).mockReset();
 
     const mockToken =
