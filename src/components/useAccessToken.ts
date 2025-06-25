@@ -4,6 +4,7 @@ import { useAuth } from './authkit-provider.js';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
+const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60; // 24 hours
 const RETRY_DELAY_SECONDS = 300; // 5 minutes
 
 interface TokenState {
@@ -35,7 +36,11 @@ function tokenReducer(state: TokenState, action: TokenAction): TokenState {
 }
 
 function getRefreshDelay(timeUntilExpiry: number) {
-  return Math.max((timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000, MIN_REFRESH_DELAY_SECONDS * 1000);
+  const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
+  return Math.min(
+    Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000),
+    MAX_REFRESH_DELAY_SECONDS * 1000
+  );
 }
 
 function parseToken(token: string | undefined) {
