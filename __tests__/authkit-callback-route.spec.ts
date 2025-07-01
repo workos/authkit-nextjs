@@ -32,6 +32,9 @@ describe('authkit-callback-route', () => {
       object: 'user' as const,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
+      lastSignInAt: '2024-01-01T00:00:00Z',
+      externalId: null,
+      metadata: {},
     },
     oauthTokens: {
       accessToken: 'access123',
