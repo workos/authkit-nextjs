@@ -92,7 +92,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
 
       return result;
     },
-    [getAuth],
+    [],
   );
 
   const refreshAuth = useCallback(
