@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import {
   checkSessionAction,
   getAuthAction,
@@ -78,46 +78,49 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
     }
   };
 
-  const switchToOrganization = async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
-    const opts = { revalidationStrategy: 'none', ...options };
-    const result = await switchToOrganizationAction(organizationId, {
-      revalidationStrategy: 'none',
-      ...options,
-    });
+  const switchToOrganization = useCallback(
+    async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
+      const opts = { revalidationStrategy: 'none', ...options };
+      const result = await switchToOrganizationAction(organizationId, {
+        revalidationStrategy: 'none',
+        ...options,
+      });
 
-    if (opts.revalidationStrategy === 'none') {
-      await getAuth({ ensureSignedIn: true });
-    }
+      if (opts.revalidationStrategy === 'none') {
+        await getAuth({ ensureSignedIn: true });
+      }
 
-    return result;
-  };
+      return result;
+    },
+    [getAuth],
+  );
 
-  const refreshAuth = async ({
-    ensureSignedIn = false,
-    organizationId,
-  }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
-    try {
-      setLoading(true);
-      const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+  const refreshAuth = useCallback(
+    async ({ ensureSignedIn = false, organizationId }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
+      try {
+        setLoading(true);
+        const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
 
-      setUser(auth.user);
-      setSessionId(auth.sessionId);
-      setOrganizationId(auth.organizationId);
-      setRole(auth.role);
-      setPermissions(auth.permissions);
-      setEntitlements(auth.entitlements);
-      setFeatureFlags(auth.featureFlags);
-      setImpersonator(auth.impersonator);
-    } catch (error) {
-      return error instanceof Error ? { error: error.message } : { error: String(error) };
-    } finally {
-      setLoading(false);
-    }
-  };
+        setUser(auth.user);
+        setSessionId(auth.sessionId);
+        setOrganizationId(auth.organizationId);
+        setRole(auth.role);
+        setPermissions(auth.permissions);
+        setEntitlements(auth.entitlements);
+        setFeatureFlags(auth.featureFlags);
+        setImpersonator(auth.impersonator);
+      } catch (error) {
+        return error instanceof Error ? { error: error.message } : { error: String(error) };
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
-  const signOut = async ({ returnTo }: { returnTo?: string } = {}) => {
+  const signOut = useCallback(async ({ returnTo }: { returnTo?: string } = {}) => {
     await handleSignOutAction({ returnTo });
-  };
+  }, []);
 
   useEffect(() => {
     getAuth();
