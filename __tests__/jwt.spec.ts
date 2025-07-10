@@ -22,10 +22,7 @@ describe('jwt', () => {
     it('should parse valid JWT with base64url encoding', () => {
       // Standard JWT with base64url encoding (using - and _ characters)
       const payload = { sub: '1234567890', name: 'John Doe', iat: 1516239022 };
-      const encodedPayload = btoa(JSON.stringify(payload))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+      const encodedPayload = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
       const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${encodedPayload}.mock-signature`;
 
       const result = parseToken(token);
@@ -45,10 +42,7 @@ describe('jwt', () => {
     it('should handle payload with special characters requiring base64 padding', () => {
       // Payload that when encoded requires padding characters
       const payload = { id: '123', data: 'x' };
-      const encodedPayload = btoa(JSON.stringify(payload))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+      const encodedPayload = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
       const token = `header.${encodedPayload}.signature`;
 
       const result = parseToken(token);
@@ -113,14 +107,11 @@ describe('jwt', () => {
       const testCases = [
         { data: '>>?' }, // Results in Pj4/
         { data: '>>>' }, // Results in Pj4+
-        { data: '?' },   // Results in Pw==
+        { data: '?' }, // Results in Pw==
       ];
 
       testCases.forEach((payload) => {
-        const encodedPayload = btoa(JSON.stringify(payload))
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_')
-          .replace(/=/g, '');
+        const encodedPayload = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         const token = `header.${encodedPayload}.signature`;
 
         const result = parseToken(token);
