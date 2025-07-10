@@ -52,7 +52,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  const getAuth = async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+  const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
     setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
@@ -76,7 +76,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const switchToOrganization = useCallback(
     async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
