@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { useAuth } from './authkit-provider.js';
+import { parseToken } from '../jwt.js';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
@@ -40,20 +41,19 @@ function getRefreshDelay(timeUntilExpiry: number) {
   return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
 }
 
-function parseToken(token: string | undefined) {
+function parseTokenPayload(token: string | undefined) {
   // istanbul ignore next
   if (!token) {
     return null;
   }
 
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
+    const payload = parseToken(token);
+    const now = Math.floor(Date.now() / 1000);
+
+    if (typeof payload.exp !== 'number') {
       return null;
     }
-
-    const payload = JSON.parse(atob(parts[1]));
-    const now = Math.floor(Date.now() / 1000);
 
     return {
       payload,
@@ -100,7 +100,7 @@ export function useAccessToken() {
     try {
       let token = await getAccessTokenAction();
       if (token) {
-        const tokenData = parseToken(token);
+        const tokenData = parseTokenPayload(token);
         if (!tokenData || tokenData.isExpiring) {
           token = await refreshAccessTokenAction();
         }
@@ -109,7 +109,7 @@ export function useAccessToken() {
       dispatch({ type: 'FETCH_SUCCESS', token });
 
       if (token) {
-        const tokenData = parseToken(token);
+        const tokenData = parseTokenPayload(token);
         if (tokenData) {
           const delay = getRefreshDelay(tokenData.timeUntilExpiry);
           clearRefreshTimeout();
@@ -120,6 +120,7 @@ export function useAccessToken() {
       return token;
     } catch (error) {
       dispatch({ type: 'FETCH_ERROR', error: error instanceof Error ? error : new Error(String(error)) });
+      clearRefreshTimeout();
       refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
@@ -141,7 +142,7 @@ export function useAccessToken() {
       dispatch({ type: 'FETCH_SUCCESS', token });
 
       if (token) {
-        const tokenData = parseToken(token);
+        const tokenData = parseTokenPayload(token);
         if (tokenData) {
           const delay = getRefreshDelay(tokenData.timeUntilExpiry);
           clearRefreshTimeout();
@@ -153,6 +154,7 @@ export function useAccessToken() {
     } catch (error) {
       const typedError = error instanceof Error ? error : new Error(String(error));
       dispatch({ type: 'FETCH_ERROR', error: typedError });
+      clearRefreshTimeout();
       refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
@@ -171,6 +173,7 @@ export function useAccessToken() {
   }, [userId, sessionId, updateToken, clearRefreshTimeout]);
 
   return {
+    claims: parseToken(state.token),
     accessToken: state.token,
     loading: state.loading,
     error: state.error,
