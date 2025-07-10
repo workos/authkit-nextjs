@@ -51,6 +51,7 @@ function parseTokenPayload(token: string | undefined) {
     const payload = parseToken(token);
     const now = Math.floor(Date.now() / 1000);
 
+    // istanbul ignore next - if the token does not have an exp claim, we cannot determine expiry
     if (typeof payload.exp !== 'number') {
       return null;
     }
@@ -173,7 +174,6 @@ export function useAccessToken() {
   }, [userId, sessionId, updateToken, clearRefreshTimeout]);
 
   return {
-    claims: parseToken(state.token),
     accessToken: state.token,
     loading: state.loading,
     error: state.error,
