@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { useAuth } from './authkit-provider.js';
-import { parseToken } from '../jwt.js';
+import { decodeJwt } from '../jwt.js';
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
@@ -48,7 +48,7 @@ function parseTokenPayload(token: string | undefined) {
   }
 
   try {
-    const payload = parseToken(token);
+    const { payload } = decodeJwt(token);
     const now = Math.floor(Date.now() / 1000);
 
     // istanbul ignore next - if the token does not have an exp claim, we cannot determine expiry
