@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { useAccessToken } from './useAccessToken.js';
-import { decodeJwt, type JWTPayload } from 'jose';
-
-type TokenClaims<T> = Partial<JWTPayload & T>;
+import { decodeJwt, type TokenClaims } from '../jwt.js';
 
 /**
  * A hook that retrieves the claims from the access token.
@@ -22,7 +20,7 @@ export function useTokenClaims<T = Record<string, unknown>>(): TokenClaims<T> {
     }
 
     try {
-      return decodeJwt<T>(accessToken);
+      return decodeJwt<T>(accessToken).payload;
     } catch {
       return {};
     }
