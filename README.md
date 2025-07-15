@@ -429,7 +429,7 @@ If you don't want to use `authkitMiddleware` and instead want to compose your ow
 export default async function middleware(request: NextRequest) {
   // Perform logic before or after AuthKit
 
-  // Auth object contains the session, response headers and an auhorization URL in the case that the session isn't valid
+  // Auth object contains the session, response headers and an authorization URL in the case that the session isn't valid
   // This method will automatically handle setting the cookie and refreshing the session
   const { session, headers, authorizationUrl } = await authkit(request, {
     debug: true,
