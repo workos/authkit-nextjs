@@ -25,7 +25,7 @@ function tokenReducer(state: TokenState, action: TokenAction): TokenState {
     case 'FETCH_START':
       return { ...state, loading: true, error: null };
     case 'FETCH_SUCCESS':
-      return { ...state, loading: false, token: action.token };
+      return { ...state, loading: false, token: action.token, error: null };
     case 'FETCH_ERROR':
       return { ...state, loading: false, error: action.error };
     case 'RESET':
@@ -90,6 +90,10 @@ export function useAccessToken() {
     }
   }, []);
 
+  // Store the current token in a ref to avoid stale closures
+  const currentTokenRef = useRef<string | undefined>(state.token);
+  currentTokenRef.current = state.token;
+
   const updateToken = useCallback(async () => {
     // istanbul ignore next - safety guard against concurrent fetches
     if (fetchingRef.current) {
@@ -97,7 +101,7 @@ export function useAccessToken() {
     }
 
     fetchingRef.current = true;
-    dispatch({ type: 'FETCH_START' });
+
     try {
       let token = await getAccessTokenAction();
       if (token) {
@@ -107,7 +111,10 @@ export function useAccessToken() {
         }
       }
 
-      dispatch({ type: 'FETCH_SUCCESS', token });
+      // Only update state if token has changed
+      if (token !== currentTokenRef.current) {
+        dispatch({ type: 'FETCH_SUCCESS', token });
+      }
 
       if (token) {
         const tokenData = parseTokenPayload(token);
@@ -171,7 +178,7 @@ export function useAccessToken() {
     updateToken();
 
     return clearRefreshTimeout;
-  }, [userId, sessionId, updateToken, clearRefreshTimeout]);
+  }, [userId, sessionId, clearRefreshTimeout]);
 
   return {
     accessToken: state.token,
