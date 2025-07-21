@@ -94,6 +94,19 @@ export function useAccessToken() {
   const currentTokenRef = useRef<string | undefined>(state.token);
   currentTokenRef.current = state.token;
 
+  // Store updateToken in a ref to break circular dependency
+  const updateTokenRef = useRef<() => Promise<string | undefined>>();
+
+  // Centralized timer scheduling function
+  const scheduleNextRefresh = useCallback((delay: number) => {
+    clearRefreshTimeout();
+    refreshTimeoutRef.current = setTimeout(() => {
+      if (updateTokenRef.current) {
+        updateTokenRef.current();
+      }
+    }, delay);
+  }, [clearRefreshTimeout]);
+
   const updateToken = useCallback(async () => {
     // istanbul ignore next - safety guard against concurrent fetches
     if (fetchingRef.current) {
@@ -120,20 +133,21 @@ export function useAccessToken() {
         const tokenData = parseTokenPayload(token);
         if (tokenData) {
           const delay = getRefreshDelay(tokenData.timeUntilExpiry);
-          clearRefreshTimeout();
-          refreshTimeoutRef.current = setTimeout(updateToken, delay);
+          scheduleNextRefresh(delay);
         }
       }
 
       return token;
     } catch (error) {
       dispatch({ type: 'FETCH_ERROR', error: error instanceof Error ? error : new Error(String(error)) });
-      clearRefreshTimeout();
-      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
+      scheduleNextRefresh(RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
     }
-  }, [clearRefreshTimeout]);
+  }, [scheduleNextRefresh]);
+
+  // Assign updateToken to ref for use in scheduleNextRefresh
+  updateTokenRef.current = updateToken;
 
   const refresh = useCallback(async () => {
     if (fetchingRef.current) {
@@ -153,8 +167,7 @@ export function useAccessToken() {
         const tokenData = parseTokenPayload(token);
         if (tokenData) {
           const delay = getRefreshDelay(tokenData.timeUntilExpiry);
-          clearRefreshTimeout();
-          refreshTimeoutRef.current = setTimeout(updateToken, delay);
+          scheduleNextRefresh(delay);
         }
       }
 
@@ -162,12 +175,11 @@ export function useAccessToken() {
     } catch (error) {
       const typedError = error instanceof Error ? error : new Error(String(error));
       dispatch({ type: 'FETCH_ERROR', error: typedError });
-      clearRefreshTimeout();
-      refreshTimeoutRef.current = setTimeout(updateToken, RETRY_DELAY_SECONDS * 1000);
+      scheduleNextRefresh(RETRY_DELAY_SECONDS * 1000);
     } finally {
       fetchingRef.current = false;
     }
-  }, [refreshAuth, clearRefreshTimeout, updateToken]);
+  }, [refreshAuth, scheduleNextRefresh, updateToken]);
 
   useEffect(() => {
     if (!user) {
