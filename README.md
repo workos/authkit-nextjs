@@ -102,6 +102,14 @@ export const GET = handleAuth({
 });
 ```
 
+When running in environments like Docker, set the `baseURL` explicitly to ensure the redirects point to the correct location. 
+
+```ts
+export const GET = handleAuth({
+  baseURL: 'http://localhost:3000',
+});
+```
+
 `handleAuth` can be used with the following options.
 
 | Option           | Default     | Description                                                                                                                                                                                           |
