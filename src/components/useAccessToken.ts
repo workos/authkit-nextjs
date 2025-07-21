@@ -98,14 +98,17 @@ export function useAccessToken() {
   const updateTokenRef = useRef<() => Promise<string | undefined>>();
 
   // Centralized timer scheduling function
-  const scheduleNextRefresh = useCallback((delay: number) => {
-    clearRefreshTimeout();
-    refreshTimeoutRef.current = setTimeout(() => {
-      if (updateTokenRef.current) {
-        updateTokenRef.current();
-      }
-    }, delay);
-  }, [clearRefreshTimeout]);
+  const scheduleNextRefresh = useCallback(
+    (delay: number) => {
+      clearRefreshTimeout();
+      refreshTimeoutRef.current = setTimeout(() => {
+        if (updateTokenRef.current) {
+          updateTokenRef.current();
+        }
+      }, delay);
+    },
+    [clearRefreshTimeout],
+  );
 
   const updateToken = useCallback(async () => {
     // istanbul ignore next - safety guard against concurrent fetches

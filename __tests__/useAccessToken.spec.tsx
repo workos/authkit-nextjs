@@ -697,5 +697,4 @@ describe('useAccessToken', () => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
     });
   });
-
 });
