@@ -32,10 +32,13 @@ export function getCookieOptions(
   asString: boolean = false,
   expired: boolean = false,
 ): CookieOptions | string {
-  const url = new URL(redirectUri || WORKOS_REDIRECT_URI);
   const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
   assertValidSamSite(sameSite);
-  const secure = sameSite.toLowerCase() === 'none' ? true : url.protocol === 'https:';
+
+  const urlString = redirectUri || WORKOS_REDIRECT_URI;
+  // Default to secure=true when no URL available (production default)
+  // Developers should set WORKOS_REDIRECT_URI for proper local dev
+  const secure = sameSite.toLowerCase() === 'none' || (urlString ? new URL(urlString).protocol === 'https:' : true);
 
   const maxAge = expired ? 0 : WORKOS_COOKIE_MAX_AGE ? parseInt(WORKOS_COOKIE_MAX_AGE, 10) : 60 * 60 * 24 * 400;
 
