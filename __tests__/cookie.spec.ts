@@ -98,5 +98,24 @@ describe('cookie.ts', () => {
       const { getCookieOptions } = await import('../src/cookie');
       expect(() => getCookieOptions('http://example.com')).toThrow('Invalid SameSite value: invalid');
     });
+
+    it('defaults to secure=true when no URL is available', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions();
+      expect(options).toEqual(expect.objectContaining({ secure: true }));
+    });
+
+    it('defaults to secure=true when no URL is available with lax sameSite', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'lax' });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions();
+      expect(options).toEqual(expect.objectContaining({ secure: true, sameSite: 'lax' }));
+    });
   });
 });
