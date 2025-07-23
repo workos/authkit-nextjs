@@ -59,8 +59,8 @@ describe('cookie.ts', () => {
       );
 
       const options3 = getCookieOptions('https://example.com', true);
-
-      expect(options3).toEqual(expect.stringContaining('Domain='));
+      // Domain should not be included when WORKOS_COOKIE_DOMAIN is empty
+      expect(options3).not.toContain('Domain=');
     });
 
     it('should return the cookie options with expired set to true', async () => {
@@ -73,13 +73,17 @@ describe('cookie.ts', () => {
       const { getCookieOptions } = await import('../src/cookie');
       const options = getCookieOptions('http://example.com', true, false);
       expect(options).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=false; SameSite=lax; Max-Age=34560000; Domain=example.com'),
+        expect.stringContaining('Path=/; HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com'),
       );
+      expect(options).not.toContain('Secure');
 
       const options2 = getCookieOptions('https://example.com', true, true);
-      expect(options2).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; Secure=true; SameSite=lax; Max-Age=0; Domain=example.com'),
-      );
+      expect(options2).toContain('Path=/');
+      expect(options2).toContain('HttpOnly');
+      expect(options2).toContain('Secure');
+      expect(options2).toContain('SameSite=Lax');
+      expect(options2).toContain('Max-Age=0');
+      expect(options2).toContain('Domain=example.com');
     });
 
     it('allows the sameSite config to be set by the WORKOS_COOKIE_SAMESITE env variable', async () => {
@@ -116,6 +120,32 @@ describe('cookie.ts', () => {
       const { getCookieOptions } = await import('../src/cookie');
       const options = getCookieOptions();
       expect(options).toEqual(expect.objectContaining({ secure: true, sameSite: 'lax' }));
+    });
+
+    it('handles invalid URLs gracefully by defaulting to secure=true', async () => {
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions('not-a-valid-url');
+      expect(options).toEqual(expect.objectContaining({ secure: true }));
+    });
+
+    it('handles invalid WORKOS_COOKIE_MAX_AGE gracefully', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: 'invalid-number' });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      const options = getCookieOptions();
+      expect(options).toEqual(expect.objectContaining({ maxAge: 34560000 })); // Falls back to default
+    });
+
+    it('properly formats cookie string without Domain when not set', async () => {
+      const envVars = await import('../src/env-variables');
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+
+      const { getCookieOptions } = await import('../src/cookie');
+      const cookieString = getCookieOptions('https://example.com', true);
+      expect(cookieString).not.toContain('Domain=');
+      expect(cookieString).toContain('Secure');
+      expect(cookieString).toContain('SameSite=Lax'); // Capitalized
     });
   });
 });
