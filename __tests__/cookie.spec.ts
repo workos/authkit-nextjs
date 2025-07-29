@@ -60,7 +60,7 @@ describe('cookie.ts', () => {
 
       const options3 = getCookieOptions('https://example.com', true);
       // Domain should not be included when WORKOS_COOKIE_DOMAIN is empty
-      expect(options3).not.toContain('Domain=');
+      expect(options3).toEqual(expect.not.stringContaining('Domain='));
     });
 
     it('should return the cookie options with expired set to true', async () => {
@@ -75,15 +75,15 @@ describe('cookie.ts', () => {
       expect(options).toEqual(
         expect.stringContaining('Path=/; HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com'),
       );
-      expect(options).not.toContain('Secure');
+      expect(options).toEqual(expect.not.stringContaining('Secure'));
 
       const options2 = getCookieOptions('https://example.com', true, true);
-      expect(options2).toContain('Path=/');
-      expect(options2).toContain('HttpOnly');
-      expect(options2).toContain('Secure');
-      expect(options2).toContain('SameSite=Lax');
-      expect(options2).toContain('Max-Age=0');
-      expect(options2).toContain('Domain=example.com');
+      expect(options2).toEqual(expect.stringContaining('Path=/'));
+      expect(options2).toEqual(expect.stringContaining('HttpOnly'));
+      expect(options2).toEqual(expect.stringContaining('Secure'));
+      expect(options2).toEqual(expect.stringContaining('SameSite=Lax'));
+      expect(options2).toEqual(expect.stringContaining('Max-Age=0'));
+      expect(options2).toEqual(expect.stringContaining('Domain=example.com'));
     });
 
     it('allows the sameSite config to be set by the WORKOS_COOKIE_SAMESITE env variable', async () => {
