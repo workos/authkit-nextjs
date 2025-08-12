@@ -195,10 +195,53 @@ export function useAccessToken() {
     return clearRefreshTimeout;
   }, [userId, sessionId, clearRefreshTimeout]);
 
+  /// NEW
+  const refreshPromiseRef = useRef<Promise<string | undefined>>();
+  const getAccessToken = useCallback(async (): Promise<string | undefined> => {
+    if (!user || !state.token) {
+      return undefined;
+    }
+
+    const tokenData = parseTokenPayload(state.token);
+
+    if (tokenData && !tokenData.isExpiring) {
+      return state.token;
+    }
+
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    refreshPromiseRef.current = refreshAccessTokenAction()
+      .then((newToken) => {
+        if (newToken !== currentTokenRef.current) {
+          dispatch({ type: 'FETCH_SUCCESS', token: newToken });
+        }
+        if (newToken) {
+          const tokenData = parseTokenPayload(newToken);
+          if (tokenData) {
+            const delay = getRefreshDelay(tokenData.timeUntilExpiry);
+            scheduleNextRefresh(delay);
+          }
+        }
+        return newToken;
+      })
+      .catch((error) => {
+        dispatch({ type: 'FETCH_ERROR', error: error instanceof Error ? error : new Error(String(error)) });
+        return undefined;
+      })
+      .finally(() => {
+        refreshPromiseRef.current = undefined;
+      });
+    return refreshPromiseRef.current;
+  }, [user, state.token, scheduleNextRefresh]);
+
   return {
+    /** @deprecated Use getAccessToken() instead */
     accessToken: state.token,
     loading: state.loading,
     error: state.error,
     refresh,
+    getAccessToken,
   };
 }
