@@ -68,10 +68,19 @@ function parseTokenPayload(token: string | undefined) {
   }
 }
 
+export interface UseAccessTokenReturn {
+  /** @deprecated Use getAccessToken() instead */
+  accessToken: string | undefined;
+  loading: boolean;
+  error: Error | null;
+  refresh: () => Promise<string | undefined>;
+  getAccessToken: () => Promise<string | undefined>;
+}
+
 /**
  * A hook that manages access tokens with automatic refresh.
  */
-export function useAccessToken() {
+export function useAccessToken(): UseAccessTokenReturn {
   const { user, sessionId, refreshAuth } = useAuth();
   const userId = user?.id;
   const [state, dispatch] = useReducer(tokenReducer, {
@@ -195,7 +204,23 @@ export function useAccessToken() {
     return clearRefreshTimeout;
   }, [userId, sessionId, clearRefreshTimeout]);
 
-  /// NEW
+  useEffect(() => {
+    if (!user || typeof document === 'undefined') {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const tokenData = parseTokenPayload(currentTokenRef.current);
+        if (tokenData && (tokenData.isExpiring || tokenData.timeUntilExpiry <= 0)) {
+          updateToken();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, updateToken]);
+
   const refreshPromiseRef = useRef<Promise<string | undefined>>();
   const getAccessToken = useCallback(async (): Promise<string | undefined> => {
     if (!user || !state.token) {
@@ -237,7 +262,6 @@ export function useAccessToken() {
   }, [user, state.token, scheduleNextRefresh]);
 
   return {
-    /** @deprecated Use getAccessToken() instead */
     accessToken: state.token,
     loading: state.loading,
     error: state.error,
