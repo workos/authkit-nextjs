@@ -1,204 +1,122 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useAuth } from './authkit-provider.js';
-import { decodeJwt } from '../jwt.js';
+import { tokenStore } from './tokenStore.js';
 
-const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
-const MIN_REFRESH_DELAY_SECONDS = 15; // minimum delay before refreshing token
-const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60; // 24 hours
-const RETRY_DELAY_SECONDS = 300; // 5 minutes
-
-interface TokenState {
-  token: string | undefined;
+export interface UseAccessTokenReturn {
+  /**
+   * Current access token. May be stale when tab is inactive.
+   * Use this for display purposes or where eventual consistency is acceptable.
+   */
+  accessToken: string | undefined;
+  /**
+   * Loading state for initial token fetch
+   */
   loading: boolean;
+  /**
+   * Error from the last token operation
+   */
   error: Error | null;
-}
-
-type TokenAction =
-  | { type: 'FETCH_START' }
-  | { type: 'FETCH_SUCCESS'; token: string | undefined }
-  | { type: 'FETCH_ERROR'; error: Error }
-  | { type: 'RESET' };
-
-function tokenReducer(state: TokenState, action: TokenAction): TokenState {
-  switch (action.type) {
-    case 'FETCH_START':
-      return { ...state, loading: true, error: null };
-    case 'FETCH_SUCCESS':
-      return { ...state, loading: false, token: action.token, error: null };
-    case 'FETCH_ERROR':
-      return { ...state, loading: false, error: action.error };
-    case 'RESET':
-      return { ...state, token: undefined, loading: false, error: null };
-    // istanbul ignore next
-    default:
-      return state;
-  }
-}
-
-function getRefreshDelay(timeUntilExpiry: number) {
-  const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
-  return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
-}
-
-function parseTokenPayload(token: string | undefined) {
-  // istanbul ignore next
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const { payload } = decodeJwt(token);
-    const now = Math.floor(Date.now() / 1000);
-
-    // istanbul ignore next - if the token does not have an exp claim, we cannot determine expiry
-    if (typeof payload.exp !== 'number') {
-      return null;
-    }
-
-    return {
-      payload,
-      expiresAt: payload.exp,
-      isExpiring: payload.exp < now + TOKEN_EXPIRY_BUFFER_SECONDS,
-      timeUntilExpiry: payload.exp - now,
-    };
-  } catch {
-    // istanbul ignore next
-    return null;
-  }
+  /**
+   * Manually trigger a token refresh
+   */
+  refresh: () => Promise<string | undefined>;
+  /**
+   * Get a guaranteed fresh access token. Automatically refreshes if needed.
+   * Use this for API calls where token freshness is critical.
+   * @returns Promise resolving to fresh token or undefined if not authenticated
+   * @throws Error if refresh fails
+   */
+  getAccessToken: () => Promise<string | undefined>;
 }
 
 /**
  * A hook that manages access tokens with automatic refresh.
  */
-export function useAccessToken() {
-  const { user, sessionId, refreshAuth } = useAuth();
+export function useAccessToken(): UseAccessTokenReturn {
+  const { user, sessionId } = useAuth();
   const userId = user?.id;
-  const [state, dispatch] = useReducer(tokenReducer, {
-    token: undefined,
-    loading: false,
-    error: null,
-  });
+  const userRef = useRef(user);
+  userRef.current = user;
+  const prevSessionRef = useRef(sessionId);
+  const prevUserIdRef = useRef(userId);
 
-  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const fetchingRef = useRef(false);
-
-  const clearRefreshTimeout = useCallback(() => {
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
-      refreshTimeoutRef.current = undefined;
-    }
-  }, []);
-
-  // Store the current token in a ref to avoid stale closures
-  const currentTokenRef = useRef<string | undefined>(state.token);
-  currentTokenRef.current = state.token;
-
-  // Store updateToken in a ref to break circular dependency
-  const updateTokenRef = useRef<() => Promise<string | undefined>>();
-
-  // Centralized timer scheduling function
-  const scheduleNextRefresh = useCallback(
-    (delay: number) => {
-      clearRefreshTimeout();
-      refreshTimeoutRef.current = setTimeout(() => {
-        if (updateTokenRef.current) {
-          updateTokenRef.current();
-        }
-      }, delay);
-    },
-    [clearRefreshTimeout],
-  );
-
-  const updateToken = useCallback(async () => {
-    // istanbul ignore next - safety guard against concurrent fetches
-    if (fetchingRef.current) {
-      return;
-    }
-
-    fetchingRef.current = true;
-
-    try {
-      let token = await getAccessTokenAction();
-      if (token) {
-        const tokenData = parseTokenPayload(token);
-        if (!tokenData || tokenData.isExpiring) {
-          token = await refreshAccessTokenAction();
-        }
-      }
-
-      // Only update state if token has changed
-      if (token !== currentTokenRef.current) {
-        dispatch({ type: 'FETCH_SUCCESS', token });
-      }
-
-      if (token) {
-        const tokenData = parseTokenPayload(token);
-        if (tokenData) {
-          const delay = getRefreshDelay(tokenData.timeUntilExpiry);
-          scheduleNextRefresh(delay);
-        }
-      }
-
-      return token;
-    } catch (error) {
-      dispatch({ type: 'FETCH_ERROR', error: error instanceof Error ? error : new Error(String(error)) });
-      scheduleNextRefresh(RETRY_DELAY_SECONDS * 1000);
-    } finally {
-      fetchingRef.current = false;
-    }
-  }, [scheduleNextRefresh]);
-
-  // Assign updateToken to ref for use in scheduleNextRefresh
-  updateTokenRef.current = updateToken;
-
-  const refresh = useCallback(async () => {
-    if (fetchingRef.current) {
-      return;
-    }
-
-    fetchingRef.current = true;
-    dispatch({ type: 'FETCH_START' });
-
-    try {
-      await refreshAuth();
-      const token = await getAccessTokenAction();
-
-      dispatch({ type: 'FETCH_SUCCESS', token });
-
-      if (token) {
-        const tokenData = parseTokenPayload(token);
-        if (tokenData) {
-          const delay = getRefreshDelay(tokenData.timeUntilExpiry);
-          scheduleNextRefresh(delay);
-        }
-      }
-
-      return token;
-    } catch (error) {
-      const typedError = error instanceof Error ? error : new Error(String(error));
-      dispatch({ type: 'FETCH_ERROR', error: typedError });
-      scheduleNextRefresh(RETRY_DELAY_SECONDS * 1000);
-    } finally {
-      fetchingRef.current = false;
-    }
-  }, [refreshAuth, scheduleNextRefresh, updateToken]);
+  const tokenState = useSyncExternalStore(tokenStore.subscribe, tokenStore.getSnapshot, tokenStore.getServerSnapshot);
 
   useEffect(() => {
     if (!user) {
-      dispatch({ type: 'RESET' });
-      clearRefreshTimeout();
+      tokenStore.clearToken();
       return;
     }
-    updateToken();
 
-    return clearRefreshTimeout;
-  }, [userId, sessionId, clearRefreshTimeout]);
+    // Only clear token if user or session actually changed (not on initial mount)
+    const sessionChanged = prevSessionRef.current !== undefined && prevSessionRef.current !== sessionId;
+    const userChanged = prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId;
+
+    if (sessionChanged || userChanged) {
+      tokenStore.clearToken();
+    }
+
+    prevSessionRef.current = sessionId;
+    prevUserIdRef.current = userId;
+
+    /* istanbul ignore next */
+    tokenStore.getAccessTokenSilently().catch(() => {
+      // Error is handled in the store
+    });
+  }, [userId, sessionId]);
+
+  useEffect(() => {
+    if (!user || typeof document === 'undefined') {
+      return;
+    }
+
+    /* istanbul ignore next */
+    const refreshIfNeeded = () => {
+      tokenStore.getAccessTokenSilently().catch(() => {
+        // Error is handled in the store
+      });
+    };
+
+    /* istanbul ignore next */
+    const handleWake = (event: Event) => {
+      if (event.type !== 'visibilitychange' || document.visibilityState === 'visible') {
+        refreshIfNeeded();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleWake);
+    window.addEventListener('focus', handleWake);
+    window.addEventListener('online', handleWake);
+    window.addEventListener('pageshow', handleWake);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleWake);
+      window.removeEventListener('focus', handleWake);
+      window.removeEventListener('online', handleWake);
+      window.removeEventListener('pageshow', handleWake);
+    };
+  }, [userId, sessionId]);
+
+  const getAccessToken = useCallback(async (): Promise<string | undefined> => {
+    if (!userRef.current) {
+      return undefined;
+    }
+    return tokenStore.getAccessToken();
+  }, []);
+
+  // Stable refresh function
+  const refresh = useCallback(async (): Promise<string | undefined> => {
+    if (!userRef.current) {
+      return undefined;
+    }
+    return tokenStore.refreshToken();
+  }, []);
 
   return {
-    accessToken: state.token,
-    loading: state.loading,
-    error: state.error,
+    accessToken: tokenState.token,
+    loading: tokenState.loading,
+    error: tokenState.error,
     refresh,
+    getAccessToken,
   };
 }

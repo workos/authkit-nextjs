@@ -4,6 +4,7 @@ import React from 'react';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../src/actions.js';
 import { useAuth } from '../src/components/authkit-provider.js';
 import { useAccessToken } from '../src/components/useAccessToken.js';
+import { tokenStore } from '../src/components/tokenStore.js';
 
 jest.mock('../src/actions.js', () => ({
   getAccessTokenAction: jest.fn(),
@@ -20,8 +21,13 @@ jest.mock('../src/components/authkit-provider.js', () => {
 
 describe('useAccessToken', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    tokenStore.reset();
+    jest.resetAllMocks();
     jest.useFakeTimers();
+
+    // Reset mock implementations to avoid test interference
+    (getAccessTokenAction as jest.Mock).mockReset();
+    (refreshAccessTokenAction as jest.Mock).mockReset();
 
     (useAuth as jest.Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
@@ -33,6 +39,8 @@ describe('useAccessToken', () => {
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
+    tokenStore.reset();
+    jest.clearAllMocks();
   });
 
   const TestComponent = () => {
@@ -42,7 +50,7 @@ describe('useAccessToken', () => {
         <div data-testid="token">{accessToken || 'no-token'}</div>
         <div data-testid="loading">{loading.toString()}</div>
         <div data-testid="error">{error?.message || 'no-error'}</div>
-        <button data-testid="refresh" onClick={() => refresh()}>
+        <button data-testid="refresh" onClick={() => refresh().catch(() => {})}>
           Refresh
         </button>
       </div>
@@ -72,7 +80,13 @@ describe('useAccessToken', () => {
   it('should handle token refresh when an expiring token is received without showing loading', async () => {
     // Create a token that's about to expire (exp is very close to current time)
     const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    const payload = { sub: '1234567890', sid: 'session_123', exp: currentTimeInSeconds + 30 };
+    // Use 25 seconds to ensure it's within the 30-second buffer for short-lived tokens
+    const payload = {
+      sub: '1234567890',
+      sid: 'session_123',
+      exp: currentTimeInSeconds + 25,
+      iat: currentTimeInSeconds - 35,
+    };
     const expiringToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
     const refreshedToken =
@@ -101,14 +115,8 @@ describe('useAccessToken', () => {
     const refreshedToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken).mockResolvedValueOnce(refreshedToken);
-
-    const mockRefreshAuth = jest.fn().mockResolvedValue({});
-    (useAuth as jest.Mock).mockImplementation(() => ({
-      user: { id: 'user_123' },
-      sessionId: 'session_123',
-      refreshAuth: mockRefreshAuth,
-    }));
+    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
+    (refreshAccessTokenAction as jest.Mock).mockResolvedValueOnce(refreshedToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -125,38 +133,10 @@ describe('useAccessToken', () => {
     expect(getByTestId('loading')).toHaveTextContent('true');
 
     await waitFor(() => {
-      expect(mockRefreshAuth).toHaveBeenCalledTimes(1);
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
+      expect(refreshAccessTokenAction).toHaveBeenCalledTimes(1);
+      expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
       expect(getByTestId('token')).toHaveTextContent(refreshedToken);
       expect(getByTestId('loading')).toHaveTextContent('false');
-    });
-  });
-
-  it('should schedule automatic token refresh before expiration', async () => {
-    // Create a token that expires in 2 minutes
-    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    const expTimeInSeconds = currentTimeInSeconds + 120; // 2 minutes in future
-    const payload = { sub: '1234567890', sid: 'session_123', exp: expTimeInSeconds };
-    const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
-
-    const refreshedToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
-
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(token);
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(refreshedToken);
-
-    render(<TestComponent />);
-
-    await waitFor(() => {
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
-    });
-
-    act(() => {
-      jest.advanceTimersByTime((120 - 60) * 1000);
-    });
-
-    await waitFor(() => {
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -197,13 +177,7 @@ describe('useAccessToken', () => {
     const error = new Error('Failed to refresh token');
 
     (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
-
-    const mockRefreshAuth = jest.fn().mockRejectedValueOnce(error);
-    (useAuth as jest.Mock).mockImplementation(() => ({
-      user: { id: 'user_123' },
-      sessionId: 'session_123',
-      refreshAuth: mockRefreshAuth,
-    }));
+    (refreshAccessTokenAction as jest.Mock).mockRejectedValueOnce(error);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -216,8 +190,10 @@ describe('useAccessToken', () => {
     });
 
     await waitFor(() => {
-      expect(mockRefreshAuth).toHaveBeenCalledTimes(1);
+      expect(refreshAccessTokenAction).toHaveBeenCalledTimes(1);
       expect(getByTestId('error')).toHaveTextContent('Failed to refresh token');
+      // Token should be preserved on error
+      expect(getByTestId('token')).toHaveTextContent(initialToken);
     });
   });
 
@@ -260,7 +236,8 @@ describe('useAccessToken', () => {
 
     await waitFor(() => {
       expect(getByTestId('loading')).toHaveTextContent('false');
-      expect(getByTestId('token')).toHaveTextContent('no-token');
+      // Invalid tokens (non-JWT) are stored as opaque tokens, not rejected
+      expect(getByTestId('token')).toHaveTextContent(invalidToken);
     });
   });
 
@@ -296,7 +273,13 @@ describe('useAccessToken', () => {
   it('should handle errors when refreshing an expiring token', async () => {
     // Create a token that's about to expire
     const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    const payload = { sub: '1234567890', sid: 'session_123', exp: currentTimeInSeconds + 30 };
+    // Use 25 seconds to ensure it's within the 30-second buffer for short-lived tokens
+    const payload = {
+      sub: '1234567890',
+      sid: 'session_123',
+      exp: currentTimeInSeconds + 25,
+      iat: currentTimeInSeconds - 35,
+    };
     const expiringToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
     const error = new Error('Failed to refresh token');
 
@@ -308,6 +291,8 @@ describe('useAccessToken', () => {
     await waitFor(() => {
       expect(getByTestId('loading')).toHaveTextContent('false');
       expect(getByTestId('error')).toHaveTextContent('Failed to refresh token');
+      // The expiring token should still be preserved despite the error
+      expect(getByTestId('token')).toHaveTextContent(expiringToken);
     });
 
     expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
@@ -322,7 +307,8 @@ describe('useAccessToken', () => {
 
     await waitFor(() => {
       expect(getByTestId('loading')).toHaveTextContent('false');
-      expect(getByTestId('token')).toHaveTextContent('no-token');
+      // Invalid payload tokens are still stored as opaque tokens
+      expect(getByTestId('token')).toHaveTextContent(badPayloadToken);
     });
   });
 
@@ -413,27 +399,23 @@ describe('useAccessToken', () => {
   it('should prevent concurrent manual refresh operations', async () => {
     jest.clearAllMocks();
 
-    let refreshAuthCalls = 0;
+    let refreshCalls = 0;
 
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
+    const refreshedToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const refreshAuthPromise = new Promise<any>((resolve) => {
+    const refreshPromise = new Promise<string>((resolve) => {
       // Slow promise
-      setTimeout(() => resolve({}), 10);
+      setTimeout(() => resolve(refreshedToken), 10);
     });
 
-    const mockRefreshAuth = jest.fn().mockImplementation(() => {
-      refreshAuthCalls++;
-      return refreshAuthPromise;
+    (refreshAccessTokenAction as jest.Mock).mockImplementation(() => {
+      refreshCalls++;
+      return refreshPromise;
     });
-
-    (useAuth as jest.Mock).mockImplementation(() => ({
-      user: { id: 'user_123' },
-      sessionId: 'session_123',
-      refreshAuth: mockRefreshAuth,
-    }));
 
     (getAccessTokenAction as jest.Mock).mockImplementation(() => {
       return Promise.resolve(mockToken);
@@ -454,47 +436,12 @@ describe('useAccessToken', () => {
 
     // Wait for refresh to complete
     await waitFor(() => {
-      expect(refreshAuthCalls).toBe(1);
+      expect(refreshCalls).toBe(1);
+      expect(getByTestId('token')).toHaveTextContent(refreshedToken);
     });
 
-    // Verify that refreshAuth was only called once despite two clicks
-    expect(refreshAuthCalls).toBe(1);
-  });
-
-  it('should not show loading state for background refresh when token is unchanged', async () => {
-    // Create a token that expires in 2 minutes
-    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    const expTimeInSeconds = currentTimeInSeconds + 120;
-    const payload = { sub: '1234567890', sid: 'session_123', exp: expTimeInSeconds };
-    const sameToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
-
-    // Mock to return the same token twice
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(sameToken);
-
-    const { getByTestId } = render(<TestComponent />);
-
-    // Wait for initial token to be set
-    await waitFor(() => {
-      expect(getByTestId('token')).toHaveTextContent(sameToken);
-      expect(getByTestId('loading')).toHaveTextContent('false');
-    });
-
-    // Clear previous mock calls
-    (getAccessTokenAction as jest.Mock).mockClear();
-
-    // Trigger scheduled refresh by advancing time to just before expiry
-    act(() => {
-      jest.advanceTimersByTime((120 - 60) * 1000); // Advance to trigger refresh (2 min - buffer)
-    });
-
-    await waitFor(() => {
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(1); // Called once for the refresh
-    });
-
-    // Should not show loading during background refresh
-    expect(getByTestId('loading')).toHaveTextContent('false');
-    // Token should remain the same
-    expect(getByTestId('token')).toHaveTextContent(sameToken);
+    // Verify that refreshAccessToken was only called once despite two clicks
+    expect(refreshCalls).toBe(1);
   });
 
   it('should handle non-Error objects thrown during token fetch', async () => {
@@ -519,20 +466,14 @@ describe('useAccessToken', () => {
     const refreshedToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-    // Setup a delayed promise for the refresh auth
+    // Setup a delayed promise for the refresh
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let resolveRefreshPromise: (value: any) => void;
     const refreshPromise = new Promise((resolve) => {
       resolveRefreshPromise = resolve;
     });
 
-    const mockRefreshAuth = jest.fn().mockReturnValue(refreshPromise);
-    (useAuth as jest.Mock).mockImplementation(() => ({
-      user: { id: 'user_123' },
-      sessionId: 'session_123',
-      refreshAuth: mockRefreshAuth,
-    }));
-
+    (refreshAccessTokenAction as jest.Mock).mockReturnValue(refreshPromise);
     (getAccessTokenAction as jest.Mock).mockResolvedValue(initialToken);
 
     const { getByTestId } = render(<TestComponent />);
@@ -541,9 +482,6 @@ describe('useAccessToken', () => {
       expect(getByTestId('token')).toHaveTextContent(initialToken);
     });
 
-    // Now update the mock for the refresh
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(refreshedToken);
-
     act(() => {
       getByTestId('refresh').click();
     });
@@ -553,41 +491,12 @@ describe('useAccessToken', () => {
     });
 
     act(() => {
-      resolveRefreshPromise!({});
+      resolveRefreshPromise!(refreshedToken);
     });
 
     await waitFor(() => {
-      expect(mockRefreshAuth).toHaveBeenCalledTimes(1); // Should only call once
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
+      expect(refreshAccessTokenAction).toHaveBeenCalledTimes(1); // Should only call once
       expect(getByTestId('token')).toHaveTextContent(refreshedToken);
-    });
-  });
-
-  it('should handle errors during token refresh when autoRefresh is scheduled', async () => {
-    // Create a token that expires in 2 minutes
-    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    const expTimeInSeconds = currentTimeInSeconds + 120; // 2 minutes in future
-    const payload = { sub: '1234567890', sid: 'session_123', exp: expTimeInSeconds };
-    const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
-
-    const error = new Error('Failed to refresh token');
-
-    (getAccessTokenAction as jest.Mock)
-      .mockResolvedValueOnce(token) // Initial fetch succeeds
-      .mockRejectedValueOnce(error); // But auto-refresh fails
-
-    render(<TestComponent />);
-
-    await waitFor(() => {
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
-    });
-
-    act(() => {
-      jest.advanceTimersByTime((120 - 60) * 1000);
-    });
-
-    await waitFor(() => {
-      expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -616,7 +525,8 @@ describe('useAccessToken', () => {
       expect(getByTestId('loading')).toHaveTextContent('false');
     });
 
-    expect(getByTestId('token')).toHaveTextContent('no-token');
+    // Token with invalid/null payload is still stored as opaque token
+    expect(getByTestId('token')).toHaveTextContent(token);
   });
 
   it('should handle errors with string messages instead of Error objects', async () => {
@@ -638,17 +548,10 @@ describe('useAccessToken', () => {
     const stringError = 'String error directly'; // Not wrapped in Error object
 
     (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
-
-    // Mock refreshAuth to reject with a string, not an Error object
-    const mockRefreshAuth = jest.fn().mockImplementation(() => {
+    // Mock refreshAccessTokenAction to reject with a string, not an Error object
+    (refreshAccessTokenAction as jest.Mock).mockImplementation(() => {
       return Promise.reject(stringError); // Directly reject with string
     });
-
-    (useAuth as jest.Mock).mockImplementation(() => ({
-      user: { id: 'user_123' },
-      sessionId: 'session_123',
-      refreshAuth: mockRefreshAuth,
-    }));
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -656,13 +559,15 @@ describe('useAccessToken', () => {
       expect(getByTestId('token')).toHaveTextContent(initialToken);
     });
 
-    act(() => {
+    await act(async () => {
       getByTestId('refresh').click();
     });
 
     await waitFor(() => {
-      expect(mockRefreshAuth).toHaveBeenCalledTimes(1);
+      expect(refreshAccessTokenAction).toHaveBeenCalledTimes(1);
       expect(getByTestId('error')).toHaveTextContent(stringError);
+      // Token should be preserved on error
+      expect(getByTestId('token')).toHaveTextContent(initialToken);
     });
   });
 
@@ -695,6 +600,94 @@ describe('useAccessToken', () => {
 
     await waitFor(() => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('should handle getAccessToken when user is not authenticated', async () => {
+    (useAuth as jest.Mock).mockImplementation(() => ({
+      user: null,
+      sessionId: undefined,
+      refreshAuth: jest.fn().mockResolvedValue({}),
+    }));
+
+    const TestComponentWithGetAccessToken = () => {
+      const { getAccessToken } = useAccessToken();
+      const [result, setResult] = React.useState<string | undefined | null>(null);
+
+      React.useEffect(() => {
+        getAccessToken().then((token) => setResult(token || 'no-token'));
+      }, [getAccessToken]);
+
+      return <div data-testid="result">{result === null ? 'loading' : result}</div>;
+    };
+
+    const { getByTestId } = render(<TestComponentWithGetAccessToken />);
+
+    await waitFor(() => {
+      expect(getByTestId('result')).toHaveTextContent('no-token');
+    });
+  });
+
+  it('should handle getAccessToken when user is authenticated', async () => {
+    const mockToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
+
+    (getAccessTokenAction as jest.Mock).mockResolvedValue(mockToken);
+    (useAuth as jest.Mock).mockImplementation(() => ({
+      user: { id: 'user_123' },
+      sessionId: 'session_123',
+      refreshAuth: jest.fn().mockResolvedValue({}),
+    }));
+
+    const TestComponentWithGetAccessToken = () => {
+      const { getAccessToken } = useAccessToken();
+      const [result, setResult] = React.useState<string | undefined | null>(null);
+
+      React.useEffect(() => {
+        // Wait a bit for initial token load, then call getAccessToken
+        const timer = setTimeout(() => {
+          getAccessToken().then((token) => setResult(token || 'no-token'));
+        }, 100);
+        return () => clearTimeout(timer);
+      }, [getAccessToken]);
+
+      return <div data-testid="result">{result === null ? 'loading' : result}</div>;
+    };
+
+    const { getByTestId } = render(<TestComponentWithGetAccessToken />);
+
+    // Advance timers to trigger getAccessToken call
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('result')).toHaveTextContent(mockToken);
+    });
+  });
+
+  it('should handle manual refresh when user is not authenticated', async () => {
+    (useAuth as jest.Mock).mockImplementation(() => ({
+      user: null,
+      sessionId: undefined,
+      refreshAuth: jest.fn().mockResolvedValue({}),
+    }));
+
+    const TestComponentWithRefresh = () => {
+      const { refresh } = useAccessToken();
+      const [result, setResult] = React.useState<string | undefined | null>(null);
+
+      React.useEffect(() => {
+        refresh().then((token) => setResult(token || 'no-token'));
+      }, [refresh]);
+
+      return <div data-testid="result">{result === null ? 'loading' : result}</div>;
+    };
+
+    const { getByTestId } = render(<TestComponentWithRefresh />);
+
+    await waitFor(() => {
+      expect(getByTestId('result')).toHaveTextContent('no-token');
     });
   });
 });
