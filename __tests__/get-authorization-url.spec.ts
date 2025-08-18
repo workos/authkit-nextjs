@@ -45,4 +45,16 @@ describe('getAuthorizationUrl', () => {
 
     expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalled();
   });
+
+  it('works when prompt is provided', async () => {
+    jest.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+    await getAuthorizationUrl({ prompt: 'consent' });
+
+    expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'consent',
+      }),
+    );
+  });
 });

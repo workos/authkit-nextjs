@@ -11,6 +11,7 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
     organizationId,
     redirectUri = headersList.get('x-redirect-uri'),
     loginHint,
+    prompt,
   } = options;
 
   return getWorkOS().userManagement.getAuthorizationUrl({
@@ -21,6 +22,7 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
     screenHint,
     organizationId,
     loginHint,
+    prompt,
   });
 }
 
