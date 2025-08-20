@@ -47,17 +47,18 @@ To use the `signOut` method, you'll need to set a default Logout URI in your Wor
 
 Certain environment variables are optional and can be used to debug or configure cookie settings.
 
-| Environment Variable | Default Value | Description |
-|---------------------|---------------|-------------|
-| `WORKOS_COOKIE_MAX_AGE` | `34560000` (400 days) | Maximum age of the cookie in seconds |
-| `WORKOS_COOKIE_DOMAIN` | None | Domain for the cookie. When empty, the cookie is only valid for the current domain |
-| `WORKOS_COOKIE_NAME` | `'wos-session'` | Name of the session cookie |
-| `WORKOS_API_HOSTNAME` | `'api.workos.com'` | Base WorkOS API URL |
-| `WORKOS_API_HTTPS` | `true` | Whether to use HTTPS in API calls |
-| `WORKOS_API_PORT` | None | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
-| `WORKOS_COOKIE_SAMESITE` | `'lax'` | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'` |
+| Environment Variable     | Default Value         | Description                                                                               |
+| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------- |
+| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                                      |
+| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain        |
+| `WORKOS_COOKIE_NAME`     | `'wos-session'`       | Name of the session cookie                                                                |
+| `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                       |
+| `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
+| `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
+| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
 
 Example usage:
+
 ```sh
 WORKOS_COOKIE_MAX_AGE='600'
 WORKOS_COOKIE_DOMAIN='example.com'
@@ -102,7 +103,7 @@ export const GET = handleAuth({
 });
 ```
 
-When running in environments like Docker, set the `baseURL` explicitly to ensure the redirects point to the correct location. 
+When running in environments like Docker, set the `baseURL` explicitly to ensure the redirects point to the correct location.
 
 ```ts
 export const GET = handleAuth({
@@ -112,12 +113,12 @@ export const GET = handleAuth({
 
 `handleAuth` can be used with the following options.
 
-| Option           | Default     | Description                                                                                                                                                                                           |
-| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `returnPathname` | `/`         | The pathname to redirect the user to after signing in                                                                                                                                                 |
+| Option           | Default     | Description                                                                                                                                                                                                 |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `returnPathname` | `/`         | The pathname to redirect the user to after signing in                                                                                                                                                       |
 | `baseURL`        | `undefined` | The base URL to use for the redirect URI instead of the one in the request. **Required** if the app is being run in a container like docker where the hostname can be different from the one in the request |
-| `onSuccess`      | `undefined` | A function that receives successful authentication data and can be used for side-effects like persisting tokens                                                                                       |
-| `onError`        | `undefined` | A function that can receive the error and the request and handle the error in its own way.                                                                                                            |
+| `onSuccess`      | `undefined` | A function that receives successful authentication data and can be used for side-effects like persisting tokens                                                                                             |
+| `onError`        | `undefined` | A function that can receive the error and the request and handle the error in its own way.                                                                                                                  |
 
 #### onSuccess callback data
 
@@ -431,6 +432,8 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 ### Composing middleware
 
+> **Security note:** Always forward `request.headers` when returning `NextResponse.*` to mitigate SSRF issues in Next.js < 14.2.32 (14.x) or < 15.4.7 (15.x). This pattern is safe on all versions. We strongly recommend upgrading to the latest Next.js.
+
 If you don't want to use `authkitMiddleware` and instead want to compose your own middleware, you can use the `authkit` method. In this mode you are responsible to handling what to do when there's no session on a protected route.
 
 ```ts
@@ -439,23 +442,46 @@ export default async function middleware(request: NextRequest) {
 
   // Auth object contains the session, response headers and an authorization URL in the case that the session isn't valid
   // This method will automatically handle setting the cookie and refreshing the session
-  const { session, headers, authorizationUrl } = await authkit(request, {
+  const {
+    session,
+    headers: authkitHeaders,
+    authorizationUrl,
+  } = await authkit(request, {
     debug: true,
   });
 
+  const { pathname } = new URL(request.url);
+  
   // Control of what to do when there's no session on a protected route is left to the developer
-  if (request.url.includes('/account') && !session.user) {
+  if (pathname.startsWith('/account') && !session.user) {
     console.log('No session on protected path');
-    return NextResponse.redirect(authorizationUrl);
 
-    // Alternatively you could redirect to your own login page, for example if you want to use your own UI instead of hosted AuthKit
-    return NextResponse.redirect('/login');
+    // Preserve AuthKit headers on redirects (e.g., cookies)
+    const response = NextResponse.redirect(authorizationUrl);
+    for (const [key, value] of authkitHeaders) {
+      if (key.toLowerCase() === 'set-cookie') {
+        response.headers.append(key, value);
+      } else {
+        response.headers.set(key, value);
+      }
+    }
+    return response;
   }
 
-  // Headers from the authkit response need to be included in every non-redirect response to ensure that `withAuth` works as expected
-  return NextResponse.next({
-    headers: headers,
+  // Forward the incoming request headers (mitigation) and then add AuthKit's headers
+  const response = NextResponse.next({
+    request: { headers: new Headers(request.headers) },
   });
+
+  for (const [key, value] of authkitHeaders) {
+    if (key.toLowerCase() === 'set-cookie') {
+      response.headers.append(key, value);
+    } else {
+      response.headers.set(key, value);
+    }
+  }
+
+  return response;
 }
 
 // Match against the pages
