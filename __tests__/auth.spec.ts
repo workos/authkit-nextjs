@@ -89,6 +89,10 @@ describe('auth.ts', () => {
       expect(url).toBeDefined();
       expect(() => new URL(url)).not.toThrow();
     });
+    it('should use prompt=consent when calling getSignUpUrl', async () => {
+      const url = await getSignUpUrl();
+      expect(url).toContain('prompt=consent');
+    });
   });
 
   describe('switchToOrganization', () => {
