@@ -78,6 +78,11 @@ describe('auth.ts', () => {
     });
   });
 
+  it('should use prompt=consent when calling getSignInUrl', async () => {
+    const url = await getSignInUrl();
+    expect(url).toContain('prompt=consent');
+  });
+
   describe('getSignUpUrl', () => {
     it('should return a valid URL', async () => {
       const url = await getSignUpUrl();
