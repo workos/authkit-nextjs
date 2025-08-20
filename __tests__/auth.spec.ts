@@ -78,8 +78,13 @@ describe('auth.ts', () => {
     });
   });
 
-  it('should use prompt=consent when calling getSignInUrl', async () => {
+  it('should not include prompt when not specified for getSignInUrl', async () => {
     const url = await getSignInUrl();
+    expect(url).not.toContain('prompt=');
+  });
+
+  it('should include prompt=consent when explicitly specified for getSignInUrl', async () => {
+    const url = await getSignInUrl({ prompt: 'consent' });
     expect(url).toContain('prompt=consent');
   });
 
@@ -89,8 +94,13 @@ describe('auth.ts', () => {
       expect(url).toBeDefined();
       expect(() => new URL(url)).not.toThrow();
     });
-    it('should use prompt=consent when calling getSignUpUrl', async () => {
+    it('should not include prompt when not specified for getSignUpUrl', async () => {
       const url = await getSignUpUrl();
+      expect(url).not.toContain('prompt=');
+    });
+
+    it('should include prompt=consent when explicitly specified for getSignUpUrl', async () => {
+      const url = await getSignUpUrl({ prompt: 'consent' });
       expect(url).toContain('prompt=consent');
     });
   });
