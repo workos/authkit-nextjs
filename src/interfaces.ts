@@ -63,6 +63,7 @@ export interface GetAuthURLOptions {
   organizationId?: string;
   redirectUri?: string;
   loginHint?: string;
+  prompt?: 'consent';
 }
 
 export interface AuthkitMiddlewareAuth {

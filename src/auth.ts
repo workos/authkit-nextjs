@@ -13,16 +13,18 @@ export async function getSignInUrl({
   organizationId,
   loginHint,
   redirectUri,
-}: { organizationId?: string; loginHint?: string; redirectUri?: string } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri });
+  prompt,
+}: { organizationId?: string; loginHint?: string; redirectUri?: string; prompt?: 'consent' } = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt });
 }
 
 export async function getSignUpUrl({
   organizationId,
   loginHint,
   redirectUri,
-}: { organizationId?: string; loginHint?: string; redirectUri?: string } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri });
+  prompt,
+}: { organizationId?: string; loginHint?: string; redirectUri?: string; prompt?: 'consent' } = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt });
 }
 
 /**
