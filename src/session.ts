@@ -415,7 +415,7 @@ async function verifyAccessToken(accessToken: string) {
   }
 }
 
-async function getSessionFromCookie(request?: NextRequest) {
+export async function getSessionFromCookie(request?: NextRequest) {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   let cookie;
 

@@ -285,5 +285,63 @@ describe('auth.ts', () => {
         });
       });
     });
+
+    describe('when called outside of middleware', () => {
+      it('should fall back to reading session from cookie and redirect to logout URL', async () => {
+        const nextCookies = await cookies();
+
+        // Don't set x-workos-middleware header to simulate being outside middleware
+        // This will cause withAuth to throw
+
+        // Set up a session cookie with a valid access token
+        const mockSession = {
+          accessToken: await generateTestToken(),
+          refreshToken: 'refresh_token',
+          user: { id: 'user_123' },
+        };
+
+        const encryptedSession = await sealData(mockSession, {
+          password: process.env.WORKOS_COOKIE_PASSWORD as string,
+        });
+
+        nextCookies.set('wos-session', encryptedSession);
+
+        jest
+          .spyOn(workos.userManagement, 'getLogoutUrl')
+          .mockReturnValue('https://api.workos.com/user_management/sessions/logout?session_id=session_123');
+
+        await signOut();
+
+        // Cookie should be deleted
+        const sessionCookie = nextCookies.get('wos-session');
+        expect(sessionCookie).toBeUndefined();
+
+        // Should redirect to WorkOS logout URL with session ID
+        expect(redirect).toHaveBeenCalledTimes(1);
+        expect(redirect).toHaveBeenCalledWith(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123',
+        );
+        expect(workos.userManagement.getLogoutUrl).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sessionId: expect.stringMatching(/^session_/),
+          }),
+        );
+      });
+
+      it('should throw the original error when no session cookie exists outside middleware', async () => {
+        const nextCookies = await cookies();
+
+        // Don't set x-workos-middleware header to simulate being outside middleware
+        // Set a cookie to verify it gets deleted
+        nextCookies.set('wos-session', 'dummy-value');
+
+        // Should throw the error from withAuth since we can't recover
+        await expect(signOut()).rejects.toThrow(/You are calling 'withAuth'/);
+
+        // Cookie should still be deleted even though it throws
+        const sessionCookie = nextCookies.get('wos-session');
+        expect(sessionCookie).toBeUndefined();
+      });
+    });
   });
 });
