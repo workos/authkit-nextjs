@@ -1,13 +1,14 @@
 'use server';
 
+import { decodeJwt } from 'jose';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getCookieOptions } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import { SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
-import { refreshSession, withAuth } from './session.js';
+import type { AccessToken, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 export async function getSignInUrl({
   organizationId,
@@ -38,6 +39,16 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   try {
     const { sessionId: sid } = await withAuth();
     sessionId = sid;
+  } catch (error) {
+    // Fall back to reading session directly from cookie when middleware isn't available
+    const session = await getSessionFromCookie();
+    if (session && session.accessToken) {
+      const { sid } = decodeJwt<AccessToken>(session.accessToken);
+      sessionId = sid;
+    } else {
+      // can't recover - throw the original error.
+      throw error;
+    }
   } finally {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
