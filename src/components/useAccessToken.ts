@@ -69,10 +69,10 @@ export function useAccessToken(): UseAccessTokenReturn {
     /* istanbul ignore next */
     tokenStore
       .getAccessTokenSilently()
-      .finally(() => setIsInitialTokenLoading(false))
       .catch(() => {
         // Error is handled in the store
-      });
+      })
+      .finally(() => setIsInitialTokenLoading(false));
   }, [userId, sessionId]);
 
   useEffect(() => {
