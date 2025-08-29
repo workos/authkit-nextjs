@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAuth } from './authkit-provider.js';
 import { tokenStore } from './tokenStore.js';
 
@@ -40,11 +40,15 @@ export function useAccessToken(): UseAccessTokenReturn {
   const prevSessionRef = useRef(sessionId);
   const prevUserIdRef = useRef(userId);
 
+  // Track if we're waiting for the initial token fetch for the current user
+  const [isInitialTokenLoading, setIsInitialTokenLoading] = useState(false);
+
   const tokenState = useSyncExternalStore(tokenStore.subscribe, tokenStore.getSnapshot, tokenStore.getServerSnapshot);
 
   useEffect(() => {
     if (!user) {
       tokenStore.clearToken();
+      setIsInitialTokenLoading(false);
       return;
     }
 
@@ -59,10 +63,16 @@ export function useAccessToken(): UseAccessTokenReturn {
     prevSessionRef.current = sessionId;
     prevUserIdRef.current = userId;
 
+    // Start loading state for initial token fetch
+    setIsInitialTokenLoading(true);
+
     /* istanbul ignore next */
-    tokenStore.getAccessTokenSilently().catch(() => {
-      // Error is handled in the store
-    });
+    tokenStore
+      .getAccessTokenSilently()
+      .finally(() => setIsInitialTokenLoading(false))
+      .catch(() => {
+        // Error is handled in the store
+      });
   }, [userId, sessionId]);
 
   useEffect(() => {
@@ -112,9 +122,12 @@ export function useAccessToken(): UseAccessTokenReturn {
     return tokenStore.refreshToken();
   }, []);
 
+  // Combine loading states: initial token fetch OR token store is loading
+  const isLoading = isInitialTokenLoading || tokenState.loading;
+
   return {
     accessToken: tokenState.token,
-    loading: tokenState.loading,
+    loading: isLoading,
     error: tokenState.error,
     refresh,
     getAccessToken,

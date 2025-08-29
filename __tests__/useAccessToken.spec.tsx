@@ -57,15 +57,15 @@ describe('useAccessToken', () => {
     );
   };
 
-  it('should fetch an access token on mount without showing loading state', async () => {
+  it('should fetch an access token on mount and show loading state initially', async () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
     (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(mockToken);
 
     const { getByTestId } = render(<TestComponent />);
 
-    // Loading should remain false for background fetches
-    expect(getByTestId('loading')).toHaveTextContent('false');
+    // Loading should be true during initial fetch
+    expect(getByTestId('loading')).toHaveTextContent('true');
 
     await waitFor(() => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
@@ -77,7 +77,7 @@ describe('useAccessToken', () => {
     });
   });
 
-  it('should handle token refresh when an expiring token is received without showing loading', async () => {
+  it('should handle token refresh when an expiring token is received', async () => {
     // Create a token that's about to expire (exp is very close to current time)
     const currentTimeInSeconds = Math.floor(Date.now() / 1000);
     // Use 25 seconds to ensure it's within the 30-second buffer for short-lived tokens
@@ -97,8 +97,8 @@ describe('useAccessToken', () => {
 
     const { getByTestId } = render(<TestComponent />);
 
-    // Loading should remain false throughout
-    expect(getByTestId('loading')).toHaveTextContent('false');
+    // Loading should be true initially during token fetch
+    expect(getByTestId('loading')).toHaveTextContent('true');
 
     await waitFor(() => {
       expect(getByTestId('loading')).toHaveTextContent('false');
@@ -155,14 +155,14 @@ describe('useAccessToken', () => {
     });
   });
 
-  it('should handle errors during token fetch without showing loading', async () => {
+  it('should handle errors during token fetch', async () => {
     const error = new Error('Failed to fetch token');
     (getAccessTokenAction as jest.Mock).mockRejectedValueOnce(error);
 
     const { getByTestId } = render(<TestComponent />);
 
-    // Loading should remain false even when there's an error
-    expect(getByTestId('loading')).toHaveTextContent('false');
+    // Loading should be true initially
+    expect(getByTestId('loading')).toHaveTextContent('true');
 
     await waitFor(() => {
       expect(getByTestId('loading')).toHaveTextContent('false');
@@ -381,8 +381,8 @@ describe('useAccessToken', () => {
 
     const { getByTestId } = render(<TestComponent />);
 
-    // Loading should remain false for background operations
-    expect(getByTestId('loading')).toHaveTextContent('false');
+    // Loading should be true initially during fetch
+    expect(getByTestId('loading')).toHaveTextContent('true');
 
     await waitFor(() => {
       expect(fetchCalls).toBe(1);
