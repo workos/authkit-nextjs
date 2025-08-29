@@ -462,6 +462,20 @@ export default async function middleware(request: NextRequest) {
 export const config = { matcher: ['/', '/account/:path*'] };
 ```
 
+### After auth functions
+
+If you do not want to run your own middleware with `authkit` and instead want to run a function after a user is authenticated, you can use the `afterAuth` option on `authkitMiddleware`.
+
+```ts
+
+export default authkitMiddleware({
+  // Run after the user is authenticated
+  afterAuth: async (userInfo, req) => {
+    ErrorClient.setUser(userInfo);
+  },
+});
+```
+
 ### Signing out
 
 Use the `signOut` method to sign out the current logged in user and redirect to your app's default Logout URI. The Logout URI is set in your WorkOS dashboard settings under "Redirect".

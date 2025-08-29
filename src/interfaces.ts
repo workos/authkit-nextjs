@@ -71,11 +71,14 @@ export interface AuthkitMiddlewareAuth {
   unauthenticatedPaths: string[];
 }
 
+export type AfterAuthFunction = (userInfo: UserInfo, req: NextRequest) => void | Promise<void>;
+
 export interface AuthkitMiddlewareOptions {
   debug?: boolean;
   middlewareAuth?: AuthkitMiddlewareAuth;
   redirectUri?: string;
   signUpPaths?: string[];
+  afterAuth?: AfterAuthFunction;
 }
 
 export interface AuthkitOptions {
