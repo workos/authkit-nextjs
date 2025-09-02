@@ -40,10 +40,14 @@ export function useAccessToken(): UseAccessTokenReturn {
   const prevSessionRef = useRef(sessionId);
   const prevUserIdRef = useRef(userId);
 
-  // Track if we're waiting for the initial token fetch for the current user
-  const [isInitialTokenLoading, setIsInitialTokenLoading] = useState(false);
-
   const tokenState = useSyncExternalStore(tokenStore.subscribe, tokenStore.getSnapshot, tokenStore.getServerSnapshot);
+
+  // Track if we're waiting for the initial token fetch for the current user
+  // Initialize synchronously to prevent first-paint flash
+  const [isInitialTokenLoading, setIsInitialTokenLoading] = useState(() => {
+    // Only show loading if we have a user but no token yet
+    return Boolean(user && !tokenState.token && !tokenState.error);
+  });
 
   useEffect(() => {
     if (!user) {
@@ -63,8 +67,15 @@ export function useAccessToken(): UseAccessTokenReturn {
     prevSessionRef.current = sessionId;
     prevUserIdRef.current = userId;
 
-    // Start loading state for initial token fetch
-    setIsInitialTokenLoading(true);
+    // Check if getAccessTokenSilently will actually fetch (not just return cached)
+    const currentToken = tokenStore.getSnapshot().token;
+    const tokenData = currentToken ? tokenStore.parseToken(currentToken) : null;
+    const willActuallyFetch = !currentToken || (tokenData && tokenData.isExpiring);
+
+    // Only show loading if we're actually going to fetch
+    if (willActuallyFetch) {
+      setIsInitialTokenLoading(true);
+    }
 
     /* istanbul ignore next */
     tokenStore
@@ -72,7 +83,12 @@ export function useAccessToken(): UseAccessTokenReturn {
       .catch(() => {
         // Error is handled in the store
       })
-      .finally(() => setIsInitialTokenLoading(false));
+      .finally(() => {
+        // Only clear loading if we were actually loading
+        if (willActuallyFetch) {
+          setIsInitialTokenLoading(false);
+        }
+      });
   }, [userId, sessionId]);
 
   useEffect(() => {

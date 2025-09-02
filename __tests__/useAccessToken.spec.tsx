@@ -459,6 +459,44 @@ describe('useAccessToken', () => {
     });
   });
 
+  it('should show loading state immediately on first render when user exists but no token', () => {
+    // Mock user with no token initially
+    (useAuth as jest.Mock).mockImplementation(() => ({
+      user: { id: 'user_123' },
+      sessionId: 'session_123',
+      refreshAuth: jest.fn().mockResolvedValue({}),
+    }));
+
+    (getAccessTokenAction as jest.Mock).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve('token'), 100)),
+    );
+
+    const { getByTestId } = render(<TestComponent />);
+
+    expect(getByTestId('loading')).toHaveTextContent('true');
+    expect(getByTestId('token')).toHaveTextContent('no-token');
+  });
+
+  it('should not show loading when a valid token already exists', async () => {
+    const existingToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJleGlzdGluZyIsInNpZCI6InNlc3Npb24xMjMiLCJleHAiOjk5OTk5OTk5OTl9.existing';
+
+    await act(async () => {
+      (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(existingToken);
+      await tokenStore.getAccessTokenSilently();
+    });
+
+    // Reset the mock to track new calls
+    (getAccessTokenAction as jest.Mock).mockClear();
+
+    const { getByTestId } = render(<TestComponent />);
+
+    expect(getByTestId('loading')).toHaveTextContent('false');
+    expect(getByTestId('token')).toHaveTextContent(existingToken);
+
+    expect(getAccessTokenAction).not.toHaveBeenCalled();
+  });
+
   // Additional test cases to increase coverage
   it('should handle concurrent manual refresh attempts', async () => {
     const initialToken =
