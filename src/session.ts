@@ -10,6 +10,7 @@ import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_RE
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
   AccessToken,
+  AfterAuthFunction,
   AuthkitMiddlewareAuth,
   AuthkitOptions,
   AuthkitResponse,
@@ -36,13 +37,21 @@ async function encryptSession(session: Session) {
   });
 }
 
-async function updateSessionMiddleware(
-  request: NextRequest,
-  debug: boolean,
-  middlewareAuth: AuthkitMiddlewareAuth,
-  redirectUri: string,
-  signUpPaths: string[],
-) {
+async function updateSessionMiddleware({
+  request,
+  debug,
+  middlewareAuth,
+  redirectUri,
+  signUpPaths,
+  afterAuth,
+}: {
+  request: NextRequest;
+  debug: boolean;
+  middlewareAuth: AuthkitMiddlewareAuth;
+  redirectUri: string;
+  signUpPaths: string[];
+  afterAuth?: AfterAuthFunction;
+}) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
   }
@@ -100,6 +109,10 @@ async function updateSessionMiddleware(
   // Record the sign up paths so we can use them later
   if (signUpPaths.length > 0) {
     headers.set(signUpPathsHeaderName, signUpPaths.join(','));
+  }
+
+  if (afterAuth && session.user) {
+    await afterAuth(session, request);
   }
 
   return NextResponse.next({
