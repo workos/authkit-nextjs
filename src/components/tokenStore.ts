@@ -13,17 +13,42 @@ const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60;
 const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
 
 class TokenStore {
-  private static readonly SERVER_SNAPSHOT: TokenState = { token: undefined, loading: false, error: null };
-
-  private state: TokenState = {
-    token: undefined,
-    loading: false,
-    error: null,
-  };
+  private state: TokenState;
+  private serverSnapshot: TokenState;
+  
+  constructor() {
+    console.log('[TokenStore constructor] Running, isClient:', typeof window !== 'undefined');
+    // Initialize state with token from cookie if available
+    const initialToken = this.getInitialTokenFromCookie();
+    console.log('[TokenStore constructor] Initial token:', initialToken?.slice(-20));
+    this.state = {
+      token: initialToken,
+      loading: false,
+      error: null,
+    };
+    
+    // Server snapshot should match initial state for hydration
+    this.serverSnapshot = {
+      token: initialToken,
+      loading: false,
+      error: null,
+    };
+    
+    if (initialToken) {
+      // Mark as consumed if we found a token
+      this.fastCookieConsumed = true;
+      // Schedule refresh based on token expiry
+      const tokenData = this.parseToken(initialToken);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+    }
+  }
 
   private listeners = new Set<() => void>();
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+  private fastCookieConsumed = false;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -38,7 +63,7 @@ class TokenStore {
 
   getSnapshot = () => this.state;
 
-  getServerSnapshot = () => TokenStore.SERVER_SNAPSHOT;
+  getServerSnapshot = () => this.serverSnapshot;
 
   private notify() {
     this.listeners.forEach((listener) => listener());
@@ -72,6 +97,52 @@ class TokenStore {
     const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
 
     return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
+  }
+
+  private getInitialTokenFromCookie(): string | undefined {
+    if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
+      return;
+    }
+    
+    const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
+    if (!match) {
+      return;
+    }
+    
+    // Delete the cookie immediately
+    document.cookie = `wos-session_jwt=; max-age=0; path=/`;
+    
+    return match[1];
+  }
+  
+  private consumeFastCookie(): string | undefined {
+    // Only try to consume once per page load
+    if (this.fastCookieConsumed) {
+      return;
+    }
+    
+    if (typeof document.cookie === 'undefined') {
+      return;
+    }
+    
+    const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
+    if (!match) {
+      // Mark as consumed even if not found, to avoid repeated checks
+      this.fastCookieConsumed = true;
+      return;
+    }
+    
+    // Mark as consumed BEFORE deleting to prevent race conditions
+    this.fastCookieConsumed = true;
+    
+    // delete the cookie so we don't use it again
+    document.cookie = `wos-session_jwt=; max-age=0; path=/`;
+    
+    const newToken = match[1];
+    
+    if (newToken !== this.state.token) {
+      return newToken;
+    }
   }
 
   parseToken(token: string | undefined) {
@@ -123,6 +194,13 @@ class TokenStore {
   }
 
   async getAccessToken(): Promise<string | undefined> {
+    const fastToken = this.consumeFastCookie();
+
+    if (fastToken) {
+      this.setState({ token: fastToken, loading: false, error: null });
+      return fastToken;
+    }
+
     const tokenData = this.parseToken(this.state.token);
 
     // If we have a valid JWT that's not expiring, return it
@@ -140,6 +218,20 @@ class TokenStore {
   }
 
   async getAccessTokenSilently(): Promise<string | undefined> {
+    const fastToken = this.consumeFastCookie();
+
+    if (fastToken) {
+      this.setState({ token: fastToken, loading: false, error: null });
+      
+      // Schedule refresh based on token expiry
+      const tokenData = this.parseToken(fastToken);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+      
+      return fastToken;
+    }
+
     const tokenData = this.parseToken(this.state.token);
 
     // If we have a valid JWT that's not expiring, return it
@@ -257,11 +349,18 @@ class TokenStore {
   reset() {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
+    this.fastCookieConsumed = false;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
     }
     this.listeners.clear();
+  }
+
+  // No longer needed - initialization happens in constructor
+  initializeFromFastCookie() {
+    // This method is kept for compatibility but does nothing
+    // since initialization now happens in the constructor
   }
 }
 

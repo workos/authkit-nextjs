@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCookieOptions } from './cookie.js';
+import { getCookieOptions, getJwtCookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
@@ -42,6 +42,7 @@ async function updateSessionMiddleware(
   middlewareAuth: AuthkitMiddlewareAuth,
   redirectUri: string,
   signUpPaths: string[],
+  fastMode = false,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -86,6 +87,7 @@ async function updateSessionMiddleware(
     debug,
     redirectUri,
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
+    fastMode,
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
@@ -153,6 +155,7 @@ async function updateSession(
   const hasValidSession = await verifyAccessToken(session.accessToken);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  const jwtCookieName = 'wos-session_jwt';
 
   if (hasValidSession) {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
@@ -165,6 +168,11 @@ async function updateSession(
       entitlements,
       feature_flags: featureFlags,
     } = decodeJwt<AccessToken>(session.accessToken);
+
+    // Set JWT cookie if fastMode is enabled
+    if (options.fastMode) {
+      newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${session.accessToken}; ${getJwtCookieOptions(request.url)}`);
+    }
 
     return {
       session: {
@@ -213,6 +221,11 @@ async function updateSession(
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
+    // Set JWT cookie if fastMode is enabled
+    if (options.fastMode) {
+      newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${accessToken}; ${getJwtCookieOptions(request.url)}`);
+    }
+
     const {
       sid: sessionId,
       org_id: organizationId,
@@ -246,6 +259,12 @@ async function updateSession(
     // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
     const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
     newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    // Delete JWT cookie if fastMode is enabled
+    if (options.fastMode) {
+      const deleteJwtCookie = `wos-session_jwt=; Expires=${new Date(0).toUTCString()}; ${getJwtCookieOptions(request.url, undefined, true)}`;
+      newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+    }
 
     options.onSessionRefreshError?.({ error: e, request });
 

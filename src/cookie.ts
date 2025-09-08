@@ -88,3 +88,48 @@ export function getCookieOptions(
     domain: WORKOS_COOKIE_DOMAIN || '',
   };
 }
+
+export function getJwtCookieOptions(
+  redirectUri?: string | null,
+  asString?: boolean,
+  expired?: boolean,
+): string {
+  const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
+  assertValidSamSite(sameSite);
+
+  const urlString = redirectUri || WORKOS_REDIRECT_URI;
+  let secure: boolean;
+  if (sameSite.toLowerCase() === 'none') {
+    secure = true;
+  } else if (urlString) {
+    try {
+      const url = new URL(urlString);
+      secure = url.protocol === 'https:';
+    } catch {
+      secure = true;
+    }
+  } else {
+    secure = true;
+  }
+
+  let maxAge: number;
+  if (expired) {
+    maxAge = 0;
+  } else if (WORKOS_COOKIE_MAX_AGE) {
+    const parsed = parseInt(WORKOS_COOKIE_MAX_AGE, 10);
+    maxAge = Number.isFinite(parsed) ? parsed : 60 * 60 * 24 * 400;
+  } else {
+    maxAge = 60 * 60 * 24 * 400;
+  }
+
+  const capitalizedSameSite = sameSite.charAt(0).toUpperCase() + sameSite.slice(1).toLowerCase();
+  const parts = ['Path=/', `SameSite=${capitalizedSameSite}`, `Max-Age=${maxAge}`];
+  if (WORKOS_COOKIE_DOMAIN) {
+    parts.push(`Domain=${WORKOS_COOKIE_DOMAIN}`);
+  }
+  if (secure) {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
+}
