@@ -8,10 +8,10 @@ export function authkitMiddleware({
   middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
   redirectUri = WORKOS_REDIRECT_URI,
   signUpPaths = [],
-  fastMode = false,
+  eagerAuth = false,
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
-    return updateSessionMiddleware(request, debug, middlewareAuth, redirectUri, signUpPaths, fastMode);
+    return updateSessionMiddleware(request, debug, middlewareAuth, redirectUri, signUpPaths, eagerAuth);
   };
 }
 

@@ -42,7 +42,7 @@ async function updateSessionMiddleware(
   middlewareAuth: AuthkitMiddlewareAuth,
   redirectUri: string,
   signUpPaths: string[],
-  fastMode = false,
+  eagerAuth = false,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -87,7 +87,7 @@ async function updateSessionMiddleware(
     debug,
     redirectUri,
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
-    fastMode,
+    eagerAuth,
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
@@ -169,8 +169,8 @@ async function updateSession(
       feature_flags: featureFlags,
     } = decodeJwt<AccessToken>(session.accessToken);
 
-    // Set JWT cookie if fastMode is enabled
-    if (options.fastMode) {
+    // Set JWT cookie if eagerAuth is enabled
+    if (options.eagerAuth) {
       newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${session.accessToken}; ${getJwtCookieOptions(request.url)}`);
     }
 
@@ -221,8 +221,8 @@ async function updateSession(
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
-    // Set JWT cookie if fastMode is enabled
-    if (options.fastMode) {
+    // Set JWT cookie if eagerAuth is enabled
+    if (options.eagerAuth) {
       newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${accessToken}; ${getJwtCookieOptions(request.url)}`);
     }
 
@@ -260,8 +260,8 @@ async function updateSession(
     const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
     newRequestHeaders.append('Set-Cookie', deleteCookie);
 
-    // Delete JWT cookie if fastMode is enabled
-    if (options.fastMode) {
+    // Delete JWT cookie if eagerAuth is enabled
+    if (options.eagerAuth) {
       const deleteJwtCookie = `wos-session_jwt=; Expires=${new Date(0).toUTCString()}; ${getJwtCookieOptions(request.url, undefined, true)}`;
       newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
     }

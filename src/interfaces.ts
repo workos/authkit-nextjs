@@ -76,11 +76,11 @@ export interface AuthkitMiddlewareOptions {
   middlewareAuth?: AuthkitMiddlewareAuth;
   redirectUri?: string;
   signUpPaths?: string[];
-  fastMode?: boolean;
+  eagerAuth?: boolean;
 }
 
 export interface AuthkitOptions {
-  fastMode?: boolean;
+  eagerAuth?: boolean;
   debug?: boolean;
   redirectUri?: string;
   screenHint?: 'sign-up' | 'sign-in';
