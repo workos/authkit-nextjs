@@ -17,10 +17,8 @@ class TokenStore {
   private serverSnapshot: TokenState;
   
   constructor() {
-    console.log('[TokenStore constructor] Running, isClient:', typeof window !== 'undefined');
     // Initialize state with token from cookie if available
     const initialToken = this.getInitialTokenFromCookie();
-    console.log('[TokenStore constructor] Initial token:', initialToken?.slice(-20));
     this.state = {
       token: initialToken,
       loading: false,
