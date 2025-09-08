@@ -107,8 +107,30 @@ class TokenStore {
       return;
     }
     
-    // Delete the cookie immediately
-    document.cookie = `wos-session_jwt=; max-age=0; path=/`;
+    // Delete the cookie immediately with proper attributes
+    // Try multiple deletion attempts to handle different domain configurations
+    const isSecure = window.location.protocol === 'https:';
+    
+    // First attempt: delete without domain (for cookies set without domain)
+    const baseParts = [
+      'wos-session_jwt=',
+      'expires=Thu, 01 Jan 1970 00:00:00 UTC',
+      'path=/',
+      'SameSite=Lax'
+    ];
+    
+    if (isSecure) {
+      baseParts.push('Secure');
+    }
+    
+    document.cookie = baseParts.join('; ');
+    
+    // Second attempt: delete with current hostname as domain
+    const withDomain = [...baseParts];
+    withDomain.splice(3, 0, `domain=${window.location.hostname}`);
+    document.cookie = withDomain.join('; ');
+    
+    console.log('[TokenStore] Attempted to delete wos-session_jwt cookie');
     
     return match[1];
   }
@@ -133,8 +155,29 @@ class TokenStore {
     // Mark as consumed BEFORE deleting to prevent race conditions
     this.fastCookieConsumed = true;
     
-    // delete the cookie so we don't use it again
-    document.cookie = `wos-session_jwt=; max-age=0; path=/`;
+    // Delete the cookie with proper attributes
+    // Try multiple deletion attempts to handle different domain configurations
+    const isSecure = window.location.protocol === 'https:';
+    
+    const baseParts = [
+      'wos-session_jwt=',
+      'expires=Thu, 01 Jan 1970 00:00:00 UTC',
+      'path=/',
+      'SameSite=Lax'
+    ];
+    
+    if (isSecure) {
+      baseParts.push('Secure');
+    }
+    
+    document.cookie = baseParts.join('; ');
+    
+    // Also try with domain
+    const withDomain = [...baseParts];
+    withDomain.splice(3, 0, `domain=${window.location.hostname}`);
+    document.cookie = withDomain.join('; ');
+    
+    console.log('[TokenStore] Attempted to delete wos-session_jwt cookie in consumeFastCookie');
     
     const newToken = match[1];
     
