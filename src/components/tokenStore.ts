@@ -15,7 +15,7 @@ const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
 class TokenStore {
   private state: TokenState;
   private serverSnapshot: TokenState;
-  
+
   constructor() {
     // Initialize state with token from cookie if available
     const initialToken = this.getInitialTokenFromCookie();
@@ -24,14 +24,14 @@ class TokenStore {
       loading: false,
       error: null,
     };
-    
+
     // Server snapshot should match initial state for hydration
     this.serverSnapshot = {
       token: initialToken,
       loading: false,
       error: null,
     };
-    
+
     if (initialToken) {
       // Mark as consumed if we found a token
       this.fastCookieConsumed = true;
@@ -40,6 +40,21 @@ class TokenStore {
       if (tokenData) {
         this.scheduleRefresh(tokenData.timeUntilExpiry);
       }
+    }
+
+    // Monitor for cookie recreation
+    if (typeof window !== 'undefined') {
+      let lastCookieState = document.cookie;
+      setInterval(() => {
+        const currentCookieState = document.cookie;
+        if (currentCookieState !== lastCookieState) {
+          if (currentCookieState.includes('wos-session_jwt') && !lastCookieState.includes('wos-session_jwt')) {
+            console.warn('[TokenStore] ⚠️ JWT cookie was RECREATED after deletion!');
+            console.trace('Cookie recreation stack trace');
+          }
+          lastCookieState = currentCookieState;
+        }
+      }, 100);
     }
   }
 
@@ -97,90 +112,91 @@ class TokenStore {
     return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
   }
 
+  private deleteCookie() {
+    const isSecure = window.location.protocol === 'https:';
+
+    // Build deletion string to match EXACTLY what the server sets
+    // Server sets: Path=/, SameSite=Lax, and Secure (if HTTPS)
+    // NO Domain attribute is set by server, so we don't set it either
+    const deletionString = isSecure
+      ? 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0; Secure'
+      : 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0';
+
+    console.log('[TokenStore] Deleting cookie with:', deletionString);
+    document.cookie = deletionString;
+
+    // The cookie might still appear in document.cookie even after deletion
+    // due to browser caching, but it should be expired and not sent to server
+  }
+
   private getInitialTokenFromCookie(): string | undefined {
     if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
       return;
     }
-    
+
     const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
     if (!match) {
       return;
     }
-    
-    // Delete the cookie immediately with proper attributes
-    // Try multiple deletion attempts to handle different domain configurations
-    const isSecure = window.location.protocol === 'https:';
-    
-    // First attempt: delete without domain (for cookies set without domain)
-    const baseParts = [
-      'wos-session_jwt=',
-      'expires=Thu, 01 Jan 1970 00:00:00 UTC',
-      'path=/',
-      'SameSite=Lax'
-    ];
-    
-    if (isSecure) {
-      baseParts.push('Secure');
-    }
-    
-    document.cookie = baseParts.join('; ');
-    
-    // Second attempt: delete with current hostname as domain
-    const withDomain = [...baseParts];
-    withDomain.splice(3, 0, `domain=${window.location.hostname}`);
-    document.cookie = withDomain.join('; ');
-    
-    console.log('[TokenStore] Attempted to delete wos-session_jwt cookie');
-    
+
+    console.log(
+      '[TokenStore] Found JWT cookie in getInitialTokenFromCookie, value:',
+      match[1].substring(0, 20) + '...',
+    );
+
+    // Delete the cookie after reading it
+    this.deleteCookie();
+
+    // Verify deletion immediately
+    setTimeout(() => {
+      if (document.cookie.includes('wos-session_jwt')) {
+        console.error('[TokenStore] ⚠️ Cookie still exists after deletion in getInitialTokenFromCookie!');
+        console.log('Current cookies:', document.cookie);
+      } else {
+        console.log('[TokenStore] ✅ Confirmed: Cookie is gone after getInitialTokenFromCookie');
+      }
+    }, 0);
+
     return match[1];
   }
-  
+
   private consumeFastCookie(): string | undefined {
     // Only try to consume once per page load
     if (this.fastCookieConsumed) {
       return;
     }
-    
+
     if (typeof document.cookie === 'undefined') {
       return;
     }
-    
+
     const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
     if (!match) {
       // Mark as consumed even if not found, to avoid repeated checks
       this.fastCookieConsumed = true;
       return;
     }
-    
+
+    console.log('[TokenStore] Found JWT cookie in consumeFastCookie, value:', match[1].substring(0, 20) + '...');
+
     // Mark as consumed BEFORE deleting to prevent race conditions
     this.fastCookieConsumed = true;
-    
-    // Delete the cookie with proper attributes
-    // Try multiple deletion attempts to handle different domain configurations
-    const isSecure = window.location.protocol === 'https:';
-    
-    const baseParts = [
-      'wos-session_jwt=',
-      'expires=Thu, 01 Jan 1970 00:00:00 UTC',
-      'path=/',
-      'SameSite=Lax'
-    ];
-    
-    if (isSecure) {
-      baseParts.push('Secure');
-    }
-    
-    document.cookie = baseParts.join('; ');
-    
-    // Also try with domain
-    const withDomain = [...baseParts];
-    withDomain.splice(3, 0, `domain=${window.location.hostname}`);
-    document.cookie = withDomain.join('; ');
-    
-    console.log('[TokenStore] Attempted to delete wos-session_jwt cookie in consumeFastCookie');
-    
+
+    // Delete the cookie using protocol-aware deletion
+    this.deleteCookie();
+
+    // Verify deletion immediately
+    setTimeout(() => {
+      if (document.cookie.includes('wos-session_jwt')) {
+        console.error('[TokenStore] ⚠️ Cookie still exists after deletion in consumeFastCookie!');
+        console.log('Current cookies:', document.cookie);
+      } else {
+        console.log('[TokenStore] ✅ Confirmed: Cookie is gone after consumeFastCookie');
+      }
+    }, 0);
+
     const newToken = match[1];
-    
+
     if (newToken !== this.state.token) {
       return newToken;
     }
@@ -263,13 +279,13 @@ class TokenStore {
 
     if (fastToken) {
       this.setState({ token: fastToken, loading: false, error: null });
-      
+
       // Schedule refresh based on token expiry
       const tokenData = this.parseToken(fastToken);
       if (tokenData) {
         this.scheduleRefresh(tokenData.timeUntilExpiry);
       }
-      
+
       return fastToken;
     }
 

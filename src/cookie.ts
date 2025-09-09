@@ -90,46 +90,63 @@ export function getCookieOptions(
 }
 
 export function getJwtCookieOptions(
-  redirectUri?: string | null,
+  requestUrlOrRedirectUri?: string | null,
   asString?: boolean,
   expired?: boolean,
 ): string {
-  const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
-  assertValidSamSite(sameSite);
+  // Determine if we should use Secure flag based on the current request URL
+  // When called from middleware, this receives request.url (the actual request URL)
+  // This should match the protocol of the current request, not the redirect URI
 
-  const urlString = redirectUri || WORKOS_REDIRECT_URI;
-  let secure: boolean;
-  if (sameSite.toLowerCase() === 'none') {
-    secure = true;
-  } else if (urlString) {
+  let secure = false;
+
+  if (requestUrlOrRedirectUri) {
     try {
-      const url = new URL(urlString);
+      const url = new URL(requestUrlOrRedirectUri);
       secure = url.protocol === 'https:';
     } catch {
-      secure = true;
+      // If it's not a valid URL, fall back to WORKOS_REDIRECT_URI
+      const fallbackUrl = WORKOS_REDIRECT_URI;
+      if (fallbackUrl) {
+        try {
+          const url = new URL(fallbackUrl);
+          secure = url.protocol === 'https:';
+        } catch {
+          secure = false;
+        }
+      }
     }
-  } else {
-    secure = true;
+  } else if (WORKOS_REDIRECT_URI) {
+    // No URL provided, check WORKOS_REDIRECT_URI
+    try {
+      const url = new URL(WORKOS_REDIRECT_URI);
+      secure = url.protocol === 'https:';
+    } catch {
+      secure = false;
+    }
   }
 
   let maxAge: number;
   if (expired) {
     maxAge = 0;
-  } else if (WORKOS_COOKIE_MAX_AGE) {
-    const parsed = parseInt(WORKOS_COOKIE_MAX_AGE, 10);
-    maxAge = Number.isFinite(parsed) ? parsed : 60 * 60 * 24 * 400;
   } else {
-    maxAge = 60 * 60 * 24 * 400;
+    // Very short-lived cookie - just enough for the page to load and consume it
+    maxAge = 10; // 10 seconds
   }
 
-  const capitalizedSameSite = sameSite.charAt(0).toUpperCase() + sameSite.slice(1).toLowerCase();
-  const parts = ['Path=/', `SameSite=${capitalizedSameSite}`, `Max-Age=${maxAge}`];
-  if (WORKOS_COOKIE_DOMAIN) {
-    parts.push(`Domain=${WORKOS_COOKIE_DOMAIN}`);
-  }
+  // Build cookie string that matches what the client will need for deletion
+  // IMPORTANT: Do NOT set Domain attribute - let it default to current hostname
+  // This ensures client-side deletion works correctly
+  const parts = ['Path=/', 'SameSite=Lax', `Max-Age=${maxAge}`];
+
+  // Only add Secure flag if on HTTPS
   if (secure) {
     parts.push('Secure');
   }
+
+  // Never add Domain - this is critical for client-side deletion to work
+  // When Domain is omitted, the cookie is set for the exact hostname
+  // and can be deleted from JavaScript
 
   return parts.join('; ');
 }

@@ -26,6 +26,7 @@ import { lazy, redirectWithFallback } from './utils.js';
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
+const jwtCookieName = 'wos-session_jwt';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 
@@ -155,7 +156,6 @@ async function updateSession(
   const hasValidSession = await verifyAccessToken(session.accessToken);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  const jwtCookieName = 'wos-session_jwt';
 
   if (hasValidSession) {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
@@ -170,8 +170,23 @@ async function updateSession(
     } = decodeJwt<AccessToken>(session.accessToken);
 
     // Set JWT cookie if eagerAuth is enabled
+    // Only set on document requests (initial page loads), not on API/RSC requests
     if (options.eagerAuth) {
-      newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${session.accessToken}; ${getJwtCookieOptions(request.url)}`);
+      const accept = request.headers.get('accept') || '';
+      const isDocumentRequest = accept.includes('text/html');
+      const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
+
+      // Only set cookie on actual page navigations, not subsequent requests
+      if (isDocumentRequest && !isRSCRequest) {
+        const existingJwtCookie = request.cookies.get(jwtCookieName);
+        // Only set if cookie doesn't exist or has different value
+        if (!existingJwtCookie || existingJwtCookie.value !== session.accessToken) {
+          newRequestHeaders.append(
+            'Set-Cookie',
+            `${jwtCookieName}=${session.accessToken}; ${getJwtCookieOptions(request.url)}`,
+          );
+        }
+      }
     }
 
     return {
@@ -222,8 +237,16 @@ async function updateSession(
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
+    // Only set on document requests (initial page loads), not on API/RSC requests
     if (options.eagerAuth) {
-      newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${accessToken}; ${getJwtCookieOptions(request.url)}`);
+      const accept = request.headers.get('accept') || '';
+      const isDocumentRequest = accept.includes('text/html');
+      const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
+
+      // Only set cookie on actual page navigations after refresh
+      if (isDocumentRequest && !isRSCRequest) {
+        newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${accessToken}; ${getJwtCookieOptions(request.url)}`);
+      }
     }
 
     const {
@@ -262,7 +285,7 @@ async function updateSession(
 
     // Delete JWT cookie if eagerAuth is enabled
     if (options.eagerAuth) {
-      const deleteJwtCookie = `wos-session_jwt=; Expires=${new Date(0).toUTCString()}; ${getJwtCookieOptions(request.url, undefined, true)}`;
+      const deleteJwtCookie = `${jwtCookieName}=; Expires=${new Date(0).toUTCString()}; ${getJwtCookieOptions(request.url, undefined, true)}`;
       newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
     }
 
