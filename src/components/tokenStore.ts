@@ -11,6 +11,7 @@ const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15;
 const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60;
 const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
+const jwtCookieName = 'wos-session-token';
 
 class TokenStore {
   private state: TokenState;
@@ -41,7 +42,6 @@ class TokenStore {
         this.scheduleRefresh(tokenData.timeUntilExpiry);
       }
     }
-
   }
 
   private listeners = new Set<() => void>();
@@ -105,8 +105,8 @@ class TokenStore {
     // Server sets: Path=/, SameSite=Lax, and Secure (if HTTPS)
     // NO Domain attribute is set by server, so we don't set it either
     const deletionString = isSecure
-      ? 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0; Secure'
-      : 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0';
+      ? `${jwtCookieName}=; Path=/; SameSite=Lax; Max-Age=0; Secure`
+      : `${jwtCookieName}=; Path=/; SameSite=Lax; Max-Age=0`;
 
     document.cookie = deletionString;
 
@@ -114,12 +114,18 @@ class TokenStore {
     // due to browser caching, but it should be expired and not sent to server
   }
 
+  private escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   private getInitialTokenFromCookie(): string | undefined {
     if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
       return;
     }
 
-    const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
+    const pattern = new RegExp(`${this.escapeRegExp(jwtCookieName)}=([^;]+)`);
+    const match = document.cookie.match(pattern);
+
     if (!match) {
       return;
     }
@@ -136,11 +142,12 @@ class TokenStore {
       return;
     }
 
-    if (typeof document.cookie === 'undefined') {
+    if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
       return;
     }
 
-    const match = document.cookie.match(/wos-session_jwt=([^;]+)/);
+    const pattern = new RegExp(`${this.escapeRegExp(jwtCookieName)}=([^;]+)`);
+    const match = document.cookie.match(pattern);
     if (!match) {
       // Mark as consumed even if not found, to avoid repeated checks
       this.fastCookieConsumed = true;

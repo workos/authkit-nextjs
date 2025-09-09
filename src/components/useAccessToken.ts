@@ -52,8 +52,12 @@ export function useAccessToken(): UseAccessTokenReturn {
   useEffect(() => {
     if (!user) {
       setIsInitialTokenLoading(false);
-      // Don't clear the token - it might be from the fast cookie
-      // The token will be validated when used
+      // Clear token when user logs out
+      if (prevUserIdRef.current !== undefined) {
+        tokenStore.clearToken();
+      }
+      prevUserIdRef.current = undefined;
+      prevSessionRef.current = undefined;
       return;
     }
 

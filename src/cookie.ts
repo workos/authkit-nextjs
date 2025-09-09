@@ -8,6 +8,9 @@ import { CookieOptions } from './interfaces.js';
 
 type ValidSameSite = CookieOptions['sameSite'];
 
+const JWT_COOKIE_MAX_AGE = 30; // seconds
+const JWT_COOKIE_NAME = 'wos-session-token';
+
 function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite {
   if (!['lax', 'strict', 'none'].includes(sameSite.toLowerCase())) {
     throw new Error(`Invalid SameSite value: ${sameSite}`);
@@ -89,22 +92,22 @@ export function getCookieOptions(
   };
 }
 
-export function getJwtCookieOptions(
-  requestUrlOrRedirectUri?: string | null,
-  asString?: boolean,
-  expired?: boolean,
-): string {
-  // Determine if we should use Secure flag based on the current request URL
-  // When called from middleware, this receives request.url (the actual request URL)
-  // This should match the protocol of the current request, not the redirect URI
+export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: string | null, expired?: boolean): string {
+  const cookie = `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`;
 
+  // Force Secure in production, except for localhost
   let secure = false;
+  const isProduction = process.env.NODE_ENV === 'production';
 
   if (requestUrlOrRedirectUri) {
     try {
       const url = new URL(requestUrlOrRedirectUri);
-      secure = url.protocol === 'https:';
+      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      // In production, always use Secure unless explicitly on localhost
+      secure = isProduction ? !isLocalhost : url.protocol === 'https:';
     } catch {
+      // If URL parsing fails, default to secure in production
+      secure = isProduction;
       // If it's not a valid URL, fall back to WORKOS_REDIRECT_URI
       const fallbackUrl = WORKOS_REDIRECT_URI;
       if (fallbackUrl) {
@@ -126,27 +129,18 @@ export function getJwtCookieOptions(
     }
   }
 
-  let maxAge: number;
-  if (expired) {
-    maxAge = 0;
-  } else {
-    // Very short-lived cookie - just enough for the page to load and consume it
-    maxAge = 10; // 10 seconds
-  }
+  const maxAge = expired ? 0 : JWT_COOKIE_MAX_AGE;
 
-  // Build cookie string that matches what the client will need for deletion
-  // IMPORTANT: Do NOT set Domain attribute - let it default to current hostname
-  // This ensures client-side deletion works correctly
-  const parts = ['Path=/', 'SameSite=Lax', `Max-Age=${maxAge}`];
+  const parts = [cookie, 'Path=/', 'SameSite=Lax', `Max-Age=${maxAge}`];
 
   // Only add Secure flag if on HTTPS
   if (secure) {
     parts.push('Secure');
   }
 
-  // Never add Domain - this is critical for client-side deletion to work
-  // When Domain is omitted, the cookie is set for the exact hostname
-  // and can be deleted from JavaScript
+  if (expired) {
+    parts.push(`Expires=${new Date(0).toUTCString()}`);
+  }
 
   return parts.join('; ');
 }

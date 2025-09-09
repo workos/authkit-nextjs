@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCookieOptions, getJwtCookieOptions } from './cookie.js';
+import { getCookieOptions, getJwtCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
@@ -29,6 +29,21 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 const jwtCookieName = 'wos-session_jwt';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
+
+/**
+ * Determines if a request is for an initial document load (not API/RSC/prefetch)
+ */
+function isInitialDocumentRequest(request: NextRequest): boolean {
+  const accept = request.headers.get('accept') || '';
+  const isDocumentRequest = accept.includes('text/html');
+  const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
+  const isPrefetch =
+    request.headers.get('Purpose') === 'prefetch' ||
+    request.headers.get('Sec-Purpose') === 'prefetch' ||
+    request.headers.has('Next-Router-Prefetch');
+
+  return isDocumentRequest && !isRSCRequest && !isPrefetch;
+}
 
 async function encryptSession(session: Session) {
   return sealData(session, {
@@ -171,21 +186,11 @@ async function updateSession(
 
     // Set JWT cookie if eagerAuth is enabled
     // Only set on document requests (initial page loads), not on API/RSC requests
-    if (options.eagerAuth) {
-      const accept = request.headers.get('accept') || '';
-      const isDocumentRequest = accept.includes('text/html');
-      const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
-
-      // Only set cookie on actual page navigations, not subsequent requests
-      if (isDocumentRequest && !isRSCRequest) {
-        const existingJwtCookie = request.cookies.get(jwtCookieName);
-        // Only set if cookie doesn't exist or has different value
-        if (!existingJwtCookie || existingJwtCookie.value !== session.accessToken) {
-          newRequestHeaders.append(
-            'Set-Cookie',
-            `${jwtCookieName}=${session.accessToken}; ${getJwtCookieOptions(request.url)}`,
-          );
-        }
+    if (options.eagerAuth && isInitialDocumentRequest(request)) {
+      const existingJwtCookie = request.cookies.get(jwtCookieName);
+      // Only set if cookie doesn't exist or has different value
+      if (!existingJwtCookie || existingJwtCookie.value !== session.accessToken) {
+        newRequestHeaders.append('Set-Cookie', getJwtCookie(session.accessToken, request.url));
       }
     }
 
@@ -238,15 +243,8 @@ async function updateSession(
 
     // Set JWT cookie if eagerAuth is enabled
     // Only set on document requests (initial page loads), not on API/RSC requests
-    if (options.eagerAuth) {
-      const accept = request.headers.get('accept') || '';
-      const isDocumentRequest = accept.includes('text/html');
-      const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
-
-      // Only set cookie on actual page navigations after refresh
-      if (isDocumentRequest && !isRSCRequest) {
-        newRequestHeaders.append('Set-Cookie', `${jwtCookieName}=${accessToken}; ${getJwtCookieOptions(request.url)}`);
-      }
+    if (options.eagerAuth && isInitialDocumentRequest(request)) {
+      newRequestHeaders.append('Set-Cookie', getJwtCookie(accessToken, request.url));
     }
 
     const {
@@ -285,7 +283,7 @@ async function updateSession(
 
     // Delete JWT cookie if eagerAuth is enabled
     if (options.eagerAuth) {
-      const deleteJwtCookie = `${jwtCookieName}=; Expires=${new Date(0).toUTCString()}; ${getJwtCookieOptions(request.url, undefined, true)}`;
+      const deleteJwtCookie = getJwtCookie(null, request.url, true);
       newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
     }
 
