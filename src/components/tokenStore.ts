@@ -42,20 +42,6 @@ class TokenStore {
       }
     }
 
-    // Monitor for cookie recreation
-    if (typeof window !== 'undefined') {
-      let lastCookieState = document.cookie;
-      setInterval(() => {
-        const currentCookieState = document.cookie;
-        if (currentCookieState !== lastCookieState) {
-          if (currentCookieState.includes('wos-session_jwt') && !lastCookieState.includes('wos-session_jwt')) {
-            console.warn('[TokenStore] ⚠️ JWT cookie was RECREATED after deletion!');
-            console.trace('Cookie recreation stack trace');
-          }
-          lastCookieState = currentCookieState;
-        }
-      }, 100);
-    }
   }
 
   private listeners = new Set<() => void>();
@@ -122,7 +108,6 @@ class TokenStore {
       ? 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0; Secure'
       : 'wos-session_jwt=; Path=/; SameSite=Lax; Max-Age=0';
 
-    console.log('[TokenStore] Deleting cookie with:', deletionString);
     document.cookie = deletionString;
 
     // The cookie might still appear in document.cookie even after deletion
@@ -139,23 +124,8 @@ class TokenStore {
       return;
     }
 
-    console.log(
-      '[TokenStore] Found JWT cookie in getInitialTokenFromCookie, value:',
-      match[1].substring(0, 20) + '...',
-    );
-
-    // Delete the cookie after reading it
+    // Delete the cookie immediately after reading it
     this.deleteCookie();
-
-    // Verify deletion immediately
-    setTimeout(() => {
-      if (document.cookie.includes('wos-session_jwt')) {
-        console.error('[TokenStore] ⚠️ Cookie still exists after deletion in getInitialTokenFromCookie!');
-        console.log('Current cookies:', document.cookie);
-      } else {
-        console.log('[TokenStore] ✅ Confirmed: Cookie is gone after getInitialTokenFromCookie');
-      }
-    }, 0);
 
     return match[1];
   }
@@ -177,23 +147,11 @@ class TokenStore {
       return;
     }
 
-    console.log('[TokenStore] Found JWT cookie in consumeFastCookie, value:', match[1].substring(0, 20) + '...');
-
     // Mark as consumed BEFORE deleting to prevent race conditions
     this.fastCookieConsumed = true;
 
     // Delete the cookie using protocol-aware deletion
     this.deleteCookie();
-
-    // Verify deletion immediately
-    setTimeout(() => {
-      if (document.cookie.includes('wos-session_jwt')) {
-        console.error('[TokenStore] ⚠️ Cookie still exists after deletion in consumeFastCookie!');
-        console.log('Current cookies:', document.cookie);
-      } else {
-        console.log('[TokenStore] ✅ Confirmed: Cookie is gone after consumeFastCookie');
-      }
-    }, 0);
 
     const newToken = match[1];
 
