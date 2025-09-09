@@ -937,4 +937,216 @@ describe('session.ts', () => {
       expect(result).toMatchObject(tokenPayload);
     });
   });
+
+  describe('eager auth functionality', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    describe('isInitialDocumentRequest', () => {
+      // Since this is not exported, we'll test it indirectly through updateSession
+      it('should set JWT cookie on initial page load with eagerAuth enabled', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html,application/xhtml+xml');
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should have JWT cookie in response headers
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeDefined();
+        expect(jwtCookie).toContain(`wos-session-token=${validAccessToken}`);
+      });
+
+      it('should not set JWT cookie for API requests even with eagerAuth', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/api/data'));
+        request.headers.set('accept', 'application/json');
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should NOT have JWT cookie in response headers
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeUndefined();
+      });
+
+      it('should not set JWT cookie for RSC requests', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html');
+        request.headers.set('RSC', '1');
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should NOT have JWT cookie for RSC requests
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeUndefined();
+      });
+
+      it('should not set JWT cookie for prefetch requests', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html');
+        request.headers.set('Purpose', 'prefetch');
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should NOT have JWT cookie for prefetch requests
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeUndefined();
+      });
+    });
+
+    describe('JWT cookie management during session refresh', () => {
+      it('should set JWT cookie after successful session refresh', async () => {
+        // Setup invalid session that needs refresh
+        mockSession.accessToken = await generateTestToken({}, true);
+
+        (jwtVerify as jest.Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+
+        const newAccessToken = await generateTestToken();
+        jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: newAccessToken,
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html');
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should set JWT cookie with new token after refresh
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeDefined();
+        expect(jwtCookie).toContain(`wos-session-token=${newAccessToken}`);
+      });
+
+      it('should delete JWT cookie when session refresh fails', async () => {
+        // Setup invalid session
+        mockSession.accessToken = await generateTestToken({}, true);
+
+        (jwtVerify as jest.Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+
+        jest
+          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
+          .mockRejectedValue(new Error('Refresh failed'));
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html');
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should delete JWT cookie on refresh failure
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtDeleteCookie = setCookieHeaders.find(
+          (header) => header.includes('wos-session-token=') && header.includes('Max-Age=0'),
+        );
+        expect(jwtDeleteCookie).toBeDefined();
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should handle requests with no accept header', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        // Don't set accept header to test the || '' fallback (line 37)
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Without accept header, should not be treated as document request
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        expect(jwtCookie).toBeUndefined();
+      });
+
+      it('should not set duplicate JWT cookie if one already exists with same value', async () => {
+        const validAccessToken = await generateTestToken();
+        const sessionWithValidToken = { ...mockSession, accessToken: validAccessToken };
+
+        const request = new NextRequest(new URL('http://example.com/page'));
+        request.headers.set('accept', 'text/html');
+
+        // Set existing JWT cookie with same value
+        request.cookies.set('wos-session-token', validAccessToken);
+
+        request.cookies.set(
+          'wos-session',
+          await sealData(sessionWithValidToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request, { eagerAuth: true });
+
+        // Should NOT set another JWT cookie since one exists with same value (line 192 condition)
+        const setCookieHeaders = result.headers.getSetCookie();
+        const jwtCookies = setCookieHeaders.filter((header) => header.includes('wos-session-token='));
+        expect(jwtCookies).toHaveLength(0); // No new JWT cookie should be set
+      });
+
+      it('should handle saveSession with string URL parameter', async () => {
+        const { saveSession } = await import('../src/session.js');
+
+        const sessionData = {
+          accessToken: await generateTestToken(),
+          refreshToken: 'test-refresh-token',
+          user: mockSession.user,
+        };
+
+        // Test with string URL (line 545: typeof request === 'string')
+        await expect(saveSession(sessionData, 'https://example.com/callback')).resolves.not.toThrow();
+      });
+    });
+  });
 });

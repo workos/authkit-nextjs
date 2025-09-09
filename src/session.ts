@@ -26,7 +26,7 @@ import { lazy, redirectWithFallback } from './utils.js';
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
-const jwtCookieName = 'wos-session_jwt';
+const jwtCookieName = 'wos-session-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 

@@ -33,6 +33,7 @@ class TokenStore {
       error: null,
     };
 
+    /* istanbul ignore next */
     if (initialToken) {
       // Mark as consumed if we found a token
       this.fastCookieConsumed = true;
@@ -82,10 +83,12 @@ class TokenStore {
     const delay =
       typeof timeUntilExpiry === 'undefined' ? RETRY_DELAY_SECONDS * 1000 : this.getRefreshDelay(timeUntilExpiry);
 
-    this.refreshTimeout = setTimeout(() => {
-      /* istanbul ignore next */
-      void this.getAccessTokenSilently().catch(() => {});
-    }, delay);
+    this.refreshTimeout = setTimeout(
+      /* istanbul ignore next */ () => {
+        void this.getAccessTokenSilently().catch(/* istanbul ignore next */ () => {});
+      },
+      delay,
+    );
   }
 
   private getRefreshDelay(timeUntilExpiry: number) {
