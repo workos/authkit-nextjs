@@ -13,7 +13,7 @@ const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60;
 const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
 const jwtCookieName = 'workos-access-token';
 
-class TokenStore {
+export class TokenStore {
   private state: TokenState;
   private serverSnapshot: TokenState;
 
