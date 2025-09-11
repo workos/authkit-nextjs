@@ -2,7 +2,7 @@
 
 import { sealData } from 'iron-session';
 import { SignJWT } from 'jose';
-import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from '../src/env-variables.js';
+import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { cookies } from 'next/headers';
 import { User } from '@workos-inc/node';
 

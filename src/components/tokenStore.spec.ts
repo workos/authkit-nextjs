@@ -1,7 +1,7 @@
-import { tokenStore, TokenStore } from '../src/components/tokenStore.js';
-import { getAccessTokenAction, refreshAccessTokenAction } from '../src/actions.js';
+import { tokenStore, TokenStore } from './tokenStore.js';
+import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 
-jest.mock('../src/actions.js', () => ({
+jest.mock('../actions.js', () => ({
   getAccessTokenAction: jest.fn(),
   refreshAccessTokenAction: jest.fn(),
 }));

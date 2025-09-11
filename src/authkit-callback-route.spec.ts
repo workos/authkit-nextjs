@@ -1,5 +1,5 @@
-import { getWorkOS } from '../src/workos.js';
-import { handleAuth } from '../src/authkit-callback-route.js';
+import { getWorkOS } from './workos.js';
+import { handleAuth } from './authkit-callback-route.js';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Mocked in jest.setup.ts
@@ -119,7 +119,7 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
       const handler = handleAuth({
-        onError: ({ error }) => {
+        onError: () => {
           return new Response(JSON.stringify({ error: { message: 'Custom error' } }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },

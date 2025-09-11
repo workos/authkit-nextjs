@@ -26,7 +26,7 @@ const config: Config = {
     {
       displayName: 'jsdom',
       testEnvironment: 'jsdom',
-      testMatch: ['**/__tests__/**/*.spec.tsx'],
+      testMatch: ['**/src/**/*.spec.tsx'],
       transform: {
         '^.+\\.tsx?$': 'ts-jest', // Use ts-jest for TypeScript files
       },
@@ -37,7 +37,7 @@ const config: Config = {
     {
       displayName: 'node',
       testEnvironment: 'node',
-      testMatch: ['**/__tests__/**/*.spec.ts'],
+      testMatch: ['**/src/**/*.spec.ts'],
       transform: {
         '^.+\\.tsx?$': 'ts-jest',
       },

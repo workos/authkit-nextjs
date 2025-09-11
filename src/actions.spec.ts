@@ -8,7 +8,7 @@ import {
   getAccessTokenAction,
   refreshAccessTokenAction,
 } from '../src/actions.js';
-import { signOut, switchToOrganization } from '../src/auth.js';
+import { signOut, switchToOrganization } from './auth.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 

@@ -1,18 +1,18 @@
 import '@testing-library/jest-dom';
 import { act, render, waitFor } from '@testing-library/react';
 import React from 'react';
-import { getAccessTokenAction, refreshAccessTokenAction } from '../src/actions.js';
-import { useAuth } from '../src/components/authkit-provider.js';
-import { useAccessToken } from '../src/components/useAccessToken.js';
-import { tokenStore } from '../src/components/tokenStore.js';
+import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
+import { useAuth } from './authkit-provider.js';
+import { useAccessToken } from './useAccessToken.js';
+import { tokenStore } from './tokenStore.js';
 
-jest.mock('../src/actions.js', () => ({
+jest.mock('../actions.js', () => ({
   getAccessTokenAction: jest.fn(),
   refreshAccessTokenAction: jest.fn(),
 }));
 
-jest.mock('../src/components/authkit-provider.js', () => {
-  const originalModule = jest.requireActual('../src/components/authkit-provider.js');
+jest.mock('./authkit-provider.js', () => {
+  const originalModule = jest.requireActual('./authkit-provider.js');
   return {
     ...originalModule,
     useAuth: jest.fn(),

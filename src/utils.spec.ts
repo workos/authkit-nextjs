@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { redirectWithFallback, errorResponseWithFallback } from '../src/utils.js';
+import { redirectWithFallback, errorResponseWithFallback } from './utils.js';
 
 describe('utils', () => {
   afterEach(() => {
@@ -43,7 +43,7 @@ describe('utils', () => {
         },
       }));
 
-      const { redirectWithFallback } = await import('../src/utils.js');
+      const { redirectWithFallback } = await import('./utils.js');
 
       const result = redirectWithFallback(redirectUrl);
 
@@ -62,7 +62,7 @@ describe('utils', () => {
         NextResponse: undefined,
       }));
 
-      const { redirectWithFallback } = await import('../src/utils.js');
+      const { redirectWithFallback } = await import('./utils.js');
 
       const result = redirectWithFallback(redirectUrl);
 
@@ -114,7 +114,7 @@ describe('utils', () => {
         },
       }));
 
-      const { errorResponseWithFallback } = await import('../src/utils.js');
+      const { errorResponseWithFallback } = await import('./utils.js');
 
       const result = errorResponseWithFallback(errorBody);
 
@@ -130,7 +130,7 @@ describe('utils', () => {
         NextResponse: undefined,
       }));
 
-      const { errorResponseWithFallback } = await import('../src/utils.js');
+      const { errorResponseWithFallback } = await import('./utils.js');
 
       const result = errorResponseWithFallback(errorBody);
 

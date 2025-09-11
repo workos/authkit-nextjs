@@ -1,5 +1,5 @@
 import { render, act } from '@testing-library/react';
-import { MinMaxButton } from '../src/components/min-max-button.js';
+import { MinMaxButton } from './min-max-button.js';
 import * as React from 'react';
 import '@testing-library/jest-dom';
 
