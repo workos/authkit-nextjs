@@ -30,8 +30,9 @@
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "jest",
     "test:watch": "jest --watch",
-    "prettier": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --check",
-    "format": "prettier \"{src,__tests__}/**/*.{js,ts,tsx}\" --write"
+    "prettier": "prettier \"src/**/*.{js,ts,tsx}\" --check",
+    "format": "prettier \"src/**/*.{js,ts,tsx}\" --write",
+    "type-check": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workos-inc/node": "^7.67.0",
