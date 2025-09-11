@@ -131,7 +131,7 @@ export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: stri
 
   const maxAge = expired ? 0 : JWT_COOKIE_MAX_AGE;
 
-  const parts = [cookie, 'Path=/', 'SameSite=Lax', `Max-Age=${maxAge}`];
+  const parts = [cookie, 'SameSite=Lax', `Max-Age=${maxAge}`];
 
   // Only add Secure flag if on HTTPS
   if (secure) {

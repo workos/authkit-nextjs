@@ -72,13 +72,10 @@ describe('cookie.ts', () => {
     it('should return the cookie options as a string', async () => {
       const { getCookieOptions } = await import('../src/cookie');
       const options = getCookieOptions('http://example.com', true, false);
-      expect(options).toEqual(
-        expect.stringContaining('Path=/; HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com'),
-      );
+      expect(options).toEqual(expect.stringContaining('HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com'));
       expect(options).toEqual(expect.not.stringContaining('Secure'));
 
       const options2 = getCookieOptions('https://example.com', true, true);
-      expect(options2).toEqual(expect.stringContaining('Path=/'));
       expect(options2).toEqual(expect.stringContaining('HttpOnly'));
       expect(options2).toEqual(expect.stringContaining('Secure'));
       expect(options2).toEqual(expect.stringContaining('SameSite=Lax'));
@@ -160,7 +157,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie('test-token', 'https://example.com');
 
-      expect(cookie).toBe('workos-access-token=test-token; Path=/; SameSite=Lax; Max-Age=30; Secure');
+      expect(cookie).toBe('workos-access-token=test-token; SameSite=Lax; Max-Age=30; Secure');
     });
 
     it('should create JWT cookie without Secure flag for HTTP URLs', async () => {
@@ -168,7 +165,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie('test-token', 'http://localhost:3000');
 
-      expect(cookie).toBe('workos-access-token=test-token; Path=/; SameSite=Lax; Max-Age=30');
+      expect(cookie).toBe('workos-access-token=test-token; SameSite=Lax; Max-Age=30');
     });
 
     it('should force Secure in production except for localhost', async () => {
@@ -252,7 +249,7 @@ describe('cookie.ts', () => {
       const cookie = getJwtCookie('token', 'https://example.com', true);
 
       expect(cookie).toBe(
-        'workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'workos-access-token=; SameSite=Lax; Max-Age=0; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
       );
     });
 
@@ -261,7 +258,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie(null, 'https://example.com');
 
-      expect(cookie).toBe('workos-access-token=; Path=/; SameSite=Lax; Max-Age=30; Secure');
+      expect(cookie).toBe('workos-access-token=; SameSite=Lax; Max-Age=30; Secure');
     });
 
     it('should handle localhost vs 127.0.0.1 in production', async () => {

@@ -108,8 +108,8 @@ class TokenStore {
     // Server sets: Path=/, SameSite=Lax, and Secure (if HTTPS)
     // NO Domain attribute is set by server, so we don't set it either
     const deletionString = isSecure
-      ? `${jwtCookieName}=; Path=/; SameSite=Lax; Max-Age=0; Secure`
-      : `${jwtCookieName}=; Path=/; SameSite=Lax; Max-Age=0`;
+      ? `${jwtCookieName}=; SameSite=Lax; Max-Age=0; Secure`
+      : `${jwtCookieName}=; SameSite=Lax; Max-Age=0`;
 
     document.cookie = deletionString;
 
