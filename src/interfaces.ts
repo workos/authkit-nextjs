@@ -76,9 +76,11 @@ export interface AuthkitMiddlewareOptions {
   middlewareAuth?: AuthkitMiddlewareAuth;
   redirectUri?: string;
   signUpPaths?: string[];
+  eagerAuth?: boolean;
 }
 
 export interface AuthkitOptions {
+  eagerAuth?: boolean;
   debug?: boolean;
   redirectUri?: string;
   screenHint?: 'sign-up' | 'sign-in';

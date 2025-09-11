@@ -51,8 +51,13 @@ export function useAccessToken(): UseAccessTokenReturn {
 
   useEffect(() => {
     if (!user) {
-      tokenStore.clearToken();
       setIsInitialTokenLoading(false);
+      // Clear token when user logs out
+      if (prevUserIdRef.current !== undefined) {
+        tokenStore.clearToken();
+      }
+      prevUserIdRef.current = undefined;
+      prevSessionRef.current = undefined;
       return;
     }
 

@@ -8,6 +8,9 @@ import { CookieOptions } from './interfaces.js';
 
 type ValidSameSite = CookieOptions['sameSite'];
 
+const JWT_COOKIE_MAX_AGE = 30; // seconds
+const JWT_COOKIE_NAME = 'workos-access-token';
+
 function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite {
   if (!['lax', 'strict', 'none'].includes(sameSite.toLowerCase())) {
     throw new Error(`Invalid SameSite value: ${sameSite}`);
@@ -87,4 +90,57 @@ export function getCookieOptions(
     maxAge,
     domain: WORKOS_COOKIE_DOMAIN || '',
   };
+}
+
+export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: string | null, expired?: boolean): string {
+  const cookie = `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`;
+
+  // Force Secure in production, except for localhost
+  let secure = false;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (requestUrlOrRedirectUri) {
+    try {
+      const url = new URL(requestUrlOrRedirectUri);
+      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      // In production, always use Secure unless explicitly on localhost
+      secure = isProduction ? !isLocalhost : url.protocol === 'https:';
+    } catch {
+      // If URL parsing fails, default to secure in production
+      secure = isProduction;
+      // If it's not a valid URL, fall back to WORKOS_REDIRECT_URI
+      const fallbackUrl = WORKOS_REDIRECT_URI;
+      if (fallbackUrl) {
+        try {
+          const url = new URL(fallbackUrl);
+          secure = url.protocol === 'https:';
+        } catch {
+          secure = false;
+        }
+      }
+    }
+  } else if (WORKOS_REDIRECT_URI) {
+    // No URL provided, check WORKOS_REDIRECT_URI
+    try {
+      const url = new URL(WORKOS_REDIRECT_URI);
+      secure = url.protocol === 'https:';
+    } catch {
+      secure = false;
+    }
+  }
+
+  const maxAge = expired ? 0 : JWT_COOKIE_MAX_AGE;
+
+  const parts = [cookie, 'SameSite=Lax', `Max-Age=${maxAge}`];
+
+  // Only add Secure flag if on HTTPS
+  if (secure) {
+    parts.push('Secure');
+  }
+
+  if (expired) {
+    parts.push(`Expires=${new Date(0).toUTCString()}`);
+  }
+
+  return parts.join('; ');
 }

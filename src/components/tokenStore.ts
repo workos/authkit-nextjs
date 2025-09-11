@@ -11,19 +11,44 @@ const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15;
 const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60;
 const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
+const jwtCookieName = 'workos-access-token';
 
-class TokenStore {
-  private static readonly SERVER_SNAPSHOT: TokenState = { token: undefined, loading: false, error: null };
+export class TokenStore {
+  private state: TokenState;
+  private serverSnapshot: TokenState;
 
-  private state: TokenState = {
-    token: undefined,
-    loading: false,
-    error: null,
-  };
+  constructor() {
+    // Initialize state with token from cookie if available
+    const initialToken = this.getInitialTokenFromCookie();
+    this.state = {
+      token: initialToken,
+      loading: false,
+      error: null,
+    };
+
+    // Server snapshot should match initial state for hydration
+    this.serverSnapshot = {
+      token: initialToken,
+      loading: false,
+      error: null,
+    };
+
+    /* istanbul ignore next */
+    if (initialToken) {
+      // Mark as consumed if we found a token
+      this.fastCookieConsumed = true;
+      // Schedule refresh based on token expiry
+      const tokenData = this.parseToken(initialToken);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+    }
+  }
 
   private listeners = new Set<() => void>();
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+  private fastCookieConsumed = false;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -38,7 +63,7 @@ class TokenStore {
 
   getSnapshot = () => this.state;
 
-  getServerSnapshot = () => TokenStore.SERVER_SNAPSHOT;
+  getServerSnapshot = () => this.serverSnapshot;
 
   private notify() {
     this.listeners.forEach((listener) => listener());
@@ -58,10 +83,12 @@ class TokenStore {
     const delay =
       typeof timeUntilExpiry === 'undefined' ? RETRY_DELAY_SECONDS * 1000 : this.getRefreshDelay(timeUntilExpiry);
 
-    this.refreshTimeout = setTimeout(() => {
-      /* istanbul ignore next */
-      void this.getAccessTokenSilently().catch(() => {});
-    }, delay);
+    this.refreshTimeout = setTimeout(
+      /* istanbul ignore next */ () => {
+        void this.getAccessTokenSilently().catch(/* istanbul ignore next */ () => {});
+      },
+      delay,
+    );
   }
 
   private getRefreshDelay(timeUntilExpiry: number) {
@@ -72,6 +99,92 @@ class TokenStore {
     const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
 
     return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
+  }
+
+  private deleteCookie() {
+    const isSecure = window.location.protocol === 'https:';
+
+    // Build deletion string to match EXACTLY what the server sets
+    // Server sets: Path=/, SameSite=Lax, and Secure (if HTTPS)
+    // NO Domain attribute is set by server, so we don't set it either
+    const deletionString = isSecure
+      ? `${jwtCookieName}=; SameSite=Lax; Max-Age=0; Secure`
+      : `${jwtCookieName}=; SameSite=Lax; Max-Age=0`;
+
+    document.cookie = deletionString;
+
+    // The cookie might still appear in document.cookie even after deletion
+    // due to browser caching, but it should be expired and not sent to server
+  }
+
+  private getInitialTokenFromCookie(): string | undefined {
+    if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
+      return;
+    }
+
+    // Parse cookies without regex
+    const cookies = document.cookie.split(';').reduce(
+      (acc, cookie) => {
+        const [name, ...valueParts] = cookie.trim().split('=');
+        if (name && valueParts.length > 0) {
+          const value = valueParts.join('='); // Handle values that contain '='
+          acc[name.trim()] = decodeURIComponent(value);
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
+    const token = cookies[jwtCookieName];
+    if (!token) {
+      return;
+    }
+
+    // Delete the cookie immediately after reading it
+    this.deleteCookie();
+
+    return token;
+  }
+
+  private consumeFastCookie(): string | undefined {
+    // Only try to consume once per page load
+    if (this.fastCookieConsumed) {
+      return;
+    }
+
+    if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
+      return;
+    }
+
+    // Parse cookies without regex
+    const cookies = document.cookie.split(';').reduce(
+      (acc, cookie) => {
+        const [name, ...valueParts] = cookie.trim().split('=');
+        if (name && valueParts.length > 0) {
+          const value = valueParts.join('='); // Handle values that contain '='
+          acc[name.trim()] = decodeURIComponent(value);
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
+    const newToken = cookies[jwtCookieName];
+    if (!newToken) {
+      // Mark as consumed even if not found, to avoid repeated checks
+      this.fastCookieConsumed = true;
+      return;
+    }
+
+    // Mark as consumed BEFORE deleting to prevent race conditions
+    this.fastCookieConsumed = true;
+
+    // Delete the cookie using protocol-aware deletion
+    this.deleteCookie();
+
+    if (newToken !== this.state.token) {
+      return newToken;
+    }
   }
 
   parseToken(token: string | undefined) {
@@ -123,6 +236,13 @@ class TokenStore {
   }
 
   async getAccessToken(): Promise<string | undefined> {
+    const fastToken = this.consumeFastCookie();
+
+    if (fastToken) {
+      this.setState({ token: fastToken, loading: false, error: null });
+      return fastToken;
+    }
+
     const tokenData = this.parseToken(this.state.token);
 
     // If we have a valid JWT that's not expiring, return it
@@ -140,6 +260,20 @@ class TokenStore {
   }
 
   async getAccessTokenSilently(): Promise<string | undefined> {
+    const fastToken = this.consumeFastCookie();
+
+    if (fastToken) {
+      this.setState({ token: fastToken, loading: false, error: null });
+
+      // Schedule refresh based on token expiry
+      const tokenData = this.parseToken(fastToken);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+
+      return fastToken;
+    }
+
     const tokenData = this.parseToken(this.state.token);
 
     // If we have a valid JWT that's not expiring, return it
@@ -257,6 +391,7 @@ class TokenStore {
   reset() {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
+    this.fastCookieConsumed = false;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;

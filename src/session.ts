@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCookieOptions } from './cookie.js';
+import { getCookieOptions, getJwtCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
@@ -26,8 +26,24 @@ import { lazy, redirectWithFallback } from './utils.js';
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
+const jwtCookieName = 'workos-access-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
+
+/**
+ * Determines if a request is for an initial document load (not API/RSC/prefetch)
+ */
+function isInitialDocumentRequest(request: NextRequest): boolean {
+  const accept = request.headers.get('accept') || '';
+  const isDocumentRequest = accept.includes('text/html');
+  const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
+  const isPrefetch =
+    request.headers.get('Purpose') === 'prefetch' ||
+    request.headers.get('Sec-Purpose') === 'prefetch' ||
+    request.headers.has('Next-Router-Prefetch');
+
+  return isDocumentRequest && !isRSCRequest && !isPrefetch;
+}
 
 async function encryptSession(session: Session) {
   return sealData(session, {
@@ -42,6 +58,7 @@ async function updateSessionMiddleware(
   middlewareAuth: AuthkitMiddlewareAuth,
   redirectUri: string,
   signUpPaths: string[],
+  eagerAuth = false,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -86,6 +103,7 @@ async function updateSessionMiddleware(
     debug,
     redirectUri,
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
+    eagerAuth,
   });
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
@@ -166,6 +184,16 @@ async function updateSession(
       feature_flags: featureFlags,
     } = decodeJwt<AccessToken>(session.accessToken);
 
+    // Set JWT cookie if eagerAuth is enabled
+    // Only set on document requests (initial page loads), not on API/RSC requests
+    if (options.eagerAuth && isInitialDocumentRequest(request)) {
+      const existingJwtCookie = request.cookies.get(jwtCookieName);
+      // Only set if cookie doesn't exist or has different value
+      if (!existingJwtCookie || existingJwtCookie.value !== session.accessToken) {
+        newRequestHeaders.append('Set-Cookie', getJwtCookie(session.accessToken, request.url));
+      }
+    }
+
     return {
       session: {
         sessionId,
@@ -213,6 +241,12 @@ async function updateSession(
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
+    // Set JWT cookie if eagerAuth is enabled
+    // Only set on document requests (initial page loads), not on API/RSC requests
+    if (options.eagerAuth && isInitialDocumentRequest(request)) {
+      newRequestHeaders.append('Set-Cookie', getJwtCookie(accessToken, request.url));
+    }
+
     const {
       sid: sessionId,
       org_id: organizationId,
@@ -246,6 +280,12 @@ async function updateSession(
     // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
     const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
     newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    // Delete JWT cookie if eagerAuth is enabled
+    if (options.eagerAuth) {
+      const deleteJwtCookie = getJwtCookie(null, request.url, true);
+      newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+    }
 
     options.onSessionRefreshError?.({ error: e, request });
 

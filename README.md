@@ -152,12 +152,13 @@ export const config = { matcher: ['/', '/admin'] };
 
 The middleware can be configured with several options.
 
-| Option           | Default     | Description                                                                                            |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
-| `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments) |
-| `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.   |
-| `debug`          | `false`     | Enables debug logs.                                                                                    |
-| `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.           |
+| Option           | Default     | Description                                                                                                             |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                  |
+| `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.                    |
+| `debug`          | `false`     | Enables debug logs.                                                                                                     |
+| `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                            |
+| `eagerAuth`      | `false`     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details. |
 
 #### Custom redirect URI
 
@@ -430,6 +431,74 @@ In the above example the `/admin` page will require a user to be signed in, wher
 
 `unauthenticatedPaths` uses the same glob logic as the [Next.js matcher](https://nextjs.org/docs/pages/building-your-application/routing/middleware#matcher).
 
+### Eager auth
+
+The `eagerAuth` option enables synchronous access to authentication tokens on initial page load, which is required by some third-party services that validate tokens directly with WorkOS. When enabled, tokens are available immediately without requiring an asynchronous fetch.
+
+#### How it works
+
+When `eagerAuth: true` is set, the middleware temporarily stores the access token in a short-lived cookie (30 seconds) that is:
+
+- Only set on initial page loads (not API or prefetch requests)
+- Immediately consumed and deleted by the client
+- Available synchronously on the first render
+
+#### Usage
+
+Enable eager auth in your middleware configuration:
+
+```ts
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+
+export default authkitMiddleware({
+  eagerAuth: true,
+});
+```
+
+Then access the token synchronously in your client components:
+
+```tsx
+'use client';
+
+import { useAuth } from '@workos-inc/authkit-nextjs';
+
+function MyComponent() {
+  const { getAccessToken } = useAuth();
+
+  // Token is available immediately on initial page load
+  const token = getAccessToken();
+
+  // Use with third-party services that need immediate token access
+  if (token) {
+    // Initialize your third-party client with the token
+    thirdPartyClient.authenticate(token);
+  }
+
+  return <div>...</div>;
+}
+```
+
+#### Security considerations
+
+Eager auth makes tokens briefly accessible via JavaScript (30-second window) to enable synchronous access. This is a common pattern used by many authentication libraries and is generally safe with standard XSS protections.
+
+**Best practices:**
+
+- Implement a Content Security Policy (CSP) if handling sensitive data
+- Review third-party scripts on authenticated pages
+- Use the standard `getAccessToken()` method when synchronous access isn't required
+
+**When to use:**
+
+- Third-party services that require synchronous token access
+- Real-time features that need immediate authentication
+- When you want to avoid loading states on initial render
+
+**When to use standard async tokens:**
+
+- Most API calls where a brief loading state is acceptable
+- When you don't need immediate token access on page load
+
 ### Composing middleware
 
 > **Security note:** Always forward `request.headers` when returning `NextResponse.*` to mitigate SSRF issues in Next.js < 14.2.32 (14.x) or < 15.4.7 (15.x). This pattern is safe on all versions. We strongly recommend upgrading to the latest Next.js.
@@ -451,7 +520,7 @@ export default async function middleware(request: NextRequest) {
   });
 
   const { pathname } = new URL(request.url);
-  
+
   // Control of what to do when there's no session on a protected route is left to the developer
   if (pathname.startsWith('/account') && !session.user) {
     console.log('No session on protected path');
