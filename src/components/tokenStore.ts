@@ -381,12 +381,6 @@ export class TokenStore {
     }
     this.listeners.clear();
   }
-
-  // No longer needed - initialization happens in constructor
-  initializeFromFastCookie() {
-    // This method is kept for compatibility but does nothing
-    // since initialization now happens in the constructor
-  }
 }
 
 export const tokenStore = new TokenStore();

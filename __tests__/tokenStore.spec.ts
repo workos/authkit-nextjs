@@ -676,10 +676,6 @@ describe('tokenStore', () => {
   });
 
   describe('compatibility and state management', () => {
-    it('should handle compatibility methods gracefully', () => {
-      expect(() => tokenStore.initializeFromFastCookie()).not.toThrow();
-    });
-
     it('should reset to clean state', () => {
       // Set some state first
       tokenStore.clearToken();
