@@ -1,4 +1,4 @@
-import { decodeJwt } from '../src/jwt.js';
+import { decodeJwt } from './jwt.js';
 
 describe('decodeJwt', () => {
   // Valid JWT token for testing (not a real token, just for testing purposes)

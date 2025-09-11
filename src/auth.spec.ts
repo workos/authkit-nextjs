@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
-import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from '../src/auth.js';
-import * as session from '../src/session.js';
+import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
+import * as session from './session.js';
 import * as cache from 'next/cache';
-import * as workosModule from '../src/workos.js';
+import * as workosModule from './workos.js';
 
 // These are mocked in jest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateSession, generateTestToken } from './test-helpers.js';
 import { sealData } from 'iron-session';
-import { getWorkOS } from '../src/workos.js';
+import { getWorkOS } from './workos.js';
 
 const workos = getWorkOS();
 

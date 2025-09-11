@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from '../src/session.js';
-import { getWorkOS } from '../src/workos.js';
-import * as envVariables from '../src/env-variables.js';
+import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from './session.js';
+import { getWorkOS } from './workos.js';
+import * as envVariables from './env-variables.js';
 
 import { jwtVerify } from 'jose';
 import { sealData } from 'iron-session';
@@ -484,7 +484,7 @@ describe('session.ts', () => {
         });
 
         // Import session after setting up the spy
-        const { updateSessionMiddleware } = await import('../src/session.js');
+        const { updateSessionMiddleware } = await import('./session.js');
 
         const request = new NextRequest(new URL('http://example.com/invalid-regex'));
 
@@ -1136,7 +1136,7 @@ describe('session.ts', () => {
       });
 
       it('should handle saveSession with string URL parameter', async () => {
-        const { saveSession } = await import('../src/session.js');
+        const { saveSession } = await import('./session.js');
 
         const sessionData = {
           accessToken: await generateTestToken(),

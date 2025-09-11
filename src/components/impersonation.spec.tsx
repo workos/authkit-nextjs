@@ -1,18 +1,18 @@
 import { render, act, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { Impersonation } from '../src/components/impersonation.js';
-import { useAuth } from '../src/components/authkit-provider.js';
-import { getOrganizationAction } from '../src/actions.js';
+import { Impersonation } from './impersonation.js';
+import { useAuth } from './authkit-provider.js';
+import { getOrganizationAction } from '../actions.js';
 import * as React from 'react';
-import { handleSignOutAction } from '../src/actions.js';
+import { handleSignOutAction } from '../actions.js';
 
 // Mock the useAuth hook
-jest.mock('../src/components/authkit-provider', () => ({
+jest.mock('./authkit-provider', () => ({
   useAuth: jest.fn(),
 }));
 
 // Mock the getOrganizationAction
-jest.mock('../src/actions', () => ({
+jest.mock('../actions', () => ({
   getOrganizationAction: jest.fn(),
   handleSignOutAction: jest.fn(),
 }));

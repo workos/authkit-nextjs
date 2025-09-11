@@ -1,22 +1,22 @@
 import '@testing-library/jest-dom';
 import { render, waitFor } from '@testing-library/react';
 import React from 'react';
-import { useAuth } from '../src/components/authkit-provider.js';
+import { useAuth } from './authkit-provider.js';
 
-jest.mock('../src/actions.js', () => ({
+jest.mock('../actions.js', () => ({
   getAccessTokenAction: jest.fn(),
   refreshAccessTokenAction: jest.fn(),
 }));
 
-jest.mock('../src/components/authkit-provider.js', () => {
-  const originalModule = jest.requireActual('../src/components/authkit-provider.js');
+jest.mock('./authkit-provider.js', () => {
+  const originalModule = jest.requireActual('./authkit-provider.js');
   return {
     ...originalModule,
     useAuth: jest.fn(),
   };
 });
 
-jest.mock('../src/components/useAccessToken.js', () => ({
+jest.mock('./useAccessToken.js', () => ({
   useAccessToken: jest.fn(() => ({ accessToken: undefined })),
 }));
 
@@ -37,8 +37,8 @@ jest.mock('jose', () => ({
 }));
 
 // Import after mocks are set up
-import { useAccessToken } from '../src/components/useAccessToken.js';
-import { useTokenClaims } from '../src/components/useTokenClaims.js';
+import { useAccessToken } from './useAccessToken.js';
+import { useTokenClaims } from './useTokenClaims.js';
 
 describe('useTokenClaims', () => {
   beforeEach(() => {

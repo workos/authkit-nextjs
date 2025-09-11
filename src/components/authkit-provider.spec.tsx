@@ -1,16 +1,16 @@
 import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { AuthKitProvider, useAuth } from '../src/components/authkit-provider.js';
+import { AuthKitProvider, useAuth } from './authkit-provider.js';
 import {
   checkSessionAction,
   getAuthAction,
   refreshAuthAction,
   handleSignOutAction,
   switchToOrganizationAction,
-} from '../src/actions.js';
+} from '../actions.js';
 
-jest.mock('../src/actions', () => ({
+jest.mock('../actions', () => ({
   checkSessionAction: jest.fn(),
   getAuthAction: jest.fn(),
   refreshAuthAction: jest.fn(),
