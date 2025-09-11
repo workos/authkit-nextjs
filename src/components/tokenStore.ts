@@ -117,26 +117,33 @@ export class TokenStore {
     // due to browser caching, but it should be expired and not sent to server
   }
 
-  private escapeRegExp(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   private getInitialTokenFromCookie(): string | undefined {
     if (typeof document === 'undefined' || typeof document.cookie === 'undefined') {
       return;
     }
 
-    const pattern = new RegExp(`${this.escapeRegExp(jwtCookieName)}=([^;]+)`);
-    const match = document.cookie.match(pattern);
+    // Parse cookies without regex
+    const cookies = document.cookie.split(';').reduce(
+      (acc, cookie) => {
+        const [name, ...valueParts] = cookie.trim().split('=');
+        if (name && valueParts.length > 0) {
+          const value = valueParts.join('='); // Handle values that contain '='
+          acc[name.trim()] = decodeURIComponent(value);
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
 
-    if (!match) {
+    const token = cookies[jwtCookieName];
+    if (!token) {
       return;
     }
 
     // Delete the cookie immediately after reading it
     this.deleteCookie();
 
-    return match[1];
+    return token;
   }
 
   private consumeFastCookie(): string | undefined {
@@ -149,9 +156,21 @@ export class TokenStore {
       return;
     }
 
-    const pattern = new RegExp(`${this.escapeRegExp(jwtCookieName)}=([^;]+)`);
-    const match = document.cookie.match(pattern);
-    if (!match) {
+    // Parse cookies without regex
+    const cookies = document.cookie.split(';').reduce(
+      (acc, cookie) => {
+        const [name, ...valueParts] = cookie.trim().split('=');
+        if (name && valueParts.length > 0) {
+          const value = valueParts.join('='); // Handle values that contain '='
+          acc[name.trim()] = decodeURIComponent(value);
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
+    const newToken = cookies[jwtCookieName];
+    if (!newToken) {
       // Mark as consumed even if not found, to avoid repeated checks
       this.fastCookieConsumed = true;
       return;
@@ -162,8 +181,6 @@ export class TokenStore {
 
     // Delete the cookie using protocol-aware deletion
     this.deleteCookie();
-
-    const newToken = match[1];
 
     if (newToken !== this.state.token) {
       return newToken;
