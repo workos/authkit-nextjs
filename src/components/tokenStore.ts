@@ -11,7 +11,7 @@ const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 const MIN_REFRESH_DELAY_SECONDS = 15;
 const MAX_REFRESH_DELAY_SECONDS = 24 * 60 * 60;
 const RETRY_DELAY_SECONDS = 300; // 5 minutes for retry on error
-const jwtCookieName = 'wos-session-token';
+const jwtCookieName = 'workos-access-token';
 
 class TokenStore {
   private state: TokenState;

@@ -9,7 +9,7 @@ import { CookieOptions } from './interfaces.js';
 type ValidSameSite = CookieOptions['sameSite'];
 
 const JWT_COOKIE_MAX_AGE = 30; // seconds
-const JWT_COOKIE_NAME = 'wos-session-token';
+const JWT_COOKIE_NAME = 'workos-access-token';
 
 function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite {
   if (!['lax', 'strict', 'none'].includes(sameSite.toLowerCase())) {

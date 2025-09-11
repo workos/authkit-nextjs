@@ -160,7 +160,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie('test-token', 'https://example.com');
 
-      expect(cookie).toBe('wos-session-token=test-token; Path=/; SameSite=Lax; Max-Age=30; Secure');
+      expect(cookie).toBe('workos-access-token=test-token; Path=/; SameSite=Lax; Max-Age=30; Secure');
     });
 
     it('should create JWT cookie without Secure flag for HTTP URLs', async () => {
@@ -168,7 +168,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie('test-token', 'http://localhost:3000');
 
-      expect(cookie).toBe('wos-session-token=test-token; Path=/; SameSite=Lax; Max-Age=30');
+      expect(cookie).toBe('workos-access-token=test-token; Path=/; SameSite=Lax; Max-Age=30');
     });
 
     it('should force Secure in production except for localhost', async () => {
@@ -252,7 +252,7 @@ describe('cookie.ts', () => {
       const cookie = getJwtCookie('token', 'https://example.com', true);
 
       expect(cookie).toBe(
-        'wos-session-token=; Path=/; SameSite=Lax; Max-Age=0; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
       );
     });
 
@@ -261,7 +261,7 @@ describe('cookie.ts', () => {
 
       const cookie = getJwtCookie(null, 'https://example.com');
 
-      expect(cookie).toBe('wos-session-token=; Path=/; SameSite=Lax; Max-Age=30; Secure');
+      expect(cookie).toBe('workos-access-token=; Path=/; SameSite=Lax; Max-Age=30; Secure');
     });
 
     it('should handle localhost vs 127.0.0.1 in production', async () => {

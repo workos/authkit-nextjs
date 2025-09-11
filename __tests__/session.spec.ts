@@ -961,9 +961,9 @@ describe('session.ts', () => {
 
         // Should have JWT cookie in response headers
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeDefined();
-        expect(jwtCookie).toContain(`wos-session-token=${validAccessToken}`);
+        expect(jwtCookie).toContain(`workos-access-token=${validAccessToken}`);
       });
 
       it('should not set JWT cookie for API requests even with eagerAuth', async () => {
@@ -982,7 +982,7 @@ describe('session.ts', () => {
 
         // Should NOT have JWT cookie in response headers
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeUndefined();
       });
 
@@ -1003,7 +1003,7 @@ describe('session.ts', () => {
 
         // Should NOT have JWT cookie for RSC requests
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeUndefined();
       });
 
@@ -1024,7 +1024,7 @@ describe('session.ts', () => {
 
         // Should NOT have JWT cookie for prefetch requests
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeUndefined();
       });
     });
@@ -1056,9 +1056,9 @@ describe('session.ts', () => {
 
         // Should set JWT cookie with new token after refresh
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeDefined();
-        expect(jwtCookie).toContain(`wos-session-token=${newAccessToken}`);
+        expect(jwtCookie).toContain(`workos-access-token=${newAccessToken}`);
       });
 
       it('should delete JWT cookie when session refresh fails', async () => {
@@ -1085,7 +1085,7 @@ describe('session.ts', () => {
         // Should delete JWT cookie on refresh failure
         const setCookieHeaders = result.headers.getSetCookie();
         const jwtDeleteCookie = setCookieHeaders.find(
-          (header) => header.includes('wos-session-token=') && header.includes('Max-Age=0'),
+          (header) => header.includes('workos-access-token=') && header.includes('Max-Age=0'),
         );
         expect(jwtDeleteCookie).toBeDefined();
       });
@@ -1108,7 +1108,7 @@ describe('session.ts', () => {
 
         // Without accept header, should not be treated as document request
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookie = setCookieHeaders.find((header) => header.includes('wos-session-token='));
+        const jwtCookie = setCookieHeaders.find((header) => header.includes('workos-access-token='));
         expect(jwtCookie).toBeUndefined();
       });
 
@@ -1120,7 +1120,7 @@ describe('session.ts', () => {
         request.headers.set('accept', 'text/html');
 
         // Set existing JWT cookie with same value
-        request.cookies.set('wos-session-token', validAccessToken);
+        request.cookies.set('workos-access-token', validAccessToken);
 
         request.cookies.set(
           'wos-session',
@@ -1131,7 +1131,7 @@ describe('session.ts', () => {
 
         // Should NOT set another JWT cookie since one exists with same value (line 192 condition)
         const setCookieHeaders = result.headers.getSetCookie();
-        const jwtCookies = setCookieHeaders.filter((header) => header.includes('wos-session-token='));
+        const jwtCookies = setCookieHeaders.filter((header) => header.includes('workos-access-token='));
         expect(jwtCookies).toHaveLength(0); // No new JWT cookie should be set
       });
 

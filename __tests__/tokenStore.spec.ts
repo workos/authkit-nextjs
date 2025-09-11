@@ -305,7 +305,7 @@ describe('tokenStore', () => {
 
       Object.defineProperty(global, 'document', {
         value: {
-          cookie: 'wos-session-token=test-token',
+          cookie: 'workos-access-token=test-token',
         },
         writable: true,
         configurable: true,
@@ -329,7 +329,7 @@ describe('tokenStore', () => {
       // Access private method via any cast
       (tokenStore as any).deleteCookie();
 
-      expect(mockCookieSetter).toHaveBeenCalledWith('wos-session-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
+      expect(mockCookieSetter).toHaveBeenCalledWith('workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
 
       delete (global as any).document;
       delete (global as any).window;
@@ -340,7 +340,7 @@ describe('tokenStore', () => {
 
       Object.defineProperty(global, 'document', {
         value: {
-          cookie: 'wos-session-token=test-token',
+          cookie: 'workos-access-token=test-token',
         },
         writable: true,
         configurable: true,
@@ -364,7 +364,7 @@ describe('tokenStore', () => {
       // Access private method via any cast
       (tokenStore as any).deleteCookie();
 
-      expect(mockCookieSetter).toHaveBeenCalledWith('wos-session-token=; Path=/; SameSite=Lax; Max-Age=0');
+      expect(mockCookieSetter).toHaveBeenCalledWith('workos-access-token=; Path=/; SameSite=Lax; Max-Age=0');
 
       delete (global as any).document;
       delete (global as any).window;
@@ -387,7 +387,7 @@ describe('tokenStore', () => {
       tokenStore.clearToken();
 
       // Mock document.cookie with both getter and setter
-      let cookieValue = `wos-session-token=${eagerToken}; Path=/`;
+      let cookieValue = `workos-access-token=${eagerToken}; Path=/`;
 
       Object.defineProperty(global, 'document', {
         value: global.document || {},
@@ -419,7 +419,7 @@ describe('tokenStore', () => {
       expect(result).toBe(eagerToken);
       expect((tokenStore as any).fastCookieConsumed).toBe(true);
       // Verify cookie was deleted after consumption
-      expect(mockCookieSetter).toHaveBeenCalledWith('wos-session-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
+      expect(mockCookieSetter).toHaveBeenCalledWith('workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
 
       delete (global as any).document;
       delete (global as any).window;
@@ -505,7 +505,7 @@ describe('tokenStore', () => {
 
       Object.defineProperty(global, 'document', {
         value: {
-          cookie: `wos-session-token=${eagerToken}; Path=/`,
+          cookie: `workos-access-token=${eagerToken}; Path=/`,
         },
         writable: true,
         configurable: true,
@@ -616,7 +616,7 @@ describe('tokenStore', () => {
   describe('getInitialTokenFromCookie', () => {
     it('should read token from cookie and delete it', () => {
       const initialToken = 'initial-token';
-      let cookieValue = `wos-session-token=${initialToken}; Path=/`;
+      let cookieValue = `workos-access-token=${initialToken}; Path=/`;
       const cookieSetter = jest.fn();
 
       Object.defineProperty(global, 'document', {
@@ -649,7 +649,7 @@ describe('tokenStore', () => {
 
       expect(token).toBe(initialToken);
       // Verify cookie deletion was called
-      expect(cookieSetter).toHaveBeenCalledWith('wos-session-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
+      expect(cookieSetter).toHaveBeenCalledWith('workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
 
       delete (global as any).document;
       delete (global as any).window;
@@ -689,7 +689,7 @@ describe('tokenStore', () => {
         }),
       )}.mock-signature`;
 
-      let cookieValue = `wos-session-token=${fastToken}; Path=/`;
+      let cookieValue = `workos-access-token=${fastToken}; Path=/`;
       const cookieSetter = jest.fn();
 
       Object.defineProperty(global, 'document', {
@@ -733,7 +733,7 @@ describe('tokenStore', () => {
 
       // Verify cookie was consumed
       expect((tokenStore as any).fastCookieConsumed).toBe(true);
-      expect(cookieSetter).toHaveBeenCalledWith('wos-session-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
+      expect(cookieSetter).toHaveBeenCalledWith('workos-access-token=; Path=/; SameSite=Lax; Max-Age=0; Secure');
 
       delete (global as any).document;
       delete (global as any).window;
