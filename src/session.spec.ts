@@ -825,22 +825,32 @@ describe('session.ts', () => {
 
     it('throws if authenticateWithRefreshToken fails with string', async () => {
       const nextCookies = await cookies();
+      // Create a mock session with a valid JWT that includes org_id
+      const mockSessionWithValidJWT = {
+        ...mockSession,
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcmdfaWQiOiJvcmdfMTIzIn0.fake',
+      };
       nextCookies.set(
         'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
-      expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('fail');
+      expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('Failed to refresh session: fail');
     });
 
     it('throws if authenticateWithRefreshToken fails with error', async () => {
       const nextCookies = await cookies();
+      // Create a mock session with a valid JWT that includes org_id
+      const mockSessionWithValidJWT = {
+        ...mockSession,
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcmdfaWQiOiJvcmdfMTIzIn0.fake',
+      };
       nextCookies.set(
         'wos-session',
-        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
-      await expect(refreshSession()).rejects.toThrow('error');
+      await expect(refreshSession()).rejects.toThrow('Failed to refresh session: error');
     });
   });
 
