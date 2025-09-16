@@ -19,7 +19,7 @@ export class TokenStore {
 
   constructor() {
     // Initialize state with token from cookie if available
-    const initialToken = this.getInitialTokenFromCookie();
+    const initialToken = typeof window !== 'undefined' ? this.getInitialTokenFromCookie() : undefined;
     this.state = {
       token: initialToken,
       loading: false,
@@ -28,7 +28,7 @@ export class TokenStore {
 
     // Server snapshot should match initial state for hydration
     this.serverSnapshot = {
-      token: initialToken,
+      token: undefined,
       loading: false,
       error: null,
     };
