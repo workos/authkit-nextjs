@@ -223,6 +223,7 @@ describe('useAuth', () => {
       sessionId: 'test-session',
       organizationId: 'test-org',
       role: 'admin',
+      roles: ['admin'],
       permissions: ['read', 'write'],
       entitlements: ['feature1'],
       featureFlags: ['test-flag'],

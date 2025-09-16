@@ -16,6 +16,7 @@ type AuthContextType = {
   sessionId: string | undefined;
   organizationId: string | undefined;
   role: string | undefined;
+  roles: string[] | undefined;
   permissions: string[] | undefined;
   entitlements: string[] | undefined;
   featureFlags: string[] | undefined;
@@ -46,6 +47,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const [role, setRole] = useState<string | undefined>(undefined);
+  const [roles, setRoles] = useState<string[] | undefined>(undefined);
   const [permissions, setPermissions] = useState<string[] | undefined>(undefined);
   const [entitlements, setEntitlements] = useState<string[] | undefined>(undefined);
   const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(undefined);
@@ -60,6 +62,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
       setRole(auth.role);
+      setRoles(auth.roles);
       setPermissions(auth.permissions);
       setEntitlements(auth.entitlements);
       setFeatureFlags(auth.featureFlags);
@@ -69,6 +72,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setSessionId(undefined);
       setOrganizationId(undefined);
       setRole(undefined);
+      setRoles(undefined);
       setPermissions(undefined);
       setEntitlements(undefined);
       setFeatureFlags(undefined);
@@ -105,6 +109,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         setSessionId(auth.sessionId);
         setOrganizationId(auth.organizationId);
         setRole(auth.role);
+        setRoles(auth.roles);
         setPermissions(auth.permissions);
         setEntitlements(auth.entitlements);
         setFeatureFlags(auth.featureFlags);
@@ -180,6 +185,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
         sessionId,
         organizationId,
         role,
+        roles,
         permissions,
         entitlements,
         featureFlags,
