@@ -11,6 +11,7 @@ export async function generateTestToken(payload = {}, expired = false) {
     sid: 'session_123',
     org_id: 'org_123',
     role: 'member',
+    roles: ['member'],
     permissions: ['posts:create', 'posts:delete'],
     entitlements: ['audit-logs'],
     feature_flags: ['device-authorization-grant'],
