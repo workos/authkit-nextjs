@@ -244,6 +244,7 @@ export default async function HomePage() {
 For client components, use the `useAuth` hook to get the current user session.
 
 ```jsx
+'use client'
 // Note the updated import path
 import { useAuth } from '@workos-inc/authkit-nextjs/components';
 
