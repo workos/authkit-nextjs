@@ -61,6 +61,8 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
+        await saveSession({ accessToken, refreshToken, user, impersonator }, request);
+
         if (onSuccess) {
           await onSuccess({
             accessToken,
@@ -72,8 +74,6 @@ export function handleAuth(options: HandleAuthOptions = {}) {
             organizationId,
           });
         }
-
-        await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
         return response;
       } catch (error) {

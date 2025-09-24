@@ -1,5 +1,6 @@
 import { getWorkOS } from './workos.js';
 import { handleAuth } from './authkit-callback-route.js';
+import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Mocked in jest.setup.ts
@@ -253,6 +254,26 @@ describe('authkit-callback-route', () => {
       await handler(request);
 
       expect(onSuccess).toHaveBeenCalledWith(mockAuthResponse);
+      const session = await getSessionFromCookie();
+      expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
+    });
+
+    it('should allow onSuccess to update session', async () => {
+      const newAccessToken = 'new-access-token';
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const handler = handleAuth({
+        onSuccess: async (data) => {
+          await saveSession({ ...data, accessToken: newAccessToken }, request);
+        },
+      });
+      await handler(request);
+
+      const session = await getSessionFromCookie();
+      expect(session?.accessToken).toBe(newAccessToken);
     });
   });
 });

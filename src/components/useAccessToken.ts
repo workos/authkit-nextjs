@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAuth } from './authkit-provider.js';
 import { tokenStore } from './tokenStore.js';
