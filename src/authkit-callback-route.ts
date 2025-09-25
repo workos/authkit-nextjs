@@ -20,7 +20,19 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code');
     const state = request.nextUrl.searchParams.get('state');
-    let returnPathname = state && state !== 'null' ? JSON.parse(atob(state)).returnPathname : null;
+
+    // Parse the full state object, extracting returnPathname and custom state
+    let stateData: { returnPathname?: string | null; [key: string]: unknown } = {};
+    if (state && state !== 'null') {
+      try {
+        stateData = JSON.parse(atob(state));
+      } catch (e) {
+        // Fallback for backward compatibility or malformed state
+        console.warn('Failed to parse state parameter:', e);
+      }
+    }
+
+    const { returnPathname: returnPathnameState, ...customState } = stateData;
 
     if (code) {
       try {
@@ -41,7 +53,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         url.searchParams.delete('state');
 
         // Redirect to the requested path and store the session
-        returnPathname = returnPathname ?? returnPathnameOption;
+        const returnPathname = returnPathnameState ?? returnPathnameOption;
 
         // Extract the search params if they are present
         if (returnPathname.includes('?')) {
@@ -72,6 +84,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
             oauthTokens,
             authenticationMethod,
             organizationId,
+            state: Object.keys(customState).length > 0 ? customState : undefined,
           });
         }
 

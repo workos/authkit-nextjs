@@ -12,13 +12,20 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
     redirectUri = headersList.get('x-redirect-uri'),
     loginHint,
     prompt,
+    state: customState,
   } = options;
+
+  // Build state object with returnPathname and any custom state
+  const stateObject = (returnPathname || customState) ? {
+    returnPathname,
+    ...customState,
+  } : null;
 
   return getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit',
     clientId: WORKOS_CLIENT_ID,
     redirectUri: redirectUri ?? WORKOS_REDIRECT_URI,
-    state: returnPathname ? btoa(JSON.stringify({ returnPathname })) : undefined,
+    state: stateObject ? btoa(JSON.stringify(stateObject)) : undefined,
     screenHint,
     organizationId,
     loginHint,
