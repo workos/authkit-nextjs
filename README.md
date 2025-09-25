@@ -244,7 +244,7 @@ export default async function HomePage() {
 For client components, use the `useAuth` hook to get the current user session.
 
 ```jsx
-'use client'
+'use client';
 // Note the updated import path
 import { useAuth } from '@workos-inc/authkit-nextjs/components';
 
@@ -461,10 +461,10 @@ Then access the token synchronously in your client components:
 ```tsx
 'use client';
 
-import { useAuth } from '@workos-inc/authkit-nextjs';
+import { useAccessToken } from '@workos-inc/authkit-nextjs/components';
 
 function MyComponent() {
-  const { getAccessToken } = useAuth();
+  const { getAccessToken } = useAccessToken();
 
   // Token is available immediately on initial page load
   const token = getAccessToken();
