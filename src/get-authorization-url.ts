@@ -16,10 +16,13 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
   } = options;
 
   // Build state object with returnPathname and any custom state
-  const stateObject = (returnPathname || customState) ? {
-    returnPathname,
-    ...customState,
-  } : null;
+  const stateObject =
+    returnPathname || customState
+      ? {
+          returnPathname,
+          ...customState,
+        }
+      : null;
 
   return getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit',
