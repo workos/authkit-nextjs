@@ -146,7 +146,12 @@ describe('session.ts', () => {
 
       await withAuth({ ensureSignedIn: true });
 
-      const pathname = encodeURIComponent(btoa(JSON.stringify({ returnPathname: '/protected?test=123' })));
+      // URL-safe base64 encoding
+      const pathname = encodeURIComponent(
+        btoa(JSON.stringify({ returnPathname: '/protected?test=123' }))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_'),
+      );
 
       expect(redirect).toHaveBeenCalledWith(expect.stringContaining(pathname));
     });

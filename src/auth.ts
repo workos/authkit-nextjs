@@ -21,7 +21,7 @@ export async function getSignInUrl({
   loginHint?: string;
   redirectUri?: string;
   prompt?: 'consent';
-  state?: Record<string, unknown>;
+  state?: string;
 } = {}) {
   return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
 }
@@ -37,7 +37,7 @@ export async function getSignUpUrl({
   loginHint?: string;
   redirectUri?: string;
   prompt?: 'consent';
-  state?: Record<string, unknown>;
+  state?: string;
 } = {}) {
   return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
 }

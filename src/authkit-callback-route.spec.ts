@@ -279,14 +279,12 @@ describe('authkit-callback-route', () => {
     it('should pass custom state data to onSuccess callback', async () => {
       jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Create state with custom data
-      const customStateData = {
-        returnPathname: '/dashboard',
-        teamId: 'team_123',
-        feature: 'billing',
-        referrer: 'pricing-page',
-      };
-      const state = btoa(JSON.stringify(customStateData));
+      // Create state with new format: internal.user
+      const internalState = btoa(JSON.stringify({ returnPathname: '/dashboard' }))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+      const userState = 'custom-user-state-string';
+      const state = `${internalState}.${userState}`;
 
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
@@ -295,15 +293,11 @@ describe('authkit-callback-route', () => {
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
-      // Verify onSuccess was called with the custom state data
+      // Verify onSuccess was called with the custom state string
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
           ...mockAuthResponse,
-          state: {
-            teamId: 'team_123',
-            feature: 'billing',
-            referrer: 'pricing-page',
-          },
+          state: 'custom-user-state-string',
         }),
       );
 

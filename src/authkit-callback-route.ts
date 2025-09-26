@@ -5,6 +5,37 @@ import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { getWorkOS } from './workos.js';
 
+function handleState(state: string | null) {
+  let returnPathname: string | undefined = undefined;
+  let userState: string | undefined;
+  if (state?.includes('.')) {
+    const [internal, ...rest] = state.split('.');
+    userState = rest.join('.');
+    try {
+      // Reverse URL-safe base64 encoding
+      const decoded = internal.replace(/-/g, '+').replace(/_/g, '/');
+      returnPathname = JSON.parse(atob(decoded)).returnPathname;
+    } catch {
+      // Malformed internal part, ignore it
+    }
+  } else if (state) {
+    try {
+      const decoded = JSON.parse(atob(state));
+      if (decoded.returnPathname) {
+        returnPathname = decoded.returnPathname;
+      } else {
+        userState = state;
+      }
+    } catch {
+      userState = state;
+    }
+  }
+  return {
+    returnPathname,
+    state: userState,
+  };
+}
+
 export function handleAuth(options: HandleAuthOptions = {}) {
   const { returnPathname: returnPathnameOption = '/', baseURL, onSuccess, onError } = options;
 
@@ -21,18 +52,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     const code = request.nextUrl.searchParams.get('code');
     const state = request.nextUrl.searchParams.get('state');
 
-    // Parse the full state object, extracting returnPathname and custom state
-    let stateData: { returnPathname?: string | null; [key: string]: unknown } = {};
-    if (state && state !== 'null') {
-      try {
-        stateData = JSON.parse(atob(state));
-      } catch (e) {
-        // Fallback for backward compatibility or malformed state
-        console.warn('Failed to parse state parameter:', e);
-      }
-    }
-
-    const { returnPathname: returnPathnameState, ...customState } = stateData;
+    const { state: customState, returnPathname: returnPathnameState } = handleState(state);
 
     if (code) {
       try {
@@ -84,7 +104,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
             oauthTokens,
             authenticationMethod,
             organizationId,
-            state: Object.keys(customState).length > 0 ? customState : undefined,
+            state: customState,
           });
         }
 
