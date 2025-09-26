@@ -434,12 +434,8 @@ This is useful for:
 
 - Tracking user journey and referral sources
 - Maintaining context about what the user was trying to do before authentication
-- Passing team or organization context
 - Implementing custom onboarding flows
 - Analytics and attribution tracking
-
-> [!NOTE]
-> The state parameter is passed through the OAuth flow as base64-encoded JSON. While it's not encrypted, it provides a secure way to maintain application state during authentication.
 
 ### Session Refresh Callbacks
 
