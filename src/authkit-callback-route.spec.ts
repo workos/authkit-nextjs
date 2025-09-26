@@ -275,5 +275,73 @@ describe('authkit-callback-route', () => {
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(newAccessToken);
     });
+
+    it('should pass custom state data to onSuccess callback', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Create state with new format: internal.user
+      const internalState = btoa(JSON.stringify({ returnPathname: '/dashboard' }))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+      const userState = 'custom-user-state-string';
+      const state = `${internalState}.${userState}`;
+
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
+
+      const onSuccess = jest.fn();
+      const handler = handleAuth({ onSuccess });
+      await handler(request);
+
+      // Verify onSuccess was called with the custom state string
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...mockAuthResponse,
+          state: 'custom-user-state-string',
+        }),
+      );
+
+      // Verify the redirect went to the correct path
+      const response = await handler(request);
+      expect(response.headers.get('Location')).toContain('/dashboard');
+    });
+
+    it('should handle state without custom data', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // State with only returnPathname
+      const state = btoa(JSON.stringify({ returnPathname: '/profile' }));
+
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
+
+      const onSuccess = jest.fn();
+      const handler = handleAuth({ onSuccess });
+      await handler(request);
+
+      // Verify onSuccess was called without state property when no custom data exists
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...mockAuthResponse,
+          state: undefined,
+        }),
+      );
+    });
+
+    it('should handle backward compatibility with old state format', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Old format: just returnPathname
+      const state = btoa(JSON.stringify({ returnPathname: '/old-path' }));
+
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      // Should still redirect correctly
+      expect(response.headers.get('Location')).toContain('/old-path');
+    });
   });
 });

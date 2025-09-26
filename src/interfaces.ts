@@ -12,6 +12,7 @@ export interface HandleAuthSuccessData extends Session {
   oauthTokens?: OauthTokens;
   organizationId?: string;
   authenticationMethod?: AuthenticationResponse['authenticationMethod'];
+  state?: string | undefined;
 }
 
 export interface Impersonator {
@@ -67,6 +68,7 @@ export interface GetAuthURLOptions {
   redirectUri?: string;
   loginHint?: string;
   prompt?: 'consent';
+  state?: string;
 }
 
 export interface AuthkitMiddlewareAuth {
