@@ -1,6 +1,9 @@
 import type { AuthenticationResponse, OauthTokens, User } from '@workos-inc/node';
 import { type NextRequest } from 'next/server';
 
+// Re-export Event type for convenient webhook handling
+export type { Event } from '@workos-inc/node';
+
 export interface HandleAuthOptions {
   returnPathname?: string;
   baseURL?: string;
