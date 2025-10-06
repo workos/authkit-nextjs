@@ -260,6 +260,14 @@ export default function MyComponent() {
 }
 ```
 
+### Get the enabled flags for the logged in user
+
+For situations where you need access to the authenticated user's currently active feature flags, use `withAuth` to retrieve the flags from the WorkOS session.
+
+```jsx
+const { featureFlags } = await withAuth();
+```
+
 ### Requiring auth
 
 For pages where a signed-in user is mandatory, you can use the `ensureSignedIn` option:
@@ -704,6 +712,6 @@ export default authkitMiddleware({ debug: true });
 
 Wrapping a `withAuth({ ensureSignedIn: true })` call in a try/catch block will cause a `NEXT_REDIRECT` error. This is because `withAuth` will attempt to redirect the user to AuthKit if no session is detected and redirects in Next must be [called outside a try/catch](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations#redirecting).
 
-#### Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins (Unhandled scheme).
+#### Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins (Unhandled scheme)
 
 You may encounter this error if you attempt to import server side code from authkit-nextjs into a client component. Likely you are using `withAuth` in a client component instead of the `useAuth` hook. Either move the code to a server component or use the `useAuth` hook.
