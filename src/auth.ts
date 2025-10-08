@@ -15,8 +15,15 @@ export async function getSignInUrl({
   loginHint,
   redirectUri,
   prompt,
-}: { organizationId?: string; loginHint?: string; redirectUri?: string; prompt?: 'consent' } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt });
+  state,
+}: {
+  organizationId?: string;
+  loginHint?: string;
+  redirectUri?: string;
+  prompt?: 'consent';
+  state?: string;
+} = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
 }
 
 export async function getSignUpUrl({
@@ -24,8 +31,15 @@ export async function getSignUpUrl({
   loginHint,
   redirectUri,
   prompt,
-}: { organizationId?: string; loginHint?: string; redirectUri?: string; prompt?: 'consent' } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt });
+  state,
+}: {
+  organizationId?: string;
+  loginHint?: string;
+  redirectUri?: string;
+  prompt?: 'consent';
+  state?: string;
+} = {}) {
+  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
 }
 
 /**

@@ -94,10 +94,14 @@ If your application needs to persist data upon a successful authentication, like
 
 ```ts
 export const GET = handleAuth({
-  onSuccess: async ({ user, oauthTokens, authenticationMethod, organizationId }) => {
+  onSuccess: async ({ user, oauthTokens, authenticationMethod, organizationId, state }) => {
     await saveTokens(oauthTokens);
     if (authenticationMethod) {
       await saveAuthMethod(user.id, authenticationMethod);
+    }
+    // Access custom state data passed through the auth flow
+    if (state?.teamId) {
+      await addUserToTeam(user.id, state.teamId);
     }
   },
 });
@@ -124,15 +128,16 @@ export const GET = handleAuth({
 
 The `onSuccess` callback receives the following data:
 
-| Property               | Type                        | Description                                                                                        |
-| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
-| `user`                 | `User`                      | The authenticated user object                                                                      |
-| `accessToken`          | `string`                    | JWT access token                                                                                   |
-| `refreshToken`         | `string`                    | Refresh token for session renewal                                                                  |
-| `impersonator`         | `Impersonator \| undefined` | Present if user is being impersonated                                                              |
-| `oauthTokens`          | `OauthTokens \| undefined`  | OAuth tokens from upstream provider                                                                |
-| `authenticationMethod` | `string \| undefined`       | How the user authenticated (e.g., 'password', 'google-oauth'). Only available during initial login |
-| `organizationId`       | `string \| undefined`       | Organization context of authentication                                                             |
+| Property               | Type                               | Description                                                                                        |
+| ---------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `user`                 | `User`                             | The authenticated user object                                                                      |
+| `accessToken`          | `string`                           | JWT access token                                                                                   |
+| `refreshToken`         | `string`                           | Refresh token for session renewal                                                                  |
+| `impersonator`         | `Impersonator \| undefined`        | Present if user is being impersonated                                                              |
+| `oauthTokens`          | `OauthTokens \| undefined`         | OAuth tokens from upstream provider                                                                |
+| `authenticationMethod` | `string \| undefined`              | How the user authenticated (e.g., 'password', 'google-oauth'). Only available during initial login |
+| `organizationId`       | `string \| undefined`              | Organization context of authentication                                                             |
+| `state`                | `Record<string, any> \| undefined` | Custom state data passed through the authentication flow                                           |
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
@@ -216,6 +221,14 @@ export default async function HomePage() {
 
     // Get the URL to redirect the user to AuthKit to sign up
     const signUpUrl = await getSignUpUrl();
+
+    // You can also pass custom state data through the auth flow
+    const signInUrlWithState = await getSignInUrl({
+      state: {
+        teamId: 'team_123',
+        referrer: 'homepage',
+      },
+    });
 
     return (
       <>
@@ -387,6 +400,50 @@ JWT tokens are sensitive credentials and should be handled carefully:
 - Only use the token where necessary
 - Don't store tokens in localStorage or sessionStorage
 - Be cautious about exposing tokens in your application state
+
+### Passing Custom State Through Authentication
+
+You can pass custom state data through the authentication flow using the `state` parameter. This data will be available in the `onSuccess` callback after authentication:
+
+```ts
+// When generating sign-in/sign-up URLs
+const signInUrl = await getSignInUrl({
+  state: {
+    teamId: 'team_123',
+    feature: 'billing',
+    referrer: 'pricing-page',
+    timestamp: Date.now(),
+  },
+});
+
+// The state data is available in the callback handler
+export const GET = handleAuth({
+  onSuccess: async ({ user, state }) => {
+    // Access your custom state data
+    if (state?.teamId) {
+      await addUserToTeam(user.id, state.teamId);
+    }
+
+    if (state?.feature) {
+      await trackFeatureActivation(user.id, state.feature);
+    }
+
+    // Track where the user came from
+    await analytics.track('sign_in_completed', {
+      userId: user.id,
+      referrer: state?.referrer,
+      timestamp: state?.timestamp,
+    });
+  },
+});
+```
+
+This is useful for:
+
+- Tracking user journey and referral sources
+- Maintaining context about what the user was trying to do before authentication
+- Implementing custom onboarding flows
+- Analytics and attribution tracking
 
 ### Session Refresh Callbacks
 
