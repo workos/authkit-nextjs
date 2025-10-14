@@ -96,7 +96,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
         if (onSuccess) {
-          await onSuccess({
+          const redirect = await onSuccess({
             accessToken,
             refreshToken,
             user,
@@ -106,6 +106,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
             organizationId,
             state: customState,
           });
+
+          if (redirect) {
+            return redirect;
+          }
         }
 
         return response;
