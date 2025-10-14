@@ -284,7 +284,7 @@ describe('authkit-callback-route', () => {
 
       const handler = handleAuth({
         onSuccess: async (data) => {
-            return NextResponse.redirect('https://example.com/dashboard');
+          return NextResponse.redirect('https://example.com/dashboard');
         },
       });
 
