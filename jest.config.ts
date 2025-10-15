@@ -28,23 +28,26 @@ const config: Config = {
       testEnvironment: 'jsdom',
       testMatch: ['**/src/**/*.spec.tsx'],
       transform: {
-        '^.+\\.tsx?$': 'ts-jest', // Use ts-jest for TypeScript files
+        '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
       },
       moduleNameMapper: {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
+      transformIgnorePatterns: ['node_modules/(?!(@workos-inc|jose)/)'],
     },
     {
       displayName: 'node',
       testEnvironment: 'node',
       testMatch: ['**/src/**/*.spec.ts'],
       transform: {
-        '^.+\\.tsx?$': 'ts-jest',
+        '^.+\\.tsx?$': ['ts-jest', { useESM: true }],
+        '^.+\\.jsx?$': ['ts-jest', { useESM: true }],
       },
       moduleNameMapper: {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
       setupFiles: ['<rootDir>/jest.setup.ts'],
+      transformIgnorePatterns: ['node_modules/(?!(@workos-inc|jose)/)'],
     },
   ],
 

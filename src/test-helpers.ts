@@ -43,6 +43,7 @@ export async function generateSession(overrides: Partial<User> = {}) {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     lastSignInAt: '2024-01-01T00:00:00Z',
+    locale: null,
     externalId: null,
     metadata: {},
     ...overrides,
