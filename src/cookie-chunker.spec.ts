@@ -1,4 +1,4 @@
-import { readValue, chunkValue } from './cookie-chunker';
+import { readValue, chunkValue } from './cookie-chunker.js';
 
 describe('cookie-chunker', () => {
   describe('readValue', () => {
@@ -35,7 +35,7 @@ describe('cookie-chunker', () => {
 
     it('should prefer chunked cookies over non-chunked when both exist', () => {
       const cookies = {
-        session: 'old-value',
+        'session': 'old-value',
         'session.0': 'new',
         'session.1': 'value',
       };
@@ -147,7 +147,7 @@ describe('cookie-chunker', () => {
 
     it('should ignore non-chunk cookies in existing cookies', () => {
       const existingCookies = {
-        session: 'old-single',
+        'session': 'old-single',
         'session-backup': 'backup',
         'other.0': 'other',
       };

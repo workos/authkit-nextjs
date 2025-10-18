@@ -24,7 +24,7 @@ jest.mock('next/headers', () => {
         cookieStore.delete(cookieName);
       }),
       get: jest.fn((name: string) => cookieStore.get(name)),
-      getAll: jest.fn(() => Array.from(cookieStore.entries())),
+      getAll: jest.fn(() => Array.from(cookieStore.values())),
       set: jest.fn((name: string, value: string | { [key: string]: string | number | boolean }) =>
         cookieStore.set(name, {
           name,
