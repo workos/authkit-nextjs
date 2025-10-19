@@ -12,16 +12,17 @@ interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
 }
 
 export function Impersonation({ side = 'bottom', ...props }: ImpersonationProps) {
-  const { user, impersonator, organizationId, loading } = useAuth();
+  const { user, impersonator, organizationId } = useAuth();
 
   const [organization, setOrganization] = React.useState<Organization | null>(null);
 
   React.useEffect(() => {
-    if (!organizationId) return;
+    if (!organizationId || !impersonator || !user) return;
+    if (organization && organization.id === organizationId) return;
     getOrganizationAction(organizationId).then(setOrganization);
-  }, [organizationId]);
+  }, [organizationId, impersonator, user]);
 
-  if (loading || !impersonator || !user) return null;
+  if (!impersonator || !user) return null;
 
   return (
     <div
