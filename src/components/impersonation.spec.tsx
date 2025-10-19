@@ -129,6 +129,21 @@ describe('Impersonation', () => {
     render(<Impersonation />);
     const stopButton = await screen.findByText('Stop');
     stopButton.click();
-    expect(handleSignOutAction).toHaveBeenCalled();
+    expect(handleSignOutAction).toHaveBeenCalledWith({});
+  });
+
+  it('should pass returnTo prop to handleSignOutAction when provided', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: null,
+      loading: false,
+    });
+
+    const returnTo = '/dashboard';
+    render(<Impersonation returnTo={returnTo} />);
+    const stopButton = await screen.findByText('Stop');
+    stopButton.click();
+    expect(handleSignOutAction).toHaveBeenCalledWith({ returnTo });
   });
 });
