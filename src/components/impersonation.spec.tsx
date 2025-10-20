@@ -27,19 +27,6 @@ describe('Impersonation', () => {
       impersonator: null,
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
-    });
-
-    const { container } = render(<Impersonation />);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('should return null if loading', () => {
-    (useAuth as jest.Mock).mockReturnValue({
-      impersonator: { email: 'admin@example.com' },
-      user: { id: '123', email: 'user@example.com' },
-      organizationId: null,
-      loading: true,
     });
 
     const { container } = render(<Impersonation />);
@@ -51,7 +38,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
     });
 
     const { container } = render(<Impersonation />);
@@ -63,7 +49,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: 'org_123',
-      loading: false,
     });
 
     (getOrganizationAction as jest.Mock).mockResolvedValue({
@@ -83,7 +68,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
     });
 
     const { container } = render(<Impersonation />);
@@ -96,7 +80,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
     });
 
     const { container } = render(<Impersonation side="top" />);
@@ -109,7 +92,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
     });
 
     const customStyle = { backgroundColor: 'red' };
@@ -123,7 +105,6 @@ describe('Impersonation', () => {
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
-      loading: false,
     });
 
     render(<Impersonation />);
@@ -145,5 +126,125 @@ describe('Impersonation', () => {
     const stopButton = await screen.findByText('Stop');
     stopButton.click();
     expect(handleSignOutAction).toHaveBeenCalledWith({ returnTo });
+  });
+
+  it('should not call getOrganizationAction when organizationId is not provided', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: null,
+    });
+
+    render(<Impersonation />);
+    expect(getOrganizationAction).not.toHaveBeenCalled();
+  });
+
+  it('should not call getOrganizationAction when impersonator is not present', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: null,
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: 'org_123',
+    });
+
+    render(<Impersonation />);
+    expect(getOrganizationAction).not.toHaveBeenCalled();
+  });
+
+  it('should not call getOrganizationAction when user is not present', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: null,
+      organizationId: 'org_123',
+    });
+
+    render(<Impersonation />);
+    expect(getOrganizationAction).not.toHaveBeenCalled();
+  });
+
+  it('should not call getOrganizationAction again when organization is already loaded with same ID', async () => {
+    const mockOrg = {
+      id: 'org_123',
+      name: 'Test Org',
+    };
+
+    (getOrganizationAction as jest.Mock).mockResolvedValue(mockOrg);
+
+    const { rerender } = await act(async () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        impersonator: { email: 'admin@example.com' },
+        user: { id: '123', email: 'user@example.com' },
+        organizationId: 'org_123',
+      });
+
+      return render(<Impersonation />);
+    });
+
+    // Wait for the initial call to complete
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(getOrganizationAction).toHaveBeenCalledTimes(1);
+
+    // Rerender with the same organizationId
+    await act(async () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        impersonator: { email: 'admin@example.com' },
+        user: { id: '123', email: 'user@example.com' },
+        organizationId: 'org_123',
+      });
+
+      rerender(<Impersonation />);
+    });
+
+    // Should still be called only once
+    expect(getOrganizationAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('should call getOrganizationAction again when organizationId changes', async () => {
+    const mockOrg1 = {
+      id: 'org_123',
+      name: 'Test Org 1',
+    };
+
+    const mockOrg2 = {
+      id: 'org_456',
+      name: 'Test Org 2',
+    };
+
+    (getOrganizationAction as jest.Mock).mockResolvedValueOnce(mockOrg1).mockResolvedValueOnce(mockOrg2);
+
+    const { rerender } = await act(async () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        impersonator: { email: 'admin@example.com' },
+        user: { id: '123', email: 'user@example.com' },
+        organizationId: 'org_123',
+      });
+
+      return render(<Impersonation />);
+    });
+
+    // Wait for the initial call to complete
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(getOrganizationAction).toHaveBeenCalledTimes(1);
+    expect(getOrganizationAction).toHaveBeenCalledWith('org_123');
+
+    // Rerender with a different organizationId
+    await act(async () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        impersonator: { email: 'admin@example.com' },
+        user: { id: '123', email: 'user@example.com' },
+        organizationId: 'org_456',
+      });
+
+      rerender(<Impersonation />);
+    });
+
+    // Should be called again with the new ID
+    expect(getOrganizationAction).toHaveBeenCalledTimes(2);
+    expect(getOrganizationAction).toHaveBeenCalledWith('org_456');
   });
 });
