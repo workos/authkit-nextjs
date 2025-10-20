@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from './session.js';
+import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims, saveSession } from './session.js';
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
 
@@ -1154,7 +1154,44 @@ describe('session.ts', () => {
         expect(jwtCookies).toHaveLength(0); // No new JWT cookie should be set
       });
 
-      it('should handle saveSession with string URL parameter', async () => {
+      it('cleans up chunked cookies when session shrinks', async () => {
+      jest
+        .spyOn(workos.userManagement, 'getJwksUrl')
+        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+
+      const nextCookies = await cookies();
+
+      const largeSession = {
+        accessToken: 'x'.repeat(5000),
+        refreshToken: 'refresh-token',
+        user: mockSession.user,
+      };
+      await saveSession(largeSession, 'http://localhost:3000');
+
+      let allCookies = nextCookies.getAll();
+      const chunks = allCookies.filter((c) => c.name.startsWith('wos-session.'));
+      expect(chunks.length).toBeGreaterThan(1);
+
+      const smallSession = {
+        accessToken: await generateTestToken(),
+        refreshToken: 'refresh-token',
+        user: mockSession.user,
+      };
+      await saveSession(smallSession, 'http://localhost:3000');
+
+      allCookies = nextCookies.getAll();
+      const mainCookie = allCookies.find((c) => c.name === 'wos-session');
+      const remainingChunks = allCookies.filter(
+        (c) => c.name.startsWith('wos-session.') && c.name.match(/\.\d+$/),
+      );
+
+      expect(mainCookie).toBeDefined();
+      remainingChunks.forEach((chunk) => {
+        expect(chunk.value).toBe('');
+      });
+    });
+
+    it('should handle saveSession with string URL parameter', async () => {
         const { saveSession } = await import('./session.js');
 
         const sessionData = {

@@ -2,48 +2,43 @@ import { readValue, chunkValue } from './cookie-chunker.js';
 
 describe('cookie-chunker', () => {
   describe('readValue', () => {
-    it('should return null when cookie does not exist', () => {
-      const result = readValue('session', {});
-      expect(result).toBeNull();
+    it('returns null when cookie does not exist', () => {
+      expect(readValue('session', {})).toBeNull();
     });
 
-    it('should read a non-chunked cookie', () => {
+    it('reads a non-chunked cookie', () => {
       const cookies = { session: 'simple-value' };
-      const result = readValue('session', cookies);
-      expect(result).toBe('simple-value');
+      expect(readValue('session', cookies)).toBe('simple-value');
     });
 
-    it('should read chunked cookies and reassemble them in order', () => {
+    it('reassembles chunked cookies in order', () => {
       const cookies = {
         'session.0': 'first',
         'session.1': 'second',
         'session.2': 'third',
       };
-      const result = readValue('session', cookies);
-      expect(result).toBe('firstsecondthird');
+      expect(readValue('session', cookies)).toBe('firstsecondthird');
     });
 
-    it('should handle chunks in any order', () => {
+    it('handles chunks in any order', () => {
       const cookies = {
         'session.2': 'third',
         'session.0': 'first',
         'session.1': 'second',
       };
-      const result = readValue('session', cookies);
-      expect(result).toBe('firstsecondthird');
+      expect(readValue('session', cookies)).toBe('firstsecondthird');
     });
 
-    it('should prefer chunked cookies over non-chunked when both exist', () => {
+    it('prefers chunked cookies when both chunked and non-chunked exist', () => {
       const cookies = {
         'session': 'old-value',
         'session.0': 'new',
         'session.1': 'value',
       };
-      const result = readValue('session', cookies);
-      expect(result).toBe('newvalue');
+      expect(readValue('session', cookies)).toBe('newvalue');
     });
 
-    it('should ignore cookies with similar names but different patterns', () => {
+    it('ignores cookies with similar names but different patterns', () => {
       const cookies = {
         'session.0': 'chunk1',
         'session.1': 'chunk2',
@@ -51,35 +46,32 @@ describe('cookie-chunker', () => {
         'session.foo': 'invalid',
         'other-session.0': 'other',
       };
-      const result = readValue('session', cookies);
-      expect(result).toBe('chunk1chunk2');
+      expect(readValue('session', cookies)).toBe('chunk1chunk2');
     });
 
-    it('should handle empty string values', () => {
+    it('handles empty string values', () => {
       const cookies = {
         'session.0': '',
         'session.1': 'value',
       };
-      const result = readValue('session', cookies);
-      expect(result).toBe('value');
+      expect(readValue('session', cookies)).toBe('value');
     });
   });
 
   describe('chunkValue', () => {
-    it('should return single cookie for small values', () => {
+    it('returns single cookie for small values', () => {
       const result = chunkValue('session', 'small-value', {});
       expect(result).toEqual([{ name: 'session', value: 'small-value' }]);
     });
 
-    it('should return single cookie for values at the threshold', () => {
+    it('returns single cookie for values at the threshold', () => {
       // CHUNK_SIZE = 4096 - 160 = 3936
       const value = 'x'.repeat(3936);
       const result = chunkValue('session', value, {});
       expect(result).toEqual([{ name: 'session', value }]);
     });
 
-    it('should chunk large values into multiple cookies', () => {
-      // Create a value that requires 2 chunks
+    it('chunks large values into multiple cookies', () => {
       const value = 'x'.repeat(5000);
       const result = chunkValue('session', value, {});
 
@@ -93,18 +85,17 @@ describe('cookie-chunker', () => {
         value: expect.any(String),
       });
 
-      // Verify the chunks can be reassembled
       const reassembled = result.map((c) => c.value).join('');
       expect(reassembled).toBe(value);
     });
 
-    it('should clean up old chunks when value shrinks', () => {
-      const existingCookies = {
+    it('cleans up old chunks when value shrinks', () => {
+      const existing = {
         'session.0': 'old',
         'session.1': 'old',
         'session.2': 'old',
       };
-      const result = chunkValue('session', 'small', existingCookies);
+      const result = chunkValue('session', 'small', existing);
 
       expect(result).toEqual([
         { name: 'session', value: 'small' },
@@ -114,18 +105,15 @@ describe('cookie-chunker', () => {
       ]);
     });
 
-    it('should clean up extra chunks when chunk count decreases', () => {
-      // Start with 3 chunks, reduce to 2
-      const existingCookies = {
+    it('cleans up extra chunks when chunk count decreases', () => {
+      const existing = {
         'session.0': 'old1',
         'session.1': 'old2',
         'session.2': 'old3',
       };
-      // Value that requires exactly 2 chunks
-      const value = 'x'.repeat(4500);
-      const result = chunkValue('session', value, existingCookies);
+      const value = 'x'.repeat(4500); // Requires 2 chunks
+      const result = chunkValue('session', value, existing);
 
-      // Should have 2 new chunks + 1 cleanup
       expect(result).toHaveLength(3);
       expect(result[0].name).toBe('session.0');
       expect(result[1].name).toBe('session.1');
@@ -136,46 +124,42 @@ describe('cookie-chunker', () => {
       });
     });
 
-    it('should not include cleanup cookies when no existing chunks', () => {
+    it('does not include cleanup cookies when no existing chunks', () => {
       const value = 'x'.repeat(5000);
       const result = chunkValue('session', value, {});
 
-      // Should only have the 2 chunks, no cleanup cookies
       expect(result).toHaveLength(2);
       expect(result.every((c) => !c.clear)).toBe(true);
     });
 
-    it('should ignore non-chunk cookies in existing cookies', () => {
-      const existingCookies = {
+    it('ignores non-chunk cookies in existing cookies', () => {
+      const existing = {
         'session': 'old-single',
         'session-backup': 'backup',
         'other.0': 'other',
       };
-      const result = chunkValue('session', 'new', existingCookies);
-
-      // Should only return the new single cookie, no cleanup
+      const result = chunkValue('session', 'new', existing);
       expect(result).toEqual([{ name: 'session', value: 'new' }]);
     });
 
-    it('should handle transition from non-chunked to chunked', () => {
-      const existingCookies = {
+    it('handles transition from non-chunked to chunked', () => {
+      const existing = {
         session: 'old-small-value',
       };
       const largeValue = 'x'.repeat(5000);
-      const result = chunkValue('session', largeValue, existingCookies);
+      const result = chunkValue('session', largeValue, existing);
 
-      // Should have 2 chunks, no cleanup needed since no existing chunks
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('session.0');
       expect(result[1].name).toBe('session.1');
     });
 
-    it('should handle transition from chunked to non-chunked', () => {
-      const existingCookies = {
+    it('handles transition from chunked to non-chunked', () => {
+      const existing = {
         'session.0': 'chunk1',
         'session.1': 'chunk2',
       };
-      const result = chunkValue('session', 'small', existingCookies);
+      const result = chunkValue('session', 'small', existing);
 
       expect(result).toEqual([
         { name: 'session', value: 'small' },
@@ -186,11 +170,10 @@ describe('cookie-chunker', () => {
   });
 
   describe('integration scenarios', () => {
-    it('should handle round-trip for non-chunked cookie', () => {
+    it('handles round-trip for non-chunked cookie', () => {
       const original = 'my-session-value';
       const chunks = chunkValue('session', original, {});
 
-      // Convert to cookie record
       const cookies: Record<string, string> = {};
       chunks.forEach((chunk) => {
         if (!chunk.clear) {
@@ -198,15 +181,13 @@ describe('cookie-chunker', () => {
         }
       });
 
-      const result = readValue('session', cookies);
-      expect(result).toBe(original);
+      expect(readValue('session', cookies)).toBe(original);
     });
 
-    it('should handle round-trip for chunked cookie', () => {
+    it('handles round-trip for chunked cookie', () => {
       const original = 'x'.repeat(8000);
       const chunks = chunkValue('session', original, {});
 
-      // Convert to cookie record
       const cookies: Record<string, string> = {};
       chunks.forEach((chunk) => {
         if (!chunk.clear) {
@@ -214,37 +195,31 @@ describe('cookie-chunker', () => {
         }
       });
 
-      const result = readValue('session', cookies);
-      expect(result).toBe(original);
+      expect(readValue('session', cookies)).toBe(original);
     });
 
-    it('should handle growing session size', () => {
-      // Start with small session
-      let existingCookies: Record<string, string> = {};
-      let chunks = chunkValue('session', 'small', existingCookies);
+    it('handles growing session size', () => {
+      let cookies: Record<string, string> = {};
+      let chunks = chunkValue('session', 'small', cookies);
       chunks.forEach((chunk) => {
         if (!chunk.clear) {
-          existingCookies[chunk.name] = chunk.value;
+          cookies[chunk.name] = chunk.value;
         } else {
-          delete existingCookies[chunk.name];
+          delete cookies[chunk.name];
         }
       });
 
-      // Grow to medium
-      chunks = chunkValue('session', 'x'.repeat(4500), existingCookies);
+      chunks = chunkValue('session', 'x'.repeat(4500), cookies);
       expect(chunks.length).toBeGreaterThan(1);
 
-      // Apply changes
-      existingCookies = {};
+      cookies = {};
       chunks.forEach((chunk) => {
         if (!chunk.clear) {
-          existingCookies[chunk.name] = chunk.value;
+          cookies[chunk.name] = chunk.value;
         }
       });
 
-      // Verify can read back
-      const result = readValue('session', existingCookies);
-      expect(result).toBe('x'.repeat(4500));
+      expect(readValue('session', cookies)).toBe('x'.repeat(4500));
     });
   });
 });

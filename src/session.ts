@@ -604,8 +604,11 @@ export async function saveSession(
   // Set all chunks (or single cookie if small enough)
   chunks.forEach((chunk) => {
     if (chunk.clear) {
-      // Delete old chunk cookies
-      nextCookies.delete(chunk.name);
+      // Delete old chunk cookies by setting with maxAge: 0
+      nextCookies.set(chunk.name, '', {
+        ...cookieOptions,
+        maxAge: 0,
+      });
     } else {
       nextCookies.set(chunk.name, chunk.value, cookieOptions);
     }
