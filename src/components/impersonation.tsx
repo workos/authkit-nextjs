@@ -9,9 +9,10 @@ import { useAuth } from './authkit-provider.js';
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
   side?: 'top' | 'bottom';
+  returnTo?: string;
 }
 
-export function Impersonation({ side = 'bottom', ...props }: ImpersonationProps) {
+export function Impersonation({ side = 'bottom', returnTo, ...props }: ImpersonationProps) {
   const { user, impersonator, organizationId, loading } = useAuth();
 
   const [organization, setOrganization] = React.useState<Organization | null>(null);
@@ -78,7 +79,7 @@ export function Impersonation({ side = 'bottom', ...props }: ImpersonationProps)
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            await handleSignOutAction();
+            await handleSignOutAction({ returnTo });
           }}
           style={{
             display: 'flex',
