@@ -67,7 +67,15 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
     const { domain, path, sameSite, secure } = getCookieOptions();
-    nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
+
+    // Delete all session cookies (base + chunks)
+    const allCookies = nextCookies.getAll();
+    for (const cookie of allCookies) {
+      // Delete base cookie or any chunked cookie (cookieName.0, cookieName.1, etc.)
+      if (cookie.name === cookieName || (cookie.name.startsWith(`${cookieName}.`) && /\.\d+$/.test(cookie.name))) {
+        nextCookies.delete({ name: cookie.name, domain, path, sameSite, secure });
+      }
+    }
 
     if (sessionId) {
       redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
