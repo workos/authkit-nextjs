@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkOS Auth Demo</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 WorkOS Auth</h1>
+            <p class="subtitle">Capacitor OAuth Demo</p>
+        </div>
+
+        <div id="statusMessage" class="status-message hidden"></div>
+
+        <div id="loginView" class="view">
+            <div class="info-card">
+                <h3>📱 Mobile OAuth Flow</h3>
+                <p>This demo shows how OAuth works in a native mobile app using:</p>
+                <ul>
+                    <li><strong>Custom URL Scheme:</strong> workosauthdemo://</li>
+                    <li><strong>Browser Plugin:</strong> Opens system browser</li>
+                    <li><strong>App Plugin:</strong> Captures the callback</li>
+                    <li><strong>Backend:</strong> Exchanges code for tokens</li>
+                </ul>
+            </div>
+
+            <button id="loginBtn" class="primary-btn">
+                Sign In with WorkOS
+            </button>
+
+            <div class="info-card">
+                <h4>What happens when you click:</h4>
+                <ol>
+                    <li>App opens system browser with WorkOS URL</li>
+                    <li>You authenticate in WorkOS</li>
+                    <li>WorkOS redirects to: <code>workosauthdemo://callback?code=...</code></li>
+                    <li>iOS/Android captures this and returns to app</li>
+                    <li>App extracts code and calls backend</li>
+                    <li>Backend exchanges code for tokens</li>
+                </ol>
+            </div>
+        </div>
+
+        <div id="userView" class="view hidden">
+            <div class="user-card">
+                <div id="userInfo"></div>
+            </div>
+
+            <div class="button-group">
+                <button id="refreshBtn" class="secondary-btn">
+                    🔄 Refresh Token
+                </button>
+                <button id="logoutBtn" class="secondary-btn">
+                    🚪 Sign Out
+                </button>
+            </div>
+
+            <div class="info-card">
+                <h4>🔍 Debug Info</h4>
+                <div id="debugInfo" class="debug-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

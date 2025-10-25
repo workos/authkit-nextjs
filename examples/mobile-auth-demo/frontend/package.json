@@ -1,0 +1,20 @@
+{
+  "name": "workos-mobile-auth-demo-frontend",
+  "version": "1.0.0",
+  "description": "Frontend demo for WorkOS mobile auth",
+  "scripts": {
+    "start": "npx serve . -p 3000"
+  },
+  "keywords": [
+    "workos",
+    "auth",
+    "oauth",
+    "mobile",
+    "capacitor"
+  ],
+  "author": "WorkOS",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}

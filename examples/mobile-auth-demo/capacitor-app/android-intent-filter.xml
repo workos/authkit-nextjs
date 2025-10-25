@@ -1,0 +1,52 @@
+<!--
+    Android Intent Filter Configuration
+
+    Add this inside the <activity> tag in your AndroidManifest.xml
+    Location: android/app/src/main/AndroidManifest.xml
+
+    This tells Android that your app can handle URLs with the "workosauthdemo://" scheme.
+    When WorkOS redirects to "workosauthdemo://callback?code=...", Android will:
+    1. Intercept the URL
+    2. Launch or bring your app to foreground
+    3. Fire the appUrlOpen event with the URL
+-->
+
+<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <!-- This is the key part: register your custom URL scheme -->
+    <data
+        android:scheme="workosauthdemo"
+        android:host="callback" />
+</intent-filter>
+
+<!--
+    Capacitor will automatically add this when you run `cap sync android`
+    if you have configured the scheme in capacitor.config.ts:
+
+    android: {
+      scheme: 'workosauthdemo'
+    }
+
+    But you can also add it manually if needed.
+
+    IMPORTANT: Make sure to add this inside your MainActivity's <activity> tag:
+
+    <activity
+        android:name=".MainActivity"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme.NoActionBarLaunch"
+        android:launchMode="singleTask"
+        android:exported="true">
+
+        <!-- Your existing intent filters -->
+
+        <!-- Add the custom URL scheme intent filter here -->
+        <intent-filter android:autoVerify="true">
+            ...
+        </intent-filter>
+
+    </activity>
+-->

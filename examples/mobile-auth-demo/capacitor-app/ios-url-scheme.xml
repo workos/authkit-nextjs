@@ -1,0 +1,35 @@
+<!--
+    iOS URL Scheme Configuration
+
+    Add this to your iOS app's Info.plist file to register the custom URL scheme.
+    Location: ios/App/App/Info.plist
+
+    This tells iOS that your app can handle URLs with the "workosauthdemo://" scheme.
+    When WorkOS redirects to "workosauthdemo://callback?code=...", iOS will:
+    1. Intercept the URL
+    2. Launch or bring your app to foreground
+    3. Fire the appUrlOpen event with the URL
+-->
+
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLName</key>
+        <string>com.workos.authdemo</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>workosauthdemo</string>
+        </array>
+    </dict>
+</array>
+
+<!--
+    Capacitor will automatically add this when you run `cap sync ios`
+    if you have configured the scheme in capacitor.config.ts:
+
+    ios: {
+      scheme: 'workosauthdemo'
+    }
+
+    But you can also add it manually if needed.
+-->

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkOS Mobile Auth Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .info-box code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        button {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 15px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .user-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .user-info p {
+            color: #666;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .user-info strong {
+            color: #333;
+        }
+
+        .config {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .config label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .config input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .code-display {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        .debug {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .debug h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .debug pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 WorkOS Mobile Auth Demo</h1>
+        <p class="subtitle">OAuth flow for mobile and desktop apps</p>
+
+        <div class="info-box">
+            <h3>📱 Capacitor Translation</h3>
+            <p>
+                This HTML demo uses standard web APIs. In Capacitor, you would use:
+                <br><code>Browser.open()</code> instead of window.location
+                <br><code>App.addListener('appUrlOpen')</code> to handle callbacks
+            </p>
+        </div>
+
+        <div class="config">
+            <label for="backendUrl">Backend URL:</label>
+            <input
+                type="text"
+                id="backendUrl"
+                value="http://localhost:3001"
+                placeholder="http://localhost:3001"
+            >
+
+            <label for="redirectUri">Redirect URI:</label>
+            <input
+                type="text"
+                id="redirectUri"
+                value="http://localhost:3000/callback"
+                placeholder="http://localhost:3000/callback"
+            >
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <button id="loginBtn" onclick="startAuth()">
+            🚀 Sign In with WorkOS
+        </button>
+
+        <button id="refreshBtn" onclick="refreshToken()" style="display: none;">
+            🔄 Refresh Token
+        </button>
+
+        <button id="logoutBtn" onclick="logout()" style="display: none;">
+            🚪 Sign Out
+        </button>
+
+        <div id="userInfo" class="user-info"></div>
+
+        <div id="debug" class="debug">
+            <h4>Debug Information</h4>
+            <pre id="debugContent"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let tokens = {
+            access: null,
+            refresh: null,
+        };
+
+        // On page load, check if we're on the callback URL
+        window.addEventListener('DOMContentLoaded', () => {
+            handleCallback();
+            loadStoredTokens();
+        });
+
+        // Check if this is a callback from WorkOS
+        function handleCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+
+            if (code) {
+                showStatus('Received authorization code, exchanging for tokens...', 'info');
+                console.log('Authorization code received:', code);
+
+                // In Capacitor, you would handle this differently:
+                /*
+                import { App } from '@capacitor/app';
+
+                App.addListener('appUrlOpen', async (event) => {
+                    const url = new URL(event.url);
+                    const code = url.searchParams.get('code');
+                    const state = url.searchParams.get('state');
+
+                    if (code) {
+                        await exchangeCodeForTokens(code);
+                    }
+                });
+                */
+
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                // Exchange code for tokens
+                exchangeCodeForTokens(code);
+            }
+        }
+
+        // Start the OAuth flow
+        async function startAuth() {
+            const backendUrl = document.getElementById('backendUrl').value;
+            const redirectUri = document.getElementById('redirectUri').value;
+
+            showStatus('Generating authorization URL...', 'info');
+            document.getElementById('loginBtn').disabled = true;
+
+            try {
+                // Request authorization URL from backend
+                const response = await fetch(`${backendUrl}/auth/url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        redirectUri,
+                        state: 'demo_state_' + Math.random().toString(36).substring(7),
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Authorization URL generated:', data.authorizationUrl);
+
+                showDebug({
+                    step: 'Authorization URL Generated',
+                    url: data.authorizationUrl,
+                });
+
+                showStatus('Redirecting to WorkOS...', 'info');
+
+                // Redirect to WorkOS for authentication
+                // In a web app, we use window.location
+                window.location.href = data.authorizationUrl;
+
+                // In Capacitor, you would use:
+                /*
+                import { Browser } from '@capacitor/browser';
+
+                await Browser.open({ url: data.authorizationUrl });
+                */
+
+            } catch (error) {
+                console.error('Error starting auth:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+                document.getElementById('loginBtn').disabled = false;
+            }
+        }
+
+        // Exchange authorization code for tokens
+        async function exchangeCodeForTokens(code) {
+            const backendUrl = document.getElementById('backendUrl').value;
+
+            try {
+                const response = await fetch(`${backendUrl}/auth/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Authentication successful:', data);
+
+                // Store tokens
+                tokens.access = data.accessToken;
+                tokens.refresh = data.refreshToken;
+                localStorage.setItem('access_token', data.accessToken);
+                localStorage.setItem('refresh_token', data.refreshToken);
+
+                // In Capacitor, use secure storage instead of localStorage:
+                /*
+                import { Preferences } from '@capacitor/preferences';
+
+                await Preferences.set({
+                    key: 'access_token',
+                    value: data.accessToken
+                });
+
+                await Preferences.set({
+                    key: 'refresh_token',
+                    value: data.refreshToken
+                });
+                */
+
+                showStatus('✅ Authentication successful!', 'success');
+                showUserInfo(data);
+                showDebug({
+                    step: 'Token Exchange Complete',
+                    user: data.user,
+                    hasAccessToken: !!data.accessToken,
+                    hasRefreshToken: !!data.refreshToken,
+                    organizationId: data.organizationId,
+                });
+
+                // Show refresh and logout buttons
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('refreshBtn').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error exchanging code:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Refresh the access token
+        async function refreshToken() {
+            const backendUrl = document.getElementById('backendUrl').value;
+
+            if (!tokens.refresh) {
+                showStatus('No refresh token available', 'error');
+                return;
+            }
+
+            showStatus('Refreshing access token...', 'info');
+            document.getElementById('refreshBtn').disabled = true;
+
+            try {
+                const response = await fetch(`${backendUrl}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        refreshToken: tokens.refresh,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Token refresh successful:', data);
+
+                // Update stored tokens
+                tokens.access = data.accessToken;
+                tokens.refresh = data.refreshToken;
+                localStorage.setItem('access_token', data.accessToken);
+                localStorage.setItem('refresh_token', data.refreshToken);
+
+                showStatus('✅ Token refreshed successfully!', 'success');
+                showDebug({
+                    step: 'Token Refresh Complete',
+                    hasAccessToken: !!data.accessToken,
+                    hasRefreshToken: !!data.refreshToken,
+                });
+
+            } catch (error) {
+                console.error('Error refreshing token:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('refreshBtn').disabled = false;
+            }
+        }
+
+        // Load tokens from storage on page load
+        function loadStoredTokens() {
+            const accessToken = localStorage.getItem('access_token');
+            const refreshToken = localStorage.getItem('refresh_token');
+
+            if (accessToken && refreshToken) {
+                tokens.access = accessToken;
+                tokens.refresh = refreshToken;
+
+                // Show that we have an active session
+                showStatus('Found existing session', 'info');
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('refreshBtn').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'block';
+
+                // Could verify the token here
+                showDebug({
+                    step: 'Loaded from Storage',
+                    hasAccessToken: !!accessToken,
+                    hasRefreshToken: !!refreshToken,
+                });
+            }
+        }
+
+        // Logout
+        function logout() {
+            tokens.access = null;
+            tokens.refresh = null;
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+
+            document.getElementById('userInfo').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'block';
+            document.getElementById('refreshBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'none';
+
+            showStatus('Logged out successfully', 'info');
+            showDebug({ step: 'Logged Out' });
+        }
+
+        // Display user information
+        function showUserInfo(data) {
+            const userInfoEl = document.getElementById('userInfo');
+            userInfoEl.innerHTML = `
+                <h3>👤 User Information</h3>
+                <p><strong>Name:</strong> ${data.user.firstName} ${data.user.lastName}</p>
+                <p><strong>Email:</strong> ${data.user.email}</p>
+                <p><strong>User ID:</strong> ${data.user.id}</p>
+                <p><strong>Email Verified:</strong> ${data.user.emailVerified ? '✅ Yes' : '❌ No'}</p>
+                ${data.organizationId ? `<p><strong>Organization ID:</strong> ${data.organizationId}</p>` : ''}
+            `;
+            userInfoEl.style.display = 'block';
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Show debug information
+        function showDebug(data) {
+            const debugEl = document.getElementById('debug');
+            const debugContent = document.getElementById('debugContent');
+
+            debugContent.textContent = JSON.stringify(data, null, 2);
+            debugEl.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# Capacitor
+ios/
+android/
+.capacitor/
+
+# Build outputs
+build/
+www/
