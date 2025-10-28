@@ -100,8 +100,9 @@ export const GET = handleAuth({
       await saveAuthMethod(user.id, authenticationMethod);
     }
     // Access custom state data passed through the auth flow
-    if (state?.teamId) {
-      await addUserToTeam(user.id, state.teamId);
+    const customData = state ? JSON.parse(state) : null;
+    if (customData?.teamId) {
+      await addUserToTeam(user.id, customData.teamId);
     }
   },
 });
@@ -128,16 +129,16 @@ export const GET = handleAuth({
 
 The `onSuccess` callback receives the following data:
 
-| Property               | Type                               | Description                                                                                        |
-| ---------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `user`                 | `User`                             | The authenticated user object                                                                      |
-| `accessToken`          | `string`                           | JWT access token                                                                                   |
-| `refreshToken`         | `string`                           | Refresh token for session renewal                                                                  |
-| `impersonator`         | `Impersonator \| undefined`        | Present if user is being impersonated                                                              |
-| `oauthTokens`          | `OauthTokens \| undefined`         | OAuth tokens from upstream provider                                                                |
-| `authenticationMethod` | `string \| undefined`              | How the user authenticated (e.g., 'password', 'google-oauth'). Only available during initial login |
-| `organizationId`       | `string \| undefined`              | Organization context of authentication                                                             |
-| `state`                | `Record<string, any> \| undefined` | Custom state data passed through the authentication flow                                           |
+| Property               | Type                        | Description                                                                                        |
+| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `user`                 | `User`                      | The authenticated user object                                                                      |
+| `accessToken`          | `string`                    | JWT access token                                                                                   |
+| `refreshToken`         | `string`                    | Refresh token for session renewal                                                                  |
+| `impersonator`         | `Impersonator \| undefined` | Present if user is being impersonated                                                              |
+| `oauthTokens`          | `OauthTokens \| undefined`  | OAuth tokens from upstream provider                                                                |
+| `authenticationMethod` | `string \| undefined`       | How the user authenticated (e.g., 'password', 'google-oauth'). Only available during initial login |
+| `organizationId`       | `string \| undefined`       | Organization context of authentication                                                             |
+| `state`                | `string \| undefined`       | Custom state string passed through the authentication flow (parse with JSON.parse if needed)       |
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
@@ -224,10 +225,10 @@ export default async function HomePage() {
 
     // You can also pass custom state data through the auth flow
     const signInUrlWithState = await getSignInUrl({
-      state: {
+      state: JSON.stringify({
         teamId: 'team_123',
         referrer: 'homepage',
-      },
+      }),
     });
 
     return (
@@ -403,40 +404,45 @@ JWT tokens are sensitive credentials and should be handled carefully:
 
 ### Passing Custom State Through Authentication
 
-You can pass custom state data through the authentication flow using the `state` parameter. This data will be available in the `onSuccess` callback after authentication:
+You can pass custom state data through the authentication flow using the `state` parameter. The state parameter is a string value that gets passed through OAuth and returned in the callback. To pass complex data, serialize it as JSON:
 
 ```ts
-// When generating sign-in/sign-up URLs
+// When generating sign-in/sign-up URLs, serialize your data as JSON
 const signInUrl = await getSignInUrl({
-  state: {
+  state: JSON.stringify({
     teamId: 'team_123',
     feature: 'billing',
     referrer: 'pricing-page',
     timestamp: Date.now(),
-  },
+  }),
 });
 
 // The state data is available in the callback handler
 export const GET = handleAuth({
   onSuccess: async ({ user, state }) => {
+    // Parse the state string back to an object
+    const customData = state ? JSON.parse(state) : null;
+
     // Access your custom state data
-    if (state?.teamId) {
-      await addUserToTeam(user.id, state.teamId);
+    if (customData?.teamId) {
+      await addUserToTeam(user.id, customData.teamId);
     }
 
-    if (state?.feature) {
-      await trackFeatureActivation(user.id, state.feature);
+    if (customData?.feature) {
+      await trackFeatureActivation(user.id, customData.feature);
     }
 
     // Track where the user came from
     await analytics.track('sign_in_completed', {
       userId: user.id,
-      referrer: state?.referrer,
-      timestamp: state?.timestamp,
+      referrer: customData?.referrer,
+      timestamp: customData?.timestamp,
     });
   },
 });
 ```
+
+> **Note**: The `state` parameter is an opaque string as defined by OAuth 2.0 (RFC 6749). If you need to pass structured data, you must serialize it yourself using `JSON.stringify()` and parse it with `JSON.parse()` in the callback.
 
 This is useful for:
 
