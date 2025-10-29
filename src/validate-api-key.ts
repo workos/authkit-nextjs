@@ -10,7 +10,7 @@ export async function validateApiKey() {
     return { apiKey: null };
   }
 
-  const value = authorizationHeader.match(/Bearer\s+(.*)/)?.[1];
+  const value = authorizationHeader.match(/Bearer\s+(.*)/i)?.[1];
   if (!value) {
     return { apiKey: null };
   }
