@@ -209,6 +209,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
+#### Optimizing with Server-Side Auth Data
+
+To avoid a server action call on mount, you can pass the initial auth data from the server to the `AuthKitProvider`.
+
+```jsx
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
+import { withAuth } from '@workos-inc/authkit-nextjs';
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Fetch auth data on the server
+  const auth = await withAuth();
+  
+  // Remove the accessToken from the auth object as it is not needed on the client side
+  const { accessToken, ...initialAuth } = auth;
+
+  return (
+    <html lang="en">
+      <body>
+        <AuthKitProvider initialAuth={initialAuth}>{children}</AuthKitProvider>
+      </body>
+    </html>
+  );
+}
+```
+
 ### Get the current user in a server component
 
 For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user session from WorkOS.
