@@ -10,6 +10,16 @@ import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { AccessToken, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
 import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
+
+/**
+ * A wrapper around revalidateTag to provide compatibility with previous versions.
+ * @param tag The tag to revalidate.
+ */
+function revalidateTagCompat(tag: string): void {
+  const fn = revalidateTag as (tag: string, profile: string) => void;
+  return fn(tag, 'max');
+}
+
 export async function getSignInUrl({
   organizationId,
   loginHint,
@@ -111,7 +121,7 @@ export async function switchToOrganization(
       break;
     case 'tag':
       for (const tag of revalidationTags) {
-        revalidateTag(tag);
+        revalidateTagCompat(tag);
       }
       break;
   }

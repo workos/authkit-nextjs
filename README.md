@@ -141,9 +141,14 @@ The `onSuccess` callback receives the following data:
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
-### Middleware
+### Middleware / Proxy
 
-This library relies on [Next.js middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware) to provide session management for routes. Put the following in your `middleware.ts` file in the root of your project:
+This library relies on Next.js middleware to provide session management for routes.
+
+**For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
+**For Next.js 16+:** Create a `proxy.ts` file in the root of your project.
+
+The code remains the same; only the filename changes:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -570,6 +575,8 @@ Eager auth makes tokens briefly accessible via JavaScript (30-second window) to 
 > **Security note:** Always forward `request.headers` when returning `NextResponse.*` to mitigate SSRF issues in Next.js < 14.2.32 (14.x) or < 15.4.7 (15.x). This pattern is safe on all versions. We strongly recommend upgrading to the latest Next.js.
 
 If you don't want to use `authkitMiddleware` and instead want to compose your own middleware, you can use the `authkit` method. In this mode you are responsible to handling what to do when there's no session on a protected route.
+
+> **Note:** For Next.js 16+, name your file `proxy.ts` and the function `proxy` instead of `middleware`.
 
 ```ts
 export default async function middleware(request: NextRequest) {
