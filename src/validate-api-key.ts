@@ -15,6 +15,5 @@ export async function validateApiKey() {
     return { apiKey: null };
   }
 
-  const response = await getWorkOS().apiKeys.validateApiKey({ value });
-  return response;
+  return getWorkOS().apiKeys.validateApiKey({ value });
 }
