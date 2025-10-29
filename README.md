@@ -689,6 +689,25 @@ export default authkitMiddleware({
 });
 ```
 
+### Validate an API key
+
+Use the `validateApiKey` function in your application's public API endpoints to parse a [Bearer Authentication](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) header and validate the [API key](https://workos.com/docs/authkit/api-keys) with WorkOS.
+
+```ts
+import { NextResponse } from 'next/server'
+import { validateApiKey } from '@workos-inc/authkit-nextjs'
+
+export async function GET() {
+  const { apiKey } = await validateApiKey()
+
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+```
+
 ### Advanced: Direct access to the WorkOS client
 
 For advanced use cases or functionality not covered by the helper methods, you can access the underlying WorkOS client directly:
