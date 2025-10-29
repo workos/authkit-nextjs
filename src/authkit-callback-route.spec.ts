@@ -36,6 +36,7 @@ describe('authkit-callback-route', () => {
       lastSignInAt: '2024-01-01T00:00:00Z',
       externalId: null,
       metadata: {},
+      locale: null,
     },
     oauthTokens: {
       accessToken: 'access123',
