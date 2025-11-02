@@ -31,6 +31,33 @@ const jwtCookieName = 'workos-access-token';
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 
 /**
+ * Applies cache security headers to prevent CDN caching of authenticated responses.
+ * Critical for preventing session crossover in CDN environments (CloudFront, Cloudflare, etc.)
+ */
+function applyCacheSecurityHeaders(headers: Headers, request: NextRequest): void {
+  // Build Vary header with deduplication
+  const varyValues = ['Cookie'];
+  if (request.headers.has('authorization')) {
+    varyValues.push('Authorization');
+  }
+
+  const currentVary = headers.get('Vary');
+  if (currentVary) {
+    const existing = new Set(currentVary.split(',').map((v) => v.trim()));
+    varyValues.forEach((v) => existing.add(v));
+    headers.set('Vary', Array.from(existing).join(', '));
+  } else {
+    headers.set('Vary', varyValues.join(', '));
+  }
+
+  // Prevent caching - critical for CDN security
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Pragma', 'no-cache');
+  headers.set('x-middleware-cache', 'no-cache');
+  headers.set('CDN-Cache-Control', 'no-store');
+}
+
+/**
  * Determines if a request is for an initial document load (not API/RSC/prefetch)
  */
 function isInitialDocumentRequest(request: NextRequest): boolean {
@@ -118,6 +145,13 @@ async function updateSessionMiddleware(
   // Record the sign up paths so we can use them later
   if (signUpPaths.length > 0) {
     headers.set(signUpPathsHeaderName, signUpPaths.join(','));
+  }
+
+  // Apply cache security headers to prevent CDN caching of authenticated responses
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+
+  if (session?.accessToken != null || request.cookies.has(cookieName) || request.headers.has('authorization')) {
+    applyCacheSecurityHeaders(headers, request);
   }
 
   return NextResponse.next({

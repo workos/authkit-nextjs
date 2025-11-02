@@ -707,17 +707,17 @@ export default authkitMiddleware({
 Use the `validateApiKey` function in your application's public API endpoints to parse a [Bearer Authentication](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) header and validate the [API key](https://workos.com/docs/authkit/api-keys) with WorkOS.
 
 ```ts
-import { NextResponse } from 'next/server'
-import { validateApiKey } from '@workos-inc/authkit-nextjs'
+import { NextResponse } from 'next/server';
+import { validateApiKey } from '@workos-inc/authkit-nextjs';
 
 export async function GET() {
-  const { apiKey } = await validateApiKey()
+  const { apiKey } = await validateApiKey();
 
   if (!apiKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }
 ```
 
@@ -784,6 +784,31 @@ await saveSession(session, req);
 // With URL string
 await saveSession(session, 'https://example.com/callback');
 ```
+
+### CDN Deployments and Caching
+
+AuthKit automatically implements cache security measures to protect against session leakage in CDN environments. This is particularly important when deploying to AWS with SST/OpenNext, Cloudflare, or other CDN configurations.
+
+#### How It Works
+
+The library automatically sets appropriate cache headers on all authenticated requests:
+
+- `Cache-Control: private, no-cache, no-store, must-revalidate` - Prevents CDN caching of authenticated responses
+- `Vary: Cookie` - Ensures CDNs differentiate between different users
+- `Pragma: no-cache` - HTTP/1.0 compatibility
+
+These headers are applied automatically when:
+
+- A session cookie is present
+- An Authorization header is detected
+- Requests are made to auth routes (`/api/auth/*`, `/callback`)
+- Active authenticated sessions exist
+
+#### Performance Considerations
+
+**Authenticated pages:** Will not be cached at the CDN level and will always hit your origin server. This is the correct and secure behavior for session-based authentication.
+
+**Public pages:** Unaffected by these security measures. Public routes without authentication context can still be cached normally.
 
 ### Debugging
 

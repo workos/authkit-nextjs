@@ -5,6 +5,17 @@ import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback } from './utils.js';
 import { getWorkOS } from './workos.js';
 
+/**
+ * Prevents CDN caching of auth callback responses (critical for security)
+ */
+function preventCaching(headers: Headers): void {
+  headers.set('Vary', 'Cookie');
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Pragma', 'no-cache');
+  headers.set('x-middleware-cache', 'no-cache');
+  headers.set('CDN-Cache-Control', 'no-store');
+}
+
 function handleState(state: string | null) {
   let returnPathname: string | undefined = undefined;
   let userState: string | undefined;
@@ -90,6 +101,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // Fall back to standard Response if NextResponse is not available.
         // This is to support Next.js 13.
         const response = redirectWithFallback(url.toString());
+        preventCaching(response.headers);
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
@@ -116,23 +128,28 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         console.error(errorRes);
 
-        return errorResponse(request, error);
+        return await errorResponse(request, error);
       }
     }
 
-    return errorResponse(request);
+    return await errorResponse(request);
   };
 
-  function errorResponse(request: NextRequest, error?: unknown) {
+  async function errorResponse(request: NextRequest, error?: unknown) {
     if (onError) {
-      return onError({ error, request });
+      const response = await onError({ error, request });
+      preventCaching(response.headers);
+      return response;
     }
 
-    return errorResponseWithFallback({
+    const response = errorResponseWithFallback({
       error: {
         message: 'Something went wrong',
         description: "Couldn't sign in. If you are not sure what happened, please contact your organization admin.",
       },
     });
+
+    preventCaching(response.headers);
+    return response;
   }
 }
