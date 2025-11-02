@@ -51,7 +51,7 @@ function applyCacheSecurityHeaders(headers: Headers, request: NextRequest): void
   }
 
   // Prevent caching - critical for CDN security
-  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Cache-Control', 'private, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
   headers.set('x-middleware-cache', 'no-cache');
   headers.set('CDN-Cache-Control', 'no-store');

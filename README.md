@@ -793,16 +793,17 @@ AuthKit automatically implements cache security measures to protect against sess
 
 The library automatically sets appropriate cache headers on all authenticated requests:
 
-- `Cache-Control: private, no-cache, no-store, must-revalidate` - Prevents CDN caching of authenticated responses
+- `Cache-Control: private, no-store, must-revalidate` - Prevents CDN caching of authenticated responses
 - `Vary: Cookie` - Ensures CDNs differentiate between different users
+- `CDN-Cache-Control: no-store` - Additional protection for CloudFront and Vercel
+- `x-middleware-cache: no-cache` - Prevents middleware result caching (OpenNext/SST)
 - `Pragma: no-cache` - HTTP/1.0 compatibility
 
 These headers are applied automatically when:
 
-- A session cookie is present
+- A session cookie is present in the request
 - An Authorization header is detected
-- Requests are made to auth routes (`/api/auth/*`, `/callback`)
-- Active authenticated sessions exist
+- An active authenticated session exists
 
 #### Performance Considerations
 
