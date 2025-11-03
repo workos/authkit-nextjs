@@ -54,7 +54,6 @@ function applyCacheSecurityHeaders(headers: Headers, request: NextRequest): void
   headers.set('Cache-Control', 'private, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
   headers.set('x-middleware-cache', 'no-cache');
-  headers.set('CDN-Cache-Control', 'no-store');
 }
 
 /**

@@ -794,9 +794,8 @@ AuthKit automatically implements cache security measures to protect against sess
 The library automatically sets appropriate cache headers on all authenticated requests:
 
 - `Cache-Control: private, no-store, must-revalidate` - Prevents CDN caching of authenticated responses
-- `Vary: Cookie` - Ensures CDNs differentiate between different users
-- `CDN-Cache-Control: no-store` - Additional protection for CloudFront and Vercel
-- `x-middleware-cache: no-cache` - Prevents middleware result caching (OpenNext/SST)
+- `Vary: Cookie` - Ensures CDNs differentiate between different users (defense-in-depth)
+- `x-middleware-cache: no-cache` - Prevents Next.js middleware result caching
 - `Pragma: no-cache` - HTTP/1.0 compatibility
 
 These headers are applied automatically when:

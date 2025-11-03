@@ -13,7 +13,6 @@ function preventCaching(headers: Headers): void {
   headers.set('Cache-Control', 'private, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
   headers.set('x-middleware-cache', 'no-cache');
-  headers.set('CDN-Cache-Control', 'no-store');
 }
 
 function handleState(state: string | null) {
