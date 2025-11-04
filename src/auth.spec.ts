@@ -254,8 +254,9 @@ describe('auth.ts', () => {
         } as const;
 
         const nextHeaders = await headers();
+        // Set header WITHOUT prefix - simulates what Next.js/OpenNext do after stripping prefix
         nextHeaders.set(
-          'x-workos-session',
+          'workos-session',
           await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
         );
 

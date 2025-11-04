@@ -23,7 +23,9 @@ import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { lazy, redirectWithFallback } from './utils.js';
 
-const sessionHeaderName = 'x-workos-session';
+// Use x-middleware-request- prefix to prevent header leakage in responses
+// Next.js and OpenNext strip this prefix when passing to page handlers
+const sessionHeaderName = 'x-middleware-request-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
 const jwtCookieName = 'workos-access-token';
@@ -525,7 +527,9 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
     );
   }
 
-  const authHeader = headersList.get(sessionHeaderName);
+  // Read the header WITHOUT the x-middleware-request- prefix
+  // Next.js and OpenNext strip the prefix before passing to page handlers
+  const authHeader = headersList.get('workos-session');
   if (!authHeader) return;
 
   return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
