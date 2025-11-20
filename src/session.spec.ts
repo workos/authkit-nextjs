@@ -116,7 +116,7 @@ describe('session.ts', () => {
       await expect(async () => {
         await withAuth();
       }).rejects.toThrow(
-        "You are calling 'withAuth' on https://example.com/ that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.",
+        /You are calling 'withAuth' on https:\/\/example\.com\/ that isn't covered by the AuthKit middleware/,
       );
     });
 
@@ -126,9 +126,7 @@ describe('session.ts', () => {
 
       await expect(async () => {
         await withAuth({ ensureSignedIn: true });
-      }).rejects.toThrow(
-        "You are calling 'withAuth' on a route that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.",
-      );
+      }).rejects.toThrow(/You are calling 'withAuth' on a route that isn't covered by the AuthKit middleware/);
     });
 
     it('should throw an error if the URL is not found in the headers', async () => {

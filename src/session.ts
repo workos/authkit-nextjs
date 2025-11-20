@@ -21,7 +21,7 @@ import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { lazy, redirectWithFallback } from './utils.js';
+import { lazy, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -29,6 +29,49 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 const jwtCookieName = 'workos-access-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
+
+/**
+ * Applies cache security headers with Vary header deduplication.
+ * Only applies headers if the request is authenticated (has session, cookie, or Authorization header).
+ * Used in middleware where existing Vary headers may already be present.
+ * @param headers - The Headers object to set the cache security headers on.
+ * @param request - The NextRequest object to check for authentication.
+ * @param sessionData - Optional session data to check for authentication.
+ */
+function applyCacheSecurityHeaders(
+  headers: Headers,
+  request: NextRequest,
+  sessionData?: { accessToken?: string } | Session,
+): void {
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+
+  // Only apply cache headers for authenticated requests
+  if (!sessionData?.accessToken && !request.cookies.has(cookieName) && !request.headers.has('authorization')) {
+    return;
+  }
+
+  const varyValues = new Set<string>(['cookie']);
+  if (request.headers.has('authorization')) {
+    varyValues.add('authorization');
+  }
+
+  const currentVary = headers.get('Vary');
+  if (currentVary) {
+    currentVary.split(',').forEach((v) => {
+      const trimmed = v.trim().toLowerCase();
+      if (trimmed) varyValues.add(trimmed);
+    });
+  }
+
+  headers.set(
+    'Vary',
+    Array.from(varyValues)
+      .map((v) => v.charAt(0).toUpperCase() + v.slice(1))
+      .join(', '),
+  );
+
+  setCachePreventionHeaders(headers);
+}
 
 /**
  * Determines if a request is for an initial document load (not API/RSC/prefetch)
@@ -120,7 +163,33 @@ async function updateSessionMiddleware(
     headers.set(signUpPathsHeaderName, signUpPaths.join(','));
   }
 
+  applyCacheSecurityHeaders(headers, request, session);
+
+  // Create a new request with modified headers (for page handlers)
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(middlewareHeaderName, headers.get(middlewareHeaderName)!);
+  requestHeaders.set('x-url', headers.get('x-url')!);
+  if (headers.has('x-redirect-uri')) {
+    requestHeaders.set('x-redirect-uri', headers.get('x-redirect-uri')!);
+  }
+  if (headers.has(signUpPathsHeaderName)) {
+    requestHeaders.set(signUpPathsHeaderName, headers.get(signUpPathsHeaderName)!);
+  }
+
+  // Pass session to page handlers via request header
+  // This ensures handlers see refreshed sessions immediately (before Set-Cookie reaches browser)
+  const sessionHeader = headers.get(sessionHeaderName);
+  if (sessionHeader) {
+    requestHeaders.set(sessionHeaderName, sessionHeader);
+  }
+
+  // Remove session header from response headers to prevent leakage
+  headers.delete(sessionHeaderName);
+
   return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
     headers,
   });
 }
@@ -171,6 +240,8 @@ async function updateSession(
   const hasValidSession = await verifyAccessToken(session.accessToken);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+
+  applyCacheSecurityHeaders(newRequestHeaders, request, session);
 
   if (hasValidSession) {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
@@ -488,7 +559,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   if (!hasMiddleware) {
     const url = headersList.get('x-url');
     throw new Error(
-      `You are calling 'withAuth' on ${url ?? 'a route'} that isn’t covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
+      `You are calling 'withAuth' on ${url ?? 'a route'} that isn't covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
   }
 

@@ -603,25 +603,21 @@ export default async function middleware(request: NextRequest) {
   // Control of what to do when there's no session on a protected route is left to the developer
   if (pathname.startsWith('/account') && !session.user) {
     console.log('No session on protected path');
-
-    // Preserve AuthKit headers on redirects (e.g., cookies)
-    const response = NextResponse.redirect(authorizationUrl);
-    for (const [key, value] of authkitHeaders) {
-      if (key.toLowerCase() === 'set-cookie') {
-        response.headers.append(key, value);
-      } else {
-        response.headers.set(key, value);
-      }
-    }
-    return response;
+    return NextResponse.redirect(authorizationUrl);
   }
 
-  // Forward the incoming request headers (mitigation) and then add AuthKit's headers
+  // Forward the incoming request headers (mitigation) and pass AuthKit headers as request headers
   const response = NextResponse.next({
-    request: { headers: new Headers(request.headers) },
+    request: { headers: authkitHeaders },
   });
 
+  // Copy Set-Cookie and cache control headers to the response, but exclude the internal
+  // x-workos-session header which contains encrypted session data and should never appear
+  // in HTTP responses (it's only used to pass session data between middleware and page handlers)
   for (const [key, value] of authkitHeaders) {
+    if (key.toLowerCase() === 'x-workos-session') {
+      continue; // Internal header - must not leak to response
+    }
     if (key.toLowerCase() === 'set-cookie') {
       response.headers.append(key, value);
     } else {
@@ -707,17 +703,17 @@ export default authkitMiddleware({
 Use the `validateApiKey` function in your application's public API endpoints to parse a [Bearer Authentication](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) header and validate the [API key](https://workos.com/docs/authkit/api-keys) with WorkOS.
 
 ```ts
-import { NextResponse } from 'next/server'
-import { validateApiKey } from '@workos-inc/authkit-nextjs'
+import { NextResponse } from 'next/server';
+import { validateApiKey } from '@workos-inc/authkit-nextjs';
 
 export async function GET() {
-  const { apiKey } = await validateApiKey()
+  const { apiKey } = await validateApiKey();
 
   if (!apiKey) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true });
 }
 ```
 
@@ -784,6 +780,32 @@ await saveSession(session, req);
 // With URL string
 await saveSession(session, 'https://example.com/callback');
 ```
+
+### CDN Deployments and Caching
+
+AuthKit automatically implements cache security measures to protect against session leakage in CDN environments. This is particularly important when deploying to AWS with SST/OpenNext, Cloudflare, or other CDN configurations.
+
+#### How It Works
+
+The library automatically sets appropriate cache headers on all authenticated requests:
+
+- `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0` - Aggressive cache prevention with multiple directives
+- `Pragma: no-cache` - HTTP/1.0 compatibility
+- `Expires: 0` - HTTP/1.0 cache expiration
+- `Vary: Cookie` - Ensures CDNs differentiate between different users (defense-in-depth)
+- `x-middleware-cache: no-cache` - Prevents Next.js middleware result caching
+
+These headers are applied automatically when:
+
+- A session cookie is present in the request
+- An Authorization header is detected
+- An active authenticated session exists
+
+#### Performance Considerations
+
+**Authenticated pages:** Will not be cached at the CDN level and will always hit your origin server. This is the correct and secure behavior for session-based authentication.
+
+**Public pages:** Unaffected by these security measures. Public routes without authentication context can still be cached normally.
 
 ### Debugging
 
