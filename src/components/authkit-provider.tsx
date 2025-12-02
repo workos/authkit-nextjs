@@ -43,7 +43,7 @@ interface AuthKitProviderProps {
   /**
    * Initial auth data from the server. If provided, the provider will skip the initial client-side fetch.
    */
-  initialAuth?: Omit<UserInfo | NoUserInfo, "accessToken">;
+  initialAuth?: Omit<UserInfo | NoUserInfo, 'accessToken'>;
 }
 
 export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: AuthKitProviderProps) => {
