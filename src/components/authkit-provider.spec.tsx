@@ -35,6 +35,121 @@ describe('AuthKitProvider', () => {
     expect(getByText('Test Child')).toBeInTheDocument();
   });
 
+  it('should skip initial getAuthAction call when initialAuth is provided', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        lastSignInAt: '2024-01-01T00:00:00Z',
+        externalId: null,
+        locale: 'en-US',
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read', 'write'],
+      entitlements: ['feature1'],
+      featureFlags: ['test-flag'],
+      impersonator: undefined,
+    };
+
+    render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <div>Test Child</div>
+      </AuthKitProvider>,
+    );
+
+    // Wait a bit to ensure no call is made
+    await waitFor(
+      () => {
+        expect(getAuthAction).not.toHaveBeenCalled();
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it('should initialize state with initialAuth values', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        lastSignInAt: '2024-01-01T00:00:00Z',
+        locale: 'en-US',
+        externalId: null,
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read', 'write'],
+      entitlements: ['feature1'],
+      featureFlags: ['test-flag'],
+      impersonator: { email: 'admin@example.com', reason: 'Support request' },
+    };
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="loading">{auth.loading.toString()}</div>
+          <div data-testid="email">{auth.user?.email}</div>
+          <div data-testid="session">{auth.sessionId}</div>
+          <div data-testid="org">{auth.organizationId}</div>
+          <div data-testid="role">{auth.role}</div>
+          <div data-testid="impersonator">{auth.impersonator?.email}</div>
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    // Should not be loading when initialAuth is provided
+    expect(getByTestId('loading')).toHaveTextContent('false');
+    expect(getByTestId('email')).toHaveTextContent('test@example.com');
+    expect(getByTestId('session')).toHaveTextContent('test-session');
+    expect(getByTestId('org')).toHaveTextContent('test-org');
+    expect(getByTestId('role')).toHaveTextContent('admin');
+    expect(getByTestId('impersonator')).toHaveTextContent('admin@example.com');
+  });
+
+  it('should call getAuthAction when initialAuth is not provided', async () => {
+    (getAuthAction as jest.Mock).mockResolvedValueOnce({
+      user: { email: 'test@example.com' },
+      sessionId: 'test-session',
+    });
+
+    render(
+      <AuthKitProvider>
+        <div>Test Child</div>
+      </AuthKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getAuthAction).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('should do nothing if onSessionExpired is false', async () => {
     jest.spyOn(window, 'addEventListener');
 
