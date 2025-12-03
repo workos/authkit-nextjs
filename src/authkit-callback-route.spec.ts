@@ -51,7 +51,7 @@ describe('authkit-callback-route', () => {
 
     beforeAll(() => {
       // Silence console.error during tests
-      jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest.spyOn(console, 'error').mockImplementation(() => { });
     });
 
     beforeEach(async () => {
@@ -343,6 +343,38 @@ describe('authkit-callback-route', () => {
 
       // Should still redirect correctly
       expect(response.headers.get('Location')).toContain('/old-path');
+    });
+
+    it('should return error and set no cookies when onSuccess throws', async () => {
+      // Mock authenticate success
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Prepare request with code + state
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', 'dummy-state');
+
+      // Make onSuccess throw intentionally
+      const onSuccess = jest.fn(() => {
+        throw new Error('onSuccess failed');
+      });
+
+      const handler = handleAuth({ onSuccess });
+
+      const response = await handler(request);
+
+      // 1. Status must be error (400, 500 — depends on your handler)
+      expect(response.status).toBeGreaterThanOrEqual(400);
+
+      // 2. Response should contain error message
+      const body = await response.json();
+      expect(body.error).toBeDefined();
+      expect(body.error.message).toBe('Something went wrong');
+
+      // 3. No cookies should be set
+      // NextResponse stores cookies in headers.getSetCookie()
+
+      const nextCookies = await cookies();
+      expect(nextCookies.getAll()).toHaveLength(0);
     });
   });
 });
