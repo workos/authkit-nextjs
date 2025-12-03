@@ -9,7 +9,7 @@ on:
       tags:
         description: 'Manually run vulnerability analysis'
       distinct_id:
-        description: "Required by the return-dispatch action"
+        description: 'Required by the return-dispatch action'
         required: true
 
 concurrency:
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   socket-vulnerability-analysis:
-    runs-on: depot-ubuntu-22.04-4
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
