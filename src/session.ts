@@ -625,4 +625,10 @@ export async function saveSession(
   nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
 }
 
+export async function deleteSession() {
+  const nextCookies = await cookies();
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  nextCookies.delete(cookieName);
+}
+
 export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };
