@@ -243,6 +243,47 @@ describe('auth.ts', () => {
       expect(sessionCookie).toBeUndefined();
     });
 
+    it('should delete all chunked cookies', async () => {
+      const nextCookies = await cookies();
+      const nextHeaders = await headers();
+
+      nextHeaders.set('x-workos-middleware', 'true');
+
+      // Simulate a chunked session cookie
+      nextCookies.set('wos-session.0', 'chunk0');
+      nextCookies.set('wos-session.1', 'chunk1');
+      nextCookies.set('wos-session.2', 'chunk2');
+
+      await signOut();
+
+      // All chunks should be deleted
+      expect(nextCookies.get('wos-session.0')).toBeUndefined();
+      expect(nextCookies.get('wos-session.1')).toBeUndefined();
+      expect(nextCookies.get('wos-session.2')).toBeUndefined();
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith('/');
+    });
+
+    it('should delete both base cookie and chunks if both exist', async () => {
+      const nextCookies = await cookies();
+      const nextHeaders = await headers();
+
+      nextHeaders.set('x-workos-middleware', 'true');
+
+      // Set both base and chunked cookies (edge case during migration)
+      nextCookies.set('wos-session', 'base');
+      nextCookies.set('wos-session.0', 'chunk0');
+      nextCookies.set('wos-session.1', 'chunk1');
+
+      await signOut();
+
+      // All cookies should be deleted
+      expect(nextCookies.get('wos-session')).toBeUndefined();
+      expect(nextCookies.get('wos-session.0')).toBeUndefined();
+      expect(nextCookies.get('wos-session.1')).toBeUndefined();
+      expect(redirect).toHaveBeenCalledTimes(1);
+    });
+
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
         jest
