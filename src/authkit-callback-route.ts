@@ -102,7 +102,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
         if (onSuccess) {
-          await onSuccess({
+          const onSuccessResponse = await onSuccess({
             accessToken,
             refreshToken,
             user,
@@ -112,6 +112,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
             organizationId,
             state: customState,
           });
+
+          if (onSuccessResponse) {
+            return onSuccessResponse;
+          }
         }
 
         return response;
