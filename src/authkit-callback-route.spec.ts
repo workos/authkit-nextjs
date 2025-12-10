@@ -184,7 +184,6 @@ describe('authkit-callback-route', () => {
     it('should handle full URL in returnPathname by extracting only the pathname', async () => {
       jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Simulate a case where returnPathname contains a full URL instead of just a pathname
       const state = btoa(JSON.stringify({ returnPathname: 'https://example.com/invite/k0123456789' }));
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
@@ -193,9 +192,7 @@ describe('authkit-callback-route', () => {
       const response = await handler(request);
 
       const location = response.headers.get('Location');
-      // Should redirect to the pathname only, not create a malformed URL
       expect(location).toContain('/invite/k0123456789');
-      // Should NOT contain the full URL in the path
       expect(location).not.toContain('https://example.com/invite');
     });
 

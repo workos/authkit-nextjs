@@ -80,9 +80,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // Redirect to the requested path and store the session
         const returnPathname = returnPathnameState ?? returnPathnameOption;
 
-        // Parse returnPathname to extract pathname and search params
-        // Using a dummy base URL handles both relative paths ("/dashboard")
-        // and full URLs ("https://example.com/dashboard") correctly
+        // Extract pathname and search params from returnPathname
         const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
         url.pathname = parsedReturnUrl.pathname;
 
