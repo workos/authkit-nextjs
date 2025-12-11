@@ -80,17 +80,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // Redirect to the requested path and store the session
         const returnPathname = returnPathnameState ?? returnPathnameOption;
 
-        // Extract the search params if they are present
-        if (returnPathname.includes('?')) {
-          const newUrl = new URL(returnPathname, 'https://example.com');
-          url.pathname = newUrl.pathname;
-
-          for (const [key, value] of newUrl.searchParams) {
-            url.searchParams.append(key, value);
-          }
-        } else {
-          url.pathname = returnPathname;
-        }
+        // Extract pathname and search params from returnPathname
+        const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
+        url.pathname = parsedReturnUrl.pathname;
+        url.search = parsedReturnUrl.search;
 
         // Fall back to standard Response if NextResponse is not available.
         // This is to support Next.js 13.

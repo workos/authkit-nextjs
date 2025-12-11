@@ -181,6 +181,21 @@ describe('authkit-callback-route', () => {
       expect(response.headers.get('Location')).toContain('/custom-path?foo=bar&baz=qux');
     });
 
+    it('should handle full URL in returnPathname by extracting only the pathname', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      const state = btoa(JSON.stringify({ returnPathname: 'https://example.com/invite/k0123456789' }));
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', state);
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      const location = response.headers.get('Location');
+      expect(location).toContain('/invite/k0123456789');
+      expect(location).not.toContain('https://example.com/invite');
+    });
+
     it('should use Response if NextResponse.redirect is not available', async () => {
       const originalRedirect = NextResponse.redirect;
       (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
