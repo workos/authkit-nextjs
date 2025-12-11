@@ -83,10 +83,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // Extract pathname and search params from returnPathname
         const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
         url.pathname = parsedReturnUrl.pathname;
-
-        for (const [key, value] of parsedReturnUrl.searchParams) {
-          url.searchParams.append(key, value);
-        }
+        url.search = parsedReturnUrl.search;
 
         // Fall back to standard Response if NextResponse is not available.
         // This is to support Next.js 13.
