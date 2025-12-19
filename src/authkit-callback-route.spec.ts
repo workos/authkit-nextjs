@@ -282,14 +282,35 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
 
       const handler = handleAuth({
-        onSuccess: async (data) => {
+        onSuccess: async ({ response, ...data }) => {
           await saveSession({ ...data, accessToken: newAccessToken }, request);
+          return response;
         },
       });
-      await handler(request);
+      const response = await handler(request);
 
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(newAccessToken);
+      expect(response).toBeInstanceOf(NextResponse);
+    });
+
+    it('should allow onSuccess to return a redirect response', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const handler = handleAuth({
+        onSuccess: async () => {
+          return NextResponse.redirect(new URL('/dashboard', 'https://example.com'));
+        },
+      });
+      const response = await handler(request);
+
+      expect(response.headers.get('Location')).toContain('/dashboard');
+      expect(response).toBeInstanceOf(NextResponse);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Set-Cookie')).toBeDefined();
     });
 
     it('should pass custom state data to onSuccess callback', async () => {
