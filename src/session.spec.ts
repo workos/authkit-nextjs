@@ -374,10 +374,7 @@ describe('session.ts', () => {
         );
       });
 
-      it('should use Response if NextResponse.redirect is not available', async () => {
-        const originalRedirect = NextResponse.redirect;
-        (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
-
+      it('should return a redirect response when middlewareAuth is enabled and user is not authenticated', async () => {
         const request = new NextRequest(new URL('http://example.com/protected'));
         const result = await updateSessionMiddleware(
           request,
@@ -390,10 +387,9 @@ describe('session.ts', () => {
           [],
         );
 
-        expect(result).toBeInstanceOf(Response);
-
-        // Restore the original redirect method
-        (NextResponse as Partial<typeof NextResponse>).redirect = originalRedirect;
+        expect(result).toBeInstanceOf(NextResponse);
+        expect(result.status).toBe(307);
+        expect(result.headers.get('Location')).toContain('workos.com');
       });
 
       it('should automatically add the redirect URI to unauthenticatedPaths when middleware is enabled', async () => {
@@ -429,7 +425,7 @@ describe('session.ts', () => {
         expect(result.headers.get('Location')).toContain('screen_hint=sign-up');
       });
 
-      it('should set the sign up paths in the headers', async () => {
+      it('should not leak sign-up paths header to the browser', async () => {
         const request = new NextRequest(new URL('http://example.com/protected-signup'));
         const result = await updateSessionMiddleware(
           request,
@@ -442,7 +438,8 @@ describe('session.ts', () => {
           ['/protected-signup'],
         );
 
-        expect(result.headers.get('x-sign-up-paths')).toBe('/protected-signup');
+        // x-sign-up-paths is an internal header that should not leak to the browser
+        expect(result.headers.get('x-sign-up-paths')).toBeNull();
       });
 
       it('should allow logged out users on unauthenticated paths', async () => {

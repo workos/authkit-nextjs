@@ -6,8 +6,6 @@ import { NextResponse } from 'next/server';
  */
 export function setCachePreventionHeaders(headers: Headers): void {
   headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate, max-age=0');
-  headers.set('Pragma', 'no-cache');
-  headers.set('Expires', '0');
   headers.set('x-middleware-cache', 'no-cache');
 }
 

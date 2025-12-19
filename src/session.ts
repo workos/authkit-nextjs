@@ -21,7 +21,8 @@ import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { lazy, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
+import { handleAuthkitHeaders } from './middleware-helpers.js';
+import { lazy, setCachePreventionHeaders } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -149,15 +150,6 @@ async function updateSessionMiddleware(
     eagerAuth,
   });
 
-  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
-  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
-    if (debug) {
-      console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
-    }
-
-    return redirectWithFallback(authorizationUrl as string, headers);
-  }
-
   // Record the sign up paths so we can use them later
   if (signUpPaths.length > 0) {
     headers.set(signUpPathsHeaderName, signUpPaths.join(','));
@@ -165,33 +157,16 @@ async function updateSessionMiddleware(
 
   applyCacheSecurityHeaders(headers, request, session);
 
-  // Create a new request with modified headers (for page handlers)
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(middlewareHeaderName, headers.get(middlewareHeaderName)!);
-  requestHeaders.set('x-url', headers.get('x-url')!);
-  if (headers.has('x-redirect-uri')) {
-    requestHeaders.set('x-redirect-uri', headers.get('x-redirect-uri')!);
-  }
-  if (headers.has(signUpPathsHeaderName)) {
-    requestHeaders.set(signUpPathsHeaderName, headers.get(signUpPathsHeaderName)!);
+  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
+  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
+    if (debug) {
+      console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
+    }
+
+    return handleAuthkitHeaders(request, headers, { redirect: authorizationUrl as string });
   }
 
-  // Pass session to page handlers via request header
-  // This ensures handlers see refreshed sessions immediately (before Set-Cookie reaches browser)
-  const sessionHeader = headers.get(sessionHeaderName);
-  if (sessionHeader) {
-    requestHeaders.set(sessionHeaderName, sessionHeader);
-  }
-
-  // Remove session header from response headers to prevent leakage
-  headers.delete(sessionHeaderName);
-
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-    headers,
-  });
+  return handleAuthkitHeaders(request, headers);
 }
 
 async function updateSession(

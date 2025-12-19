@@ -198,18 +198,14 @@ import { NextRequest } from 'next/server';
 import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs';
 
 export default async function middleware(request: NextRequest) {
-  // Get session and headers from authkit
+  // Get session, headers, and the WorkOS authorization URL for sign-in redirects
   const { session, headers, authorizationUrl } = await authkit(request);
 
   const { pathname } = request.nextUrl;
 
   // Redirect unauthenticated users on protected routes
-  if (pathname.startsWith('/app') && !session.user) {
-    return handleAuthkitHeaders(request, headers, {
-      redirect: authorizationUrl,
-      // Whitelist WorkOS domain for OAuth redirects
-      allowCrossOriginRedirect: ['https://api.workos.com'],
-    });
+  if (pathname.startsWith('/app') && !session.user && authorizationUrl) {
+    return handleAuthkitHeaders(request, headers, { redirect: authorizationUrl });
   }
 
   // Custom redirects (relative URLs supported)
@@ -228,55 +224,34 @@ export const config = { matcher: ['/', '/app/:path*'] };
 
 - AuthKit headers are properly passed to your pages (so `withAuth()` works)
 - Internal headers (session data, URLs) are never leaked to the browser
-- Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded (security allowlist)
-- `Cache-Control: no-store` is automatically set when cookies are present (prevents caching authenticated responses)
+- Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded
+- `Cache-Control: no-store` is automatically set when cookies are present
+- `Vary` headers are properly merged when multiple values exist
 - Relative redirect URLs are automatically normalized to absolute URLs
-- Cross-origin redirects are blocked by default (use origin whitelist for external auth)
 - POST/PUT redirects use 303 status to prevent form resubmission
-- CORS preflight (OPTIONS) requests are never redirected
-- Invalid redirect URLs fail gracefully instead of crashing
-- Debug logging in development helps troubleshoot redirect issues
+
+> **Security Note:** The `redirect` option should only be used with trusted values (e.g., `authorizationUrl` from `authkit()` or hardcoded paths). Never pass user-controlled input directly to `redirect` without validation, as this could enable open redirect attacks.
 
 ##### Redirect options
 
 ```ts
 handleAuthkitHeaders(request, headers, {
-  redirect: '/login',              // URL to redirect to (string or URL object)
-  redirectStatus: 307,             // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
-  allowCrossOriginRedirect: false, // Control cross-origin redirects (see below)
-  debug: true,                     // Enable debug logging for redirect decisions
+  redirect: '/login',    // URL to redirect to (string or URL object)
+  redirectStatus: 307,   // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
 });
-```
-
-##### Cross-origin redirect control
-
-The `allowCrossOriginRedirect` option provides flexible control over external redirects:
-
-```ts
-// Block all cross-origin redirects (default, most secure)
-allowCrossOriginRedirect: false
-
-// Allow all cross-origin redirects (use with caution)
-allowCrossOriginRedirect: true
-
-// Whitelist specific origins (recommended for OAuth flows)
-allowCrossOriginRedirect: ['https://api.workos.com', 'https://auth.example.com']
-
-// Custom predicate for fine-grained control
-allowCrossOriginRedirect: (url, request) => url.hostname.endsWith('.workos.com')
 ```
 
 ##### Advanced: Composing with rewrites
 
-For advanced use cases like rewrites, use the lower-level `collectAuthkitHeaders()` and `applyResponseHeaders()`:
+For advanced use cases like rewrites, use the lower-level `partitionAuthkitHeaders()` and `applyResponseHeaders()`:
 
 ```ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authkit, collectAuthkitHeaders, applyResponseHeaders } from '@workos-inc/authkit-nextjs';
+import { authkit, partitionAuthkitHeaders, applyResponseHeaders } from '@workos-inc/authkit-nextjs';
 
 export default async function middleware(request: NextRequest) {
   const { headers } = await authkit(request);
-  const { requestHeaders, responseHeaders } = collectAuthkitHeaders(request, headers);
+  const { requestHeaders, responseHeaders } = partitionAuthkitHeaders(request, headers);
 
   // Create your own response (rewrite, etc.)
   const response = NextResponse.rewrite(new URL('/app/dashboard', request.url), {
@@ -289,6 +264,36 @@ export default async function middleware(request: NextRequest) {
   return response;
 }
 ```
+
+##### Internal headers reference
+
+AuthKit uses internal headers to pass data between middleware and server components. These are automatically handled by the helpers above, but understanding them helps with debugging.
+
+**Request headers** (passed to server components, never sent to browser):
+
+| Header | Purpose |
+|--------|---------|
+| `x-workos-middleware` | Flag indicating AuthKit middleware is active. Required for `withAuth()` to function. |
+| `x-workos-session` | Encrypted session data. Contains user info, access token, and refresh token. |
+| `x-url` | Current request URL. Used for redirect-after-login and generating sign-in URLs. |
+| `x-redirect-uri` | OAuth callback URI. Used by `getAuthorizationUrl()` for the OAuth flow. |
+| `x-sign-up-paths` | Paths configured to trigger sign-up instead of sign-in flow. |
+
+> **Security:** These headers contain sensitive session data. The `handleAuthkitHeaders()` helper ensures they're forwarded to your pages (so `withAuth()` works) but never leaked to the browser. Client-injected `x-workos-*` headers are stripped and replaced with trusted values.
+
+**Response headers** (safe to send to browser):
+
+| Header | Purpose |
+|--------|---------|
+| `Set-Cookie` | Session cookies (e.g., `wos-session`). Multiple cookies are properly appended. |
+| `Cache-Control` | Caching directives. Auto-set to `no-store` when cookies are present. |
+| `Vary` | Cache variation keys. Values are deduplicated when merging. |
+| `WWW-Authenticate` | Authentication challenge for 401 responses (API auth flows). |
+| `Proxy-Authenticate` | Authentication challenge for proxy auth. |
+| `Link` | Pagination, preload hints, etc. |
+| `x-middleware-cache` | Next.js middleware result caching. Set to `no-cache` to prevent stale responses. |
+
+Only these allowlisted headers are forwarded to the browser. Any other headers from `authkit()` (including future `x-workos-*` headers) are filtered out for security.
 
 ## Usage
 
