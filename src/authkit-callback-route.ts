@@ -94,8 +94,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
+        // if onSuccess is provided, return it as it may be a redirect or contain custom headers than the default response
         if (onSuccess) {
-          await onSuccess({
+          return await onSuccess({
+            response,
             accessToken,
             refreshToken,
             user,
