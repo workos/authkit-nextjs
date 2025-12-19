@@ -15,11 +15,14 @@ jobs:
   test:
     name: Publish to NPM
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install Dependencies
@@ -32,14 +35,10 @@ jobs:
 
       - name: Push Release
         if: ${{ !github.event.release.prerelease }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm publish --tag latest --access=public
+          npm publish --tag latest --access=public --provenance
 
       - name: Push Pre-Release
         if: ${{ github.event.release.prerelease }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm publish --tag next --access=public
+          npm publish --tag next --access=public --provenance
