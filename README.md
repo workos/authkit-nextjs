@@ -189,6 +189,107 @@ export const config = { matcher: ['/', '/admin'] };
 
 Custom redirect URIs will be used over a redirect URI configured in the environment variables.
 
+#### Composable middleware
+
+If you need to combine AuthKit with other middleware (rate limiting, redirects, etc.), use the `authkit()` function with `handleAuthkitHeaders()` helper:
+
+```ts
+import { NextRequest } from 'next/server';
+import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs';
+
+export default async function middleware(request: NextRequest) {
+  // Get session and headers from authkit
+  const { session, headers, authorizationUrl } = await authkit(request);
+
+  const { pathname } = request.nextUrl;
+
+  // Redirect unauthenticated users on protected routes
+  if (pathname.startsWith('/app') && !session.user) {
+    return handleAuthkitHeaders(request, headers, {
+      redirect: authorizationUrl,
+      // Whitelist WorkOS domain for OAuth redirects
+      allowCrossOriginRedirect: ['https://api.workos.com'],
+    });
+  }
+
+  // Custom redirects (relative URLs supported)
+  if (pathname === '/old-path') {
+    return handleAuthkitHeaders(request, headers, { redirect: '/new-path' });
+  }
+
+  // Continue request with properly merged headers
+  return handleAuthkitHeaders(request, headers);
+}
+
+export const config = { matcher: ['/', '/app/:path*'] };
+```
+
+**Important:** Always use `handleAuthkitHeaders()` when returning a response. This helper ensures:
+
+- AuthKit headers are properly passed to your pages (so `withAuth()` works)
+- Internal headers (session data, URLs) are never leaked to the browser
+- Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded (security allowlist)
+- `Cache-Control: no-store` is automatically set when cookies are present (prevents caching authenticated responses)
+- Relative redirect URLs are automatically normalized to absolute URLs
+- Cross-origin redirects are blocked by default (use origin whitelist for external auth)
+- POST/PUT redirects use 303 status to prevent form resubmission
+- CORS preflight (OPTIONS) requests are never redirected
+- Invalid redirect URLs fail gracefully instead of crashing
+- Debug logging in development helps troubleshoot redirect issues
+
+##### Redirect options
+
+```ts
+handleAuthkitHeaders(request, headers, {
+  redirect: '/login',              // URL to redirect to (string or URL object)
+  redirectStatus: 307,             // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
+  allowCrossOriginRedirect: false, // Control cross-origin redirects (see below)
+  debug: true,                     // Enable debug logging for redirect decisions
+});
+```
+
+##### Cross-origin redirect control
+
+The `allowCrossOriginRedirect` option provides flexible control over external redirects:
+
+```ts
+// Block all cross-origin redirects (default, most secure)
+allowCrossOriginRedirect: false
+
+// Allow all cross-origin redirects (use with caution)
+allowCrossOriginRedirect: true
+
+// Whitelist specific origins (recommended for OAuth flows)
+allowCrossOriginRedirect: ['https://api.workos.com', 'https://auth.example.com']
+
+// Custom predicate for fine-grained control
+allowCrossOriginRedirect: (url, request) => url.hostname.endsWith('.workos.com')
+```
+
+##### Advanced: Composing with rewrites
+
+For advanced use cases like rewrites, use the lower-level `collectAuthkitHeaders()` and `applyResponseHeaders()`:
+
+```ts
+import { NextRequest, NextResponse } from 'next/server';
+import { authkit, collectAuthkitHeaders, applyResponseHeaders } from '@workos-inc/authkit-nextjs';
+
+export default async function middleware(request: NextRequest) {
+  const { headers } = await authkit(request);
+  const { requestHeaders, responseHeaders } = collectAuthkitHeaders(request, headers);
+
+  // Create your own response (rewrite, etc.)
+  const response = NextResponse.rewrite(new URL('/app/dashboard', request.url), {
+    request: { headers: requestHeaders },
+  });
+
+  // Apply AuthKit response headers (Set-Cookie, etc.)
+  applyResponseHeaders(response, responseHeaders);
+
+  return response;
+}
+```
+
 ## Usage
 
 ### Wrap your app in `AuthKitProvider`
