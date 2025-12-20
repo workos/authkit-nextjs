@@ -269,7 +269,16 @@ describe('authkit-callback-route', () => {
       const handler = handleAuth({ onSuccess: onSuccess });
       await handler(request);
 
-      expect(onSuccess).toHaveBeenCalledWith(mockAuthResponse);
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: mockAuthResponse.accessToken,
+          refreshToken: mockAuthResponse.refreshToken,
+          user: mockAuthResponse.user,
+          oauthTokens: mockAuthResponse.oauthTokens,
+          response: expect.any(Response),
+          state: undefined,
+        }),
+      );
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
@@ -326,20 +335,24 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
 
-      const onSuccess = jest.fn();
+      const onSuccess = jest.fn((data) => data.response);
       const handler = handleAuth({ onSuccess });
-      await handler(request);
+      const response = await handler(request);
 
       // Verify onSuccess was called with the custom state string
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
-          ...mockAuthResponse,
+          accessToken: mockAuthResponse.accessToken,
+          refreshToken: mockAuthResponse.refreshToken,
+          user: mockAuthResponse.user,
+          oauthTokens: mockAuthResponse.oauthTokens,
           state: 'custom-user-state-string',
+          response: expect.any(Response),
         }),
       );
 
       // Verify the redirect went to the correct path
-      const response = await handler(request);
+      expect(response).toBeDefined();
       expect(response.headers.get('Location')).toContain('/dashboard');
     });
 
