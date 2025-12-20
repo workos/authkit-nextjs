@@ -309,7 +309,7 @@ describe('authkit-callback-route', () => {
 
       expect(response.headers.get('Location')).toContain('/dashboard');
       expect(response).toBeInstanceOf(NextResponse);
-      expect(response.status).toBe(302);
+      expect(response.status).toBe(307);
       expect(response.headers.get('Set-Cookie')).toBeDefined();
     });
 
