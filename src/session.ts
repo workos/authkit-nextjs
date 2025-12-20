@@ -88,6 +88,54 @@ function isInitialDocumentRequest(request: NextRequest): boolean {
   return isDocumentRequest && !isRSCRequest && !isPrefetch;
 }
 
+/**
+ * Prepares request headers by copying relevant headers from response headers and setting up session header.
+ * Also applies cache security headers and removes the session header from response headers to prevent leakage.
+ *
+ * @param request - The original NextRequest object
+ * @param headers - The response headers containing session and metadata
+ * @param signUpPaths - Array of sign up paths to include in headers
+ * @param session - Optional session data to apply cache security headers
+ * @returns Modified request headers with session and metadata copied from response headers
+ */
+export function prepareRequestHeaders(
+  request: NextRequest,
+  headers: Headers,
+  signUpPaths: string[],
+  session?: { accessToken?: string } | Session | UserInfo | NoUserInfo,
+): Headers {
+  // Record the sign up paths so we can use them later
+  if (signUpPaths.length > 0) {
+    headers.set(signUpPathsHeaderName, signUpPaths.join(','));
+  }
+
+  // Apply cache security headers
+  applyCacheSecurityHeaders(headers, request, session);
+
+  // Create a new request with modified headers (for page handlers and middleware chaining)
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(middlewareHeaderName, headers.get(middlewareHeaderName)!);
+  requestHeaders.set('x-url', headers.get('x-url')!);
+  if (headers.has('x-redirect-uri')) {
+    requestHeaders.set('x-redirect-uri', headers.get('x-redirect-uri')!);
+  }
+  if (headers.has(signUpPathsHeaderName)) {
+    requestHeaders.set(signUpPathsHeaderName, headers.get(signUpPathsHeaderName)!);
+  }
+
+  // Pass session to page handlers via request header
+  // This ensures handlers see refreshed sessions immediately (before Set-Cookie reaches browser)
+  const sessionHeader = headers.get(sessionHeaderName);
+  if (sessionHeader) {
+    requestHeaders.set(sessionHeaderName, sessionHeader);
+  }
+
+  // Remove session header from response headers to prevent leakage
+  headers.delete(sessionHeaderName);
+
+  return requestHeaders;
+}
+
 async function encryptSession(session: Session) {
   return sealData(session, {
     password: WORKOS_COOKIE_PASSWORD,
@@ -158,33 +206,7 @@ async function updateSessionMiddleware(
     return redirectWithFallback(authorizationUrl as string, headers);
   }
 
-  // Record the sign up paths so we can use them later
-  if (signUpPaths.length > 0) {
-    headers.set(signUpPathsHeaderName, signUpPaths.join(','));
-  }
-
-  applyCacheSecurityHeaders(headers, request, session);
-
-  // Create a new request with modified headers (for page handlers)
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(middlewareHeaderName, headers.get(middlewareHeaderName)!);
-  requestHeaders.set('x-url', headers.get('x-url')!);
-  if (headers.has('x-redirect-uri')) {
-    requestHeaders.set('x-redirect-uri', headers.get('x-redirect-uri')!);
-  }
-  if (headers.has(signUpPathsHeaderName)) {
-    requestHeaders.set(signUpPathsHeaderName, headers.get(signUpPathsHeaderName)!);
-  }
-
-  // Pass session to page handlers via request header
-  // This ensures handlers see refreshed sessions immediately (before Set-Cookie reaches browser)
-  const sessionHeader = headers.get(sessionHeaderName);
-  if (sessionHeader) {
-    requestHeaders.set(sessionHeaderName, sessionHeader);
-  }
-
-  // Remove session header from response headers to prevent leakage
-  headers.delete(sessionHeaderName);
+  const requestHeaders = prepareRequestHeaders(request, headers, signUpPaths, session);
 
   return NextResponse.next({
     request: {
@@ -442,7 +464,7 @@ async function refreshSession({
   };
 }
 
-function getMiddlewareAuthPathRegex(pathGlob: string) {
+export function getMiddlewareAuthPathRegex(pathGlob: string) {
   try {
     const url = new URL(pathGlob, 'https://example.com');
     const path = `${url.pathname!}${url.hash || ''}`;
@@ -575,7 +597,7 @@ function getReturnPathname(url: string): string {
   return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
 }
 
-function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
+export function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
   if (!signUpPaths) return 'sign-in';
 
   const screenHintPaths: string[] = signUpPaths.filter((pathGlob) => {
