@@ -224,15 +224,16 @@ export default async function proxy(request: NextRequest) {
 export const config = { matcher: ['/', '/app/:path*'] };
 ```
 
-**Important:** Always use `handleAuthkitHeaders()` when returning a response. This helper ensures:
-
-- AuthKit headers are properly passed to your pages (so `withAuth()` works)
-- Internal headers (session data, URLs) are never leaked to the browser
-- Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded
-- `Cache-Control: no-store` is automatically set when cookies are present
-- `Vary` headers are properly merged when multiple values exist
-- Relative redirect URLs are automatically normalized to absolute URLs
-- POST/PUT redirects use 303 status to prevent form resubmission
+> [!IMPORTANT]
+> Always use `handleAuthkitHeaders()` when returning a response. This helper ensures:
+>
+> - AuthKit headers are properly passed to your pages (so `withAuth()` works)
+> - Internal headers (session data, URLs) are never leaked to the browser
+> - Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded
+> - `Cache-Control: no-store` is automatically set when cookies are present
+> - `Vary` headers are properly merged when multiple values exist
+> - Relative redirect URLs are automatically normalized to absolute URLs
+> - POST/PUT redirects use 303 status to prevent form resubmission
 
 > [!NOTE]
 > The `redirect` option should only be used with trusted values (e.g., `authorizationUrl` from `authkit()` or hardcoded paths). Never pass user-controlled input directly to `redirect` without validation, as this could enable open redirect attacks.
