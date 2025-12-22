@@ -142,31 +142,33 @@ The `onSuccess` callback receives the following data:
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
-### Middleware / Proxy
+### Proxy / Middleware
 
-This library relies on Next.js middleware to provide session management for routes.
+This library relies on Next.js proxy (called "middleware" in Next.js ≤15) to provide session management for routes.
 
-**For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
 **For Next.js 16+:** Create a `proxy.ts` file in the root of your project.
+**For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
 
-The code remains the same; only the filename changes:
+The code remains the same; only the filename and export name differ:
 
 ```ts
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware();
+// For Next.js 16+, you can also use: export { default as proxy } from './proxy';
 
 // Match against pages that require auth
 // Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
 
-The middleware can be configured with several options.
+The proxy/middleware can be configured with several options.
 
 | Option           | Default     | Description                                                                                                             |
 | ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                  |
-| `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.                    |
+| `middlewareAuth` | `undefined` | Used to configure proxy/middleware auth options. See [middleware auth](#middleware-auth) for more details.              |
 | `debug`          | `false`     | Enables debug logs.                                                                                                     |
 | `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                            |
 | `eagerAuth`      | `false`     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details. |
@@ -189,15 +191,17 @@ export const config = { matcher: ['/', '/admin'] };
 
 Custom redirect URIs will be used over a redirect URI configured in the environment variables.
 
-#### Composable middleware
+#### Composable proxy/middleware
 
-If you need to combine AuthKit with other middleware (rate limiting, redirects, etc.), use the `authkit()` function with `handleAuthkitHeaders()` helper:
+If you need to combine AuthKit with other proxy logic (rate limiting, redirects, etc.), use the `authkit()` function with `handleAuthkitHeaders()` helper:
 
 ```ts
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
 import { NextRequest } from 'next/server';
 import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs';
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
+  // For Next.js ≤15, use: export default async function middleware(request: NextRequest) {
   // Get session, headers, and the WorkOS authorization URL for sign-in redirects
   const { session, headers, authorizationUrl } = await authkit(request);
 
@@ -230,14 +234,15 @@ export const config = { matcher: ['/', '/app/:path*'] };
 - Relative redirect URLs are automatically normalized to absolute URLs
 - POST/PUT redirects use 303 status to prevent form resubmission
 
-> **Security Note:** The `redirect` option should only be used with trusted values (e.g., `authorizationUrl` from `authkit()` or hardcoded paths). Never pass user-controlled input directly to `redirect` without validation, as this could enable open redirect attacks.
+> [!NOTE]
+> The `redirect` option should only be used with trusted values (e.g., `authorizationUrl` from `authkit()` or hardcoded paths). Never pass user-controlled input directly to `redirect` without validation, as this could enable open redirect attacks.
 
 ##### Redirect options
 
 ```ts
 handleAuthkitHeaders(request, headers, {
-  redirect: '/login',    // URL to redirect to (string or URL object)
-  redirectStatus: 307,   // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
+  redirect: '/login', // URL to redirect to (string or URL object)
+  redirectStatus: 307, // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
 });
 ```
 
@@ -246,10 +251,12 @@ handleAuthkitHeaders(request, headers, {
 For advanced use cases like rewrites, use the lower-level `partitionAuthkitHeaders()` and `applyResponseHeaders()`:
 
 ```ts
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
 import { NextRequest, NextResponse } from 'next/server';
 import { authkit, partitionAuthkitHeaders, applyResponseHeaders } from '@workos-inc/authkit-nextjs';
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
+  // For Next.js ≤15, use: export default async function middleware(request: NextRequest) {
   const { headers } = await authkit(request);
   const { requestHeaders, responseHeaders } = partitionAuthkitHeaders(request, headers);
 
@@ -267,31 +274,31 @@ export default async function middleware(request: NextRequest) {
 
 ##### Internal headers reference
 
-AuthKit uses internal headers to pass data between middleware and server components. These are automatically handled by the helpers above, but understanding them helps with debugging.
+AuthKit uses internal headers to pass data between proxy/middleware and server components. These are automatically handled by the helpers above, but understanding them helps with debugging.
 
 **Request headers** (passed to server components, never sent to browser):
 
-| Header | Purpose |
-|--------|---------|
-| `x-workos-middleware` | Flag indicating AuthKit middleware is active. Required for `withAuth()` to function. |
-| `x-workos-session` | Encrypted session data. Contains user info, access token, and refresh token. |
-| `x-url` | Current request URL. Used for redirect-after-login and generating sign-in URLs. |
-| `x-redirect-uri` | OAuth callback URI. Used by `getAuthorizationUrl()` for the OAuth flow. |
-| `x-sign-up-paths` | Paths configured to trigger sign-up instead of sign-in flow. |
+| Header                | Purpose                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `x-workos-middleware` | Flag indicating AuthKit proxy/middleware is active. Required for `withAuth()` to function. |
+| `x-workos-session`    | Encrypted session data. Contains user info, access token, and refresh token.               |
+| `x-url`               | Current request URL. Used for redirect-after-login and generating sign-in URLs.            |
+| `x-redirect-uri`      | OAuth callback URI. Used by `getAuthorizationUrl()` for the OAuth flow.                    |
+| `x-sign-up-paths`     | Paths configured to trigger sign-up instead of sign-in flow.                               |
 
 > **Security:** These headers contain sensitive session data. The `handleAuthkitHeaders()` helper ensures they're forwarded to your pages (so `withAuth()` works) but never leaked to the browser. Client-injected `x-workos-*` headers are stripped and replaced with trusted values.
 
 **Response headers** (safe to send to browser):
 
-| Header | Purpose |
-|--------|---------|
-| `Set-Cookie` | Session cookies (e.g., `wos-session`). Multiple cookies are properly appended. |
-| `Cache-Control` | Caching directives. Auto-set to `no-store` when cookies are present. |
-| `Vary` | Cache variation keys. Values are deduplicated when merging. |
-| `WWW-Authenticate` | Authentication challenge for 401 responses (API auth flows). |
-| `Proxy-Authenticate` | Authentication challenge for proxy auth. |
-| `Link` | Pagination, preload hints, etc. |
-| `x-middleware-cache` | Next.js middleware result caching. Set to `no-cache` to prevent stale responses. |
+| Header               | Purpose                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `Set-Cookie`         | Session cookies (e.g., `wos-session`). Multiple cookies are properly appended.         |
+| `Cache-Control`      | Caching directives. Auto-set to `no-store` when cookies are present.                   |
+| `Vary`               | Cache variation keys. Values are deduplicated when merging.                            |
+| `WWW-Authenticate`   | Authentication challenge for 401 responses (API auth flows).                           |
+| `Proxy-Authenticate` | Authentication challenge for proxy auth.                                               |
+| `Link`               | Pagination, preload hints, etc.                                                        |
+| `x-middleware-cache` | Next.js proxy/middleware result caching. Set to `no-cache` to prevent stale responses. |
 
 Only these allowlisted headers are forwarded to the browser. Any other headers from `authkit()` (including future `x-workos-*` headers) are filtered out for security.
 
@@ -326,7 +333,7 @@ import { withAuth } from '@workos-inc/authkit-nextjs';
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Fetch auth data on the server
   const auth = await withAuth();
-  
+
   // Remove the accessToken from the auth object as it is not needed on the client side
   const { accessToken, ...initialAuth } = auth;
 
@@ -609,16 +616,16 @@ const { session, headers } = await authkit(request, {
 });
 ```
 
-These callbacks provide a way to perform side effects when sessions are refreshed in the middleware. Common use cases include:
+These callbacks provide a way to perform side effects when sessions are refreshed in the proxy/middleware. Common use cases include:
 
 - Logging authentication events
 - Updating last activity timestamps
 - Triggering organization-specific data prefetching
 - Recording failed refresh attempts
 
-### Middleware auth
+### Proxy / Middleware auth
 
-The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
+The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your proxy/middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use `middlewareAuth` instead:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -645,7 +652,7 @@ The `eagerAuth` option enables synchronous access to authentication tokens on in
 
 #### How it works
 
-When `eagerAuth: true` is set, the middleware temporarily stores the access token in a short-lived cookie (30 seconds) that is:
+When `eagerAuth: true` is set, the proxy/middleware temporarily stores the access token in a short-lived cookie (30 seconds) that is:
 
 - Only set on initial page loads (not API or prefetch requests)
 - Immediately consumed and deleted by the client
@@ -653,7 +660,7 @@ When `eagerAuth: true` is set, the middleware temporarily stores the access toke
 
 #### Usage
 
-Enable eager auth in your middleware configuration:
+Enable eager auth in your proxy/middleware configuration:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -707,16 +714,16 @@ Eager auth makes tokens briefly accessible via JavaScript (30-second window) to 
 - Most API calls where a brief loading state is acceptable
 - When you don't need immediate token access on page load
 
-### Composing middleware
+### Composing proxy / middleware
 
 > **Security note:** Always forward `request.headers` when returning `NextResponse.*` to mitigate SSRF issues in Next.js < 14.2.32 (14.x) or < 15.4.7 (15.x). This pattern is safe on all versions. We strongly recommend upgrading to the latest Next.js.
 
-If you don't want to use `authkitMiddleware` and instead want to compose your own middleware, you can use the `authkit` method. In this mode you are responsible to handling what to do when there's no session on a protected route.
-
-> **Note:** For Next.js 16+, name your file `proxy.ts` and the function `proxy` instead of `middleware`.
+If you don't want to use `authkitMiddleware` and instead want to compose your own proxy, you can use the `authkit` method. In this mode you are responsible for handling what to do when there's no session on a protected route.
 
 ```ts
-export default async function middleware(request: NextRequest) {
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
+export default async function proxy(request: NextRequest) {
+  // For Next.js ≤15, use: export default async function middleware(request: NextRequest) {
   // Perform logic before or after AuthKit
 
   // Auth object contains the session, response headers and an authorization URL in the case that the session isn't valid
@@ -744,7 +751,7 @@ export default async function middleware(request: NextRequest) {
 
   // Copy Set-Cookie and cache control headers to the response, but exclude the internal
   // x-workos-session header which contains encrypted session data and should never appear
-  // in HTTP responses (it's only used to pass session data between middleware and page handlers)
+  // in HTTP responses (it's only used to pass session data between proxy/middleware and page handlers)
   for (const [key, value] of authkitHeaders) {
     if (key.toLowerCase() === 'x-workos-session') {
       continue; // Internal header - must not leak to response
@@ -924,7 +931,7 @@ The library automatically sets appropriate cache headers on all authenticated re
 - `Pragma: no-cache` - HTTP/1.0 compatibility
 - `Expires: 0` - HTTP/1.0 cache expiration
 - `Vary: Cookie` - Ensures CDNs differentiate between different users (defense-in-depth)
-- `x-middleware-cache: no-cache` - Prevents Next.js middleware result caching
+- `x-middleware-cache: no-cache` - Prevents Next.js proxy/middleware result caching
 
 These headers are applied automatically when:
 
@@ -940,7 +947,7 @@ These headers are applied automatically when:
 
 ### Debugging
 
-To enable debug logs, initialize the middleware with the debug flag enabled.
+To enable debug logs, initialize the proxy/middleware with the debug flag enabled.
 
 ```js
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
