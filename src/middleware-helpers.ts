@@ -11,9 +11,7 @@ export const AUTHKIT_REQUEST_HEADERS = [
 
 export type AuthkitRequestHeader = (typeof AUTHKIT_REQUEST_HEADERS)[number];
 
-const REQUEST_ONLY_HEADERS: ReadonlySet<string> = new Set(AUTHKIT_REQUEST_HEADERS);
-
-const ALLOWED_RESPONSE_HEADERS: ReadonlySet<string> = new Set([
+const ALLOWED_RESPONSE_HEADERS: readonly string[] = [
   'set-cookie',
   'cache-control',
   'vary',
@@ -21,23 +19,18 @@ const ALLOWED_RESPONSE_HEADERS: ReadonlySet<string> = new Set([
   'proxy-authenticate',
   'link',
   'x-middleware-cache',
-]);
+];
 
-const MULTI_VALUE_HEADERS: ReadonlySet<string> = new Set([
-  'set-cookie',
-  'www-authenticate',
-  'proxy-authenticate',
-  'link',
-]);
+const MULTI_VALUE_HEADERS: readonly string[] = ['set-cookie', 'www-authenticate', 'proxy-authenticate', 'link'];
 
 export function isAuthkitRequestHeader(name: string): boolean {
   const lower = name.toLowerCase();
-  return REQUEST_ONLY_HEADERS.has(lower) || lower.startsWith('x-workos-');
+  return (AUTHKIT_REQUEST_HEADERS as readonly string[]).includes(lower) || lower.startsWith('x-workos-');
 }
 
 function setHeader(headers: Headers, name: string, value: string): void {
   const lower = name.toLowerCase();
-  if (MULTI_VALUE_HEADERS.has(lower)) {
+  if (MULTI_VALUE_HEADERS.includes(lower)) {
     headers.append(name, value);
   } else if (lower === 'vary') {
     const existing = headers.get(name);
@@ -80,7 +73,7 @@ export function partitionAuthkitHeaders(request: NextRequest, authkitHeaders: He
   const responseHeaders = new Headers();
   for (const [name, value] of headers) {
     const lower = name.toLowerCase();
-    if (!isAuthkitRequestHeader(lower) && ALLOWED_RESPONSE_HEADERS.has(lower)) {
+    if (!isAuthkitRequestHeader(lower) && ALLOWED_RESPONSE_HEADERS.includes(lower)) {
       setHeader(responseHeaders, name, value);
     }
   }
