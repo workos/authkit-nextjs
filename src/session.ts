@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCookieOptions, getJwtCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
   AccessToken,
@@ -406,9 +407,11 @@ async function refreshSession({
       organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
     });
   } catch (error) {
-    throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`, {
-      cause: error,
-    });
+    throw new TokenRefreshError(
+      `Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`,
+      error,
+      getSessionErrorContext(session),
+    );
   }
 
   const headersList = await headers();
