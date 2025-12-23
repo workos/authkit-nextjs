@@ -96,8 +96,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         // if onSuccess is provided, return it as it may be a redirect or contain custom headers than the default response
         if (onSuccess) {
-          return await onSuccess({
-            response,
+          await onSuccess({
             accessToken,
             refreshToken,
             user,
