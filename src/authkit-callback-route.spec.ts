@@ -269,6 +269,8 @@ describe('authkit-callback-route', () => {
       const handler = handleAuth({ onSuccess: onSuccess });
       await handler(request);
 
+      expect(onSuccess).toHaveBeenCalledWith(mockAuthResponse);
+
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
@@ -315,6 +317,10 @@ describe('authkit-callback-route', () => {
           state: 'custom-user-state-string',
         }),
       );
+
+      // Verify the redirect went to the correct path
+      const response = await handler(request);
+      expect(response.headers.get('Location')).toContain('/dashboard');
     });
 
     it('should handle state without custom data', async () => {
