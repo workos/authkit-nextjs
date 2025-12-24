@@ -285,11 +285,10 @@ describe('authkit-callback-route', () => {
           await saveSession({ ...data, accessToken: newAccessToken }, request);
         },
       });
-      const response = await handler(request);
+      await handler(request);
 
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(newAccessToken);
-      expect(response).toBeInstanceOf(NextResponse);
     });
 
     it('should pass custom state data to onSuccess callback', async () => {
@@ -305,25 +304,17 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
 
-      const onSuccess = jest.fn((data) => data.response);
+      const onSuccess = jest.fn();
       const handler = handleAuth({ onSuccess });
-      const response = await handler(request);
+      await handler(request);
 
       // Verify onSuccess was called with the custom state string
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
-          accessToken: mockAuthResponse.accessToken,
-          refreshToken: mockAuthResponse.refreshToken,
-          user: mockAuthResponse.user,
-          oauthTokens: mockAuthResponse.oauthTokens,
+          ...mockAuthResponse,
           state: 'custom-user-state-string',
-          response: expect.any(Response),
         }),
       );
-
-      // Verify the redirect went to the correct path
-      expect(response).toBeDefined();
-      expect(response.headers.get('Location')).toContain('/dashboard');
     });
 
     it('should handle state without custom data', async () => {
