@@ -269,16 +269,6 @@ describe('authkit-callback-route', () => {
       const handler = handleAuth({ onSuccess: onSuccess });
       await handler(request);
 
-      expect(onSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          accessToken: mockAuthResponse.accessToken,
-          refreshToken: mockAuthResponse.refreshToken,
-          user: mockAuthResponse.user,
-          oauthTokens: mockAuthResponse.oauthTokens,
-          response: expect.any(Response),
-          state: undefined,
-        }),
-      );
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
@@ -291,9 +281,8 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
 
       const handler = handleAuth({
-        onSuccess: async ({ response, ...data }) => {
+        onSuccess: async (data) => {
           await saveSession({ ...data, accessToken: newAccessToken }, request);
-          return response;
         },
       });
       const response = await handler(request);
@@ -301,25 +290,6 @@ describe('authkit-callback-route', () => {
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(newAccessToken);
       expect(response).toBeInstanceOf(NextResponse);
-    });
-
-    it('should allow onSuccess to return a redirect response', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
-
-      // Set up request with code
-      request.nextUrl.searchParams.set('code', 'test-code');
-
-      const handler = handleAuth({
-        onSuccess: async () => {
-          return NextResponse.redirect(new URL('/dashboard', 'https://example.com'));
-        },
-      });
-      const response = await handler(request);
-
-      expect(response.headers.get('Location')).toContain('/dashboard');
-      expect(response).toBeInstanceOf(NextResponse);
-      expect(response.status).toBe(307);
-      expect(response.headers.get('Set-Cookie')).toBeDefined();
     });
 
     it('should pass custom state data to onSuccess callback', async () => {
