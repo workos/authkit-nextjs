@@ -270,7 +270,6 @@ describe('authkit-callback-route', () => {
       await handler(request);
 
       expect(onSuccess).toHaveBeenCalledWith(mockAuthResponse);
-
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
