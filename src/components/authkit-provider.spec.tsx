@@ -19,8 +19,20 @@ jest.mock('../actions', () => ({
 }));
 
 describe('AuthKitProvider', () => {
+  let originalLocation: Location;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    originalLocation = window.location;
+
+    // @ts-expect-error - we're deleting the property to test the mock
+    delete window.location;
+    window.location = { ...window.location, reload: jest.fn() };
+  });
+
+  afterEach(() => {
+    window.location = originalLocation;
   });
 
   it('should render children', async () => {
@@ -230,13 +242,6 @@ describe('AuthKitProvider', () => {
   it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
     (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
 
-    const originalLocation = window.location;
-
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
-
     render(
       <AuthKitProvider>
         <div>Test Child</div>
@@ -251,21 +256,11 @@ describe('AuthKitProvider', () => {
     await waitFor(() => {
       expect(window.location.reload).toHaveBeenCalled();
     });
-
-    // Restore original reload function
-    window.location = originalLocation;
   });
 
   it('should not call onSessionExpired or reload the page if session is valid', async () => {
     (checkSessionAction as jest.Mock).mockResolvedValueOnce(true);
     const onSessionExpired = jest.fn();
-
-    const originalLocation = window.location;
-
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
 
     render(
       <AuthKitProvider onSessionExpired={onSessionExpired}>
@@ -282,8 +277,6 @@ describe('AuthKitProvider', () => {
       expect(onSessionExpired).not.toHaveBeenCalled();
       expect(window.location.reload).not.toHaveBeenCalled();
     });
-
-    window.location = originalLocation;
   });
 });
 
