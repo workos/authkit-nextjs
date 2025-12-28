@@ -558,12 +558,17 @@ export async function getSessionFromCookie(request?: NextRequest) {
 async function getSessionFromHeader(): Promise<Session | undefined> {
   const headersList = await headers();
   const hasMiddleware = Boolean(headersList.get(middlewareHeaderName));
+  const skipMiddlewareCheck = process.env.WORKOS_SKIP_MIDDLEWARE_CHECK === 'true';
 
-  if (!hasMiddleware) {
+  if (!hasMiddleware && !skipMiddlewareCheck) {
     const url = headersList.get('x-url');
     throw new Error(
       `You are calling 'withAuth' on ${url ?? 'a route'} that isn't covered by the AuthKit middleware. Make sure it is running on all paths you are calling 'withAuth' from by updating your middleware config in 'middleware.(js|ts)'.`,
     );
+  }
+
+  if (!hasMiddleware && skipMiddlewareCheck) {
+    return getSessionFromCookie();
   }
 
   const authHeader = headersList.get(sessionHeaderName);
