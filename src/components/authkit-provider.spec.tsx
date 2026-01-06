@@ -227,63 +227,59 @@ describe('AuthKitProvider', () => {
     });
   });
 
-  it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
-    (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
+  describe('window.location.reload behavior', () => {
+    let originalLocation: Location;
 
-    const originalLocation = window.location;
-
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
-
-    render(
-      <AuthKitProvider>
-        <div>Test Child</div>
-      </AuthKitProvider>,
-    );
-
-    act(() => {
-      // Simulate visibility change
-      window.dispatchEvent(new Event('visibilitychange'));
+    beforeEach(() => {
+      originalLocation = window.location;
+      // @ts-expect-error - deleting window.location to mock it
+      delete window.location;
+      window.location = { reload: jest.fn() } as unknown as Location;
     });
 
-    await waitFor(() => {
-      expect(window.location.reload).toHaveBeenCalled();
+    afterEach(() => {
+      window.location = originalLocation;
     });
 
-    // Restore original reload function
-    window.location = originalLocation;
-  });
+    it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
+      (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
 
-  it('should not call onSessionExpired or reload the page if session is valid', async () => {
-    (checkSessionAction as jest.Mock).mockResolvedValueOnce(true);
-    const onSessionExpired = jest.fn();
+      render(
+        <AuthKitProvider>
+          <div>Test Child</div>
+        </AuthKitProvider>,
+      );
 
-    const originalLocation = window.location;
+      act(() => {
+        // Simulate visibility change
+        window.dispatchEvent(new Event('visibilitychange'));
+      });
 
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
-
-    render(
-      <AuthKitProvider onSessionExpired={onSessionExpired}>
-        <div>Test Child</div>
-      </AuthKitProvider>,
-    );
-
-    act(() => {
-      // Simulate visibility change
-      window.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => {
+        expect(window.location.reload).toHaveBeenCalled();
+      });
     });
 
-    await waitFor(() => {
-      expect(onSessionExpired).not.toHaveBeenCalled();
-      expect(window.location.reload).not.toHaveBeenCalled();
-    });
+    it('should not call onSessionExpired or reload the page if session is valid', async () => {
+      (checkSessionAction as jest.Mock).mockResolvedValueOnce(true);
+      const onSessionExpired = jest.fn();
 
-    window.location = originalLocation;
+      render(
+        <AuthKitProvider onSessionExpired={onSessionExpired}>
+          <div>Test Child</div>
+        </AuthKitProvider>,
+      );
+
+      act(() => {
+        // Simulate visibility change
+        window.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => {
+        expect(onSessionExpired).not.toHaveBeenCalled();
+        expect(window.location.reload).not.toHaveBeenCalled();
+      });
+    });
   });
 });
 
