@@ -4,16 +4,12 @@ import { GetAuthURLOptions } from './interfaces.js';
 import { headers } from 'next/headers';
 
 async function getAuthorizationUrl(options: GetAuthURLOptions = {}) {
-  const headersList = await headers();
-  const {
-    returnPathname,
-    screenHint,
-    organizationId,
-    redirectUri = headersList.get('x-redirect-uri'),
-    loginHint,
-    prompt,
-    state: customState,
-  } = options;
+  const { returnPathname, screenHint, organizationId, loginHint, prompt, state: customState } = options;
+  let redirectUri = options.redirectUri;
+  if (!redirectUri) {
+    const headersList = await headers();
+    redirectUri = headersList.get('x-redirect-uri') ?? undefined;
+  }
 
   const internalState = returnPathname
     ? btoa(JSON.stringify({ returnPathname })).replace(/\+/g, '-').replace(/\//g, '_')
