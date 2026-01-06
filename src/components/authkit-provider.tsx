@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer } from 'react';
 import {
   checkSessionAction,
   getAuthAction,
@@ -14,11 +14,13 @@ import type { UserInfo, SwitchToOrganizationOptions, NoUserInfo } from '../inter
 type AuthState =
   | {
       status: 'loading';
+      data: Omit<UserInfo | NoUserInfo, 'accessToken'>;
     }
   | { status: 'unauthenticated'; data: Omit<NoUserInfo, 'accessToken'> }
   | { status: 'authenticated'; data: Omit<UserInfo, 'accessToken'> };
 
-type AuthContextType = Omit<UserInfo | NoUserInfo, 'accessToken'> & { loading: boolean } & {
+type AuthContextType = Omit<UserInfo | NoUserInfo, 'accessToken'> & {
+  loading: boolean;
   getAuth: (options?: { ensureSignedIn?: boolean }) => Promise<void>;
   refreshAuth: (options?: { ensureSignedIn?: boolean; organizationId?: string }) => Promise<void | { error: string }>;
   signOut: (options?: { returnTo?: string }) => Promise<void>;
@@ -43,63 +45,73 @@ interface AuthKitProviderProps {
   initialAuth?: Omit<UserInfo | NoUserInfo, 'accessToken'>;
 }
 
-const unauthenticatedState: { status: 'unauthenticated'; data: Omit<NoUserInfo, 'accessToken'> } = {
-  status: 'unauthenticated',
-  data: {
-    user: null,
-    sessionId: undefined,
-    organizationId: undefined,
-    role: undefined,
-    roles: undefined,
-    permissions: undefined,
-    entitlements: undefined,
-    featureFlags: undefined,
-    impersonator: undefined,
-  },
+const unauthenticatedAuthStateData: Omit<NoUserInfo, 'accessToken'> = {
+  user: null,
+  sessionId: undefined,
+  organizationId: undefined,
+  role: undefined,
+  roles: undefined,
+  permissions: undefined,
+  entitlements: undefined,
+  featureFlags: undefined,
+  impersonator: undefined,
 };
 
-function createAuthState(auth: Omit<UserInfo | NoUserInfo, 'accessToken'> | undefined): AuthState {
-  if (!auth) {
-    return { status: 'loading' };
+function initAuthState(initialAuth: Omit<UserInfo | NoUserInfo, 'accessToken'> | undefined): AuthState {
+  if (!initialAuth) {
+    return { status: 'loading', data: unauthenticatedAuthStateData };
   }
 
-  if (!auth.user) {
-    return unauthenticatedState;
+  if (!initialAuth.user) {
+    return { status: 'unauthenticated', data: initialAuth as Omit<NoUserInfo, 'accessToken'> };
   }
 
-  return {
-    status: 'authenticated',
-    data: {
-      user: auth.user,
-      sessionId: auth.sessionId,
-      organizationId: auth.organizationId,
-      role: auth.role,
-      roles: auth.roles,
-      permissions: auth.permissions,
-      entitlements: auth.entitlements,
-      featureFlags: auth.featureFlags,
-      impersonator: auth.impersonator,
-    } as Omit<UserInfo, 'accessToken'>,
-  };
+  return { status: 'authenticated', data: initialAuth as Omit<UserInfo, 'accessToken'> };
 }
 
-function getAuthStateData(authState: AuthState): Omit<UserInfo | NoUserInfo, 'accessToken'> {
-  if (authState.status === 'loading') {
-    return unauthenticatedState.data;
+type AuthAction =
+  | { type: 'START_LOADING' }
+  | { type: 'SET_AUTH_STATE_AS_UNAUTHENTICATED'; data: Omit<NoUserInfo, 'accessToken'> }
+  | { type: 'SET_AUTH_STATE_AS_AUTHENTICATED'; data: Omit<UserInfo, 'accessToken'> }
+  | { type: 'STOP_LOADING' };
+
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case 'START_LOADING':
+      return { status: 'loading', data: state.data };
+
+    case 'SET_AUTH_STATE_AS_AUTHENTICATED':
+      return { status: 'authenticated', data: action.data };
+
+    case 'SET_AUTH_STATE_AS_UNAUTHENTICATED':
+      return { status: 'unauthenticated', data: action.data };
+
+    case 'STOP_LOADING':
+      if (state.data.user) {
+        return { status: 'authenticated', data: state.data as Omit<UserInfo, 'accessToken'> };
+      }
+      return { status: 'unauthenticated', data: state.data as Omit<NoUserInfo, 'accessToken'> };
+
+    default:
+      return state;
   }
-  return authState.data;
 }
 
 export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: AuthKitProviderProps) => {
-  const [authState, setAuthState] = useState<AuthState>(() => createAuthState(initialAuth));
+  const [authState, dispatch] = useReducer(authReducer, initialAuth, initAuthState);
 
   const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
-    setAuthState({ status: 'loading' });
+    dispatch({ type: 'START_LOADING' });
     try {
       const auth = await getAuthAction({ ensureSignedIn });
-      setAuthState(createAuthState(auth));
+
+      if (auth.user) {
+        dispatch({ type: 'SET_AUTH_STATE_AS_AUTHENTICATED', data: auth as Omit<UserInfo, 'accessToken'> });
+      } else {
+        dispatch({ type: 'SET_AUTH_STATE_AS_UNAUTHENTICATED', data: auth as Omit<NoUserInfo, 'accessToken'> });
+      }
     } catch (error) {
-      setAuthState(unauthenticatedState);
+      dispatch({ type: 'SET_AUTH_STATE_AS_UNAUTHENTICATED', data: unauthenticatedAuthStateData });
     }
   }, []);
 
@@ -122,11 +134,17 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
 
   const refreshAuth = useCallback(
     async ({ ensureSignedIn = false, organizationId }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
-      setAuthState({ status: 'loading' });
+      dispatch({ type: 'START_LOADING' });
       try {
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
-        setAuthState(createAuthState(auth));
+
+        if (auth.user) {
+          dispatch({ type: 'SET_AUTH_STATE_AS_AUTHENTICATED', data: auth as Omit<UserInfo, 'accessToken'> });
+        } else {
+          dispatch({ type: 'SET_AUTH_STATE_AS_UNAUTHENTICATED', data: auth as Omit<NoUserInfo, 'accessToken'> });
+        }
       } catch (error) {
+        dispatch({ type: 'STOP_LOADING' });
         return error instanceof Error ? { error: error.message } : { error: String(error) };
       }
     },
@@ -188,16 +206,17 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
       window.removeEventListener('focus', handleVisibilityChange);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [onSessionExpired]);
+  }, [onSessionExpired, initialAuth, getAuth]);
 
   const contextValue: AuthContextType = {
+    ...authState.data,
     loading: authState.status === 'loading',
-    ...getAuthStateData(authState),
     getAuth,
     refreshAuth,
     signOut,
     switchToOrganization,
   };
+
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
 
