@@ -147,9 +147,15 @@ describe('cookie.ts', () => {
   });
 
   describe('getJwtCookie', () => {
+    const originalEnv = process.env;
+
     beforeEach(() => {
-      // Reset NODE_ENV for each test
+      process.env = { ...originalEnv };
       delete process.env.NODE_ENV;
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
     it('should create JWT cookie with Secure flag for HTTPS URLs', async () => {
