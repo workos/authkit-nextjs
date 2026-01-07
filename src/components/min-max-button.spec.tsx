@@ -14,6 +14,7 @@ describe('MinMaxButton', () => {
   afterEach(() => {
     // Clean up after each test
     document.body.innerHTML = '';
+    jest.restoreAllMocks();
   });
 
   it('sets minimized value when clicked', () => {
