@@ -6,7 +6,7 @@ import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTo
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
 
-import { jwtVerify } from 'jose';
+import { decodeJwt, jwtVerify } from 'jose';
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 
@@ -50,6 +50,8 @@ describe('session.ts', () => {
   let consoleLogSpy: jest.SpyInstance;
 
   beforeEach(async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2025-01-08T12:00:00Z'));
     // Clear all mocks between tests
     jest.clearAllMocks();
 
@@ -73,6 +75,7 @@ describe('session.ts', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     consoleLogSpy.mockRestore();
     jest.resetModules();
   });
@@ -270,10 +273,23 @@ describe('session.ts', () => {
     });
 
     it('should attempt to refresh the session when the access token is invalid', async () => {
+      // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
@@ -310,10 +326,23 @@ describe('session.ts', () => {
     it('should delete the cookie when refreshing fails', async () => {
       jest.spyOn(console, 'log').mockImplementation(() => {});
 
+      // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       jest
@@ -525,10 +554,23 @@ describe('session.ts', () => {
       it('should delete the cookie and redirect when refreshing fails', async () => {
         jest.spyOn(console, 'log').mockImplementation(() => {});
 
+        // Setup invalid session
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
+        // Advance time by 1 second so exp < now
+        jest.advanceTimersByTime(1000);
+
+        // Mock jwtVerify to check token expiration
+        (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+          const decodedJwt = decodeJwt(token);
+
+          const now = Math.floor(Date.now() / 1000);
+
+          if (decodedJwt.exp && decodedJwt.exp < now) {
+            throw new Error('Invalid token');
+          }
+
+          return { payload: decodedJwt };
         });
 
         jest
@@ -633,9 +675,20 @@ describe('session.ts', () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       // Mock successful refresh
@@ -666,9 +719,20 @@ describe('session.ts', () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       // Mock refresh failure
@@ -693,9 +757,20 @@ describe('session.ts', () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       const newAccessToken = await generateTestToken();
@@ -732,9 +807,20 @@ describe('session.ts', () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
+      // Advance time by 1 second so exp < now
+      jest.advanceTimersByTime(1000);
+
+      // Mock jwtVerify to check token expiration
+      (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+        const decodedJwt = decodeJwt(token);
+
+        const now = Math.floor(Date.now() / 1000);
+
+        if (decodedJwt.exp && decodedJwt.exp < now) {
+          throw new Error('Invalid token');
+        }
+
+        return { payload: decodedJwt };
       });
 
       const mockError = new Error('Refresh failed');
@@ -1048,8 +1134,20 @@ describe('session.ts', () => {
         // Setup invalid session that needs refresh
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
+        // Advance time by 1 second so exp < now
+        jest.advanceTimersByTime(1000);
+
+        // Mock jwtVerify to check token expiration
+        (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+          const decodedJwt = decodeJwt(token);
+
+          const now = Math.floor(Date.now() / 1000);
+
+          if (decodedJwt.exp && decodedJwt.exp < now) {
+            throw new Error('Invalid token');
+          }
+
+          return { payload: decodedJwt };
         });
 
         const newAccessToken = await generateTestToken();
@@ -1079,8 +1177,20 @@ describe('session.ts', () => {
         // Setup invalid session
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
+        // Advance time by 1 second so exp < now
+        jest.advanceTimersByTime(1000);
+
+        // Mock jwtVerify to check token expiration
+        (jwtVerify as jest.Mock).mockImplementation(async (token) => {
+          const decodedJwt = decodeJwt(token);
+
+          const now = Math.floor(Date.now() / 1000);
+
+          if (decodedJwt.exp && decodedJwt.exp < now) {
+            throw new Error('Invalid token');
+          }
+
+          return { payload: decodedJwt };
         });
 
         jest
