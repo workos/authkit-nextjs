@@ -20,25 +20,23 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        run: |
-          npm install
+        run: pnpm install
 
       - name: Build project
-        run: |
-          npm run build
+        run: pnpm run build
 
       - name: Push Release
         if: ${{ !github.event.release.prerelease }}
-        run: |
-          npm publish --tag latest --access=public --provenance
+        run: pnpm publish --tag latest --access=public --provenance --no-git-checks
 
       - name: Push Pre-Release
         if: ${{ github.event.release.prerelease }}
-        run: |
-          npm publish --tag next --access=public --provenance
+        run: pnpm publish --tag next --access=public --provenance --no-git-checks

@@ -9,7 +9,7 @@ The AuthKit library for Next.js provides convenient helpers for authentication a
 Install the package with:
 
 ```
-npm i @workos-inc/authkit-nextjs
+pnpm i @workos-inc/authkit-nextjs
 ```
 
 or
