@@ -2,6 +2,7 @@
   "name": "@workos-inc/authkit-nextjs",
   "version": "2.13.0",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
+  "packageManager": "pnpm@10.28.0",
   "sideEffects": false,
   "type": "module",
   "main": "./dist/esm/index.js",
