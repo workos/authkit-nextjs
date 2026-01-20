@@ -159,9 +159,17 @@ export default authkitMiddleware();
 // For Next.js 16+, you can also use: export { default as proxy } from './proxy';
 
 // Match against pages that require auth
-// Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
+
+> [!WARNING]
+> Using a catch-all matcher pattern can intercept static assets (CSS, images, fonts), causing styles to break—particularly with Tailwind CSS v4. If you need a broad matcher, exclude Next.js static paths:
+>
+> ```ts
+> export const config = {
+>   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+> };
+> ```
 
 The proxy/middleware can be configured with several options.
 
@@ -185,7 +193,6 @@ export default authkitMiddleware({
 });
 
 // Match against pages that require auth
-// Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
 
