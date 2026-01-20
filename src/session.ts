@@ -6,6 +6,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
 import { getCookieOptions, getJwtCookie } from './cookie.js';
+import { readValue, chunkValue } from './cookie-chunker.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
@@ -220,7 +221,15 @@ async function updateSession(
   applyCacheSecurityHeaders(newRequestHeaders, request, session);
 
   if (hasValidSession) {
-    newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
+    // Get all cookies to reassemble potentially chunked session
+    const existingCookies: Record<string, string> = {};
+    request.cookies.getAll().forEach((cookie) => {
+      existingCookies[cookie.name] = cookie.value;
+    });
+    const encryptedSession = readValue(cookieName, existingCookies);
+    if (encryptedSession) {
+      newRequestHeaders.set(sessionHeaderName, encryptedSession);
+    }
 
     const {
       sid: sessionId,
@@ -287,7 +296,27 @@ async function updateSession(
       impersonator,
     });
 
-    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
+    // Get existing cookies for cleanup tracking
+    const existingCookies: Record<string, string> = {};
+    request.cookies.getAll().forEach((cookie) => {
+      existingCookies[cookie.name] = cookie.value;
+    });
+
+    // Chunk the session if needed
+    const chunks = chunkValue(cookieName, encryptedSession, existingCookies);
+    const cookieOptionsString = getCookieOptions(request.url, true);
+
+    // Set all chunks (or single cookie if small enough)
+    chunks.forEach((chunk) => {
+      if (chunk.clear) {
+        // Delete old chunk cookies
+        const deleteCookie = `${chunk.name}=; Expires=${new Date(0).toUTCString()}; ${cookieOptionsString}`;
+        newRequestHeaders.append('Set-Cookie', deleteCookie);
+      } else {
+        newRequestHeaders.append('Set-Cookie', `${chunk.name}=${chunk.value}; ${cookieOptionsString}`);
+      }
+    });
+
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
@@ -514,17 +543,27 @@ async function verifyAccessToken(accessToken: string) {
 
 export async function getSessionFromCookie(request?: NextRequest) {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  let cookie;
+  let encryptedSession: string | null = null;
 
   if (request) {
-    cookie = request.cookies.get(cookieName);
+    // Middleware context: convert request.cookies to Record<string, string>
+    const cookieRecord: Record<string, string> = {};
+    request.cookies.getAll().forEach((cookie) => {
+      cookieRecord[cookie.name] = cookie.value;
+    });
+    encryptedSession = readValue(cookieName, cookieRecord);
   } else {
+    // Server component context: convert next/headers cookies to Record<string, string>
     const nextCookies = await cookies();
-    cookie = nextCookies.get(cookieName);
+    const cookieRecord: Record<string, string> = {};
+    nextCookies.getAll().forEach((cookie) => {
+      cookieRecord[cookie.name] = cookie.value;
+    });
+    encryptedSession = readValue(cookieName, cookieRecord);
   }
 
-  if (cookie) {
-    return unsealData<Session>(cookie.value, {
+  if (encryptedSession) {
+    return unsealData<Session>(encryptedSession, {
       password: WORKOS_COOKIE_PASSWORD,
     });
   }
@@ -600,7 +639,29 @@ export async function saveSession(
   const encryptedSession = await encryptSession(sessionOrResponse);
   const nextCookies = await cookies();
   const url = typeof request === 'string' ? request : request.url;
-  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
+
+  // Get existing cookies for cleanup tracking
+  const existingCookies: Record<string, string> = {};
+  nextCookies.getAll().forEach((cookie) => {
+    existingCookies[cookie.name] = cookie.value;
+  });
+
+  // Chunk the session if needed
+  const chunks = chunkValue(cookieName, encryptedSession, existingCookies);
+  const cookieOptions = getCookieOptions(url);
+
+  // Set all chunks (or single cookie if small enough)
+  chunks.forEach((chunk) => {
+    if (chunk.clear) {
+      // Delete old chunk cookies by setting with maxAge: 0
+      nextCookies.set(chunk.name, '', {
+        ...cookieOptions,
+        maxAge: 0,
+      });
+    } else {
+      nextCookies.set(chunk.name, chunk.value, cookieOptions);
+    }
+  });
 }
 
 export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };
