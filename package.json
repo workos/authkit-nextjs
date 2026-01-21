@@ -27,6 +27,8 @@
     "clean": "rm -rf dist",
     "prebuild": "pnpm run clean",
     "build": "tsc --project tsconfig.json",
+    "postbuild": "pnpm generate:docs",
+    "generate:docs": "npx tsx scripts/generate-docs.ts",
     "prepublishOnly": "pnpm run lint",
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "jest",
