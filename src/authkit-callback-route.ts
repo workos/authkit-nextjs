@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { saveSession } from './session.js';
+import { deleteSession, saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
 
@@ -95,16 +95,21 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
         if (onSuccess) {
-          await onSuccess({
-            accessToken,
-            refreshToken,
-            user,
-            impersonator,
-            oauthTokens,
-            authenticationMethod,
-            organizationId,
-            state: customState,
-          });
+          try {
+            await onSuccess({
+              accessToken,
+              refreshToken,
+              user,
+              impersonator,
+              oauthTokens,
+              authenticationMethod,
+              organizationId,
+              state: customState,
+            });
+          } catch (error) {
+            deleteSession();
+            throw error;
+          }
         }
 
         return response;
