@@ -243,8 +243,9 @@ describe('auth.ts', () => {
 
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
-        vi.spyOn(workos.userManagement, 'getLogoutUrl')
-          .mockReturnValue('https://user-management-logout.com/signed-out');
+        vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
+          'https://user-management-logout.com/signed-out',
+        );
         const mockSession = {
           accessToken: await generateTestToken(),
           sessionId: 'session_123',
@@ -303,8 +304,9 @@ describe('auth.ts', () => {
 
         nextCookies.set('wos-session', encryptedSession);
 
-        vi.spyOn(workos.userManagement, 'getLogoutUrl')
-          .mockReturnValue('https://api.workos.com/user_management/sessions/logout?session_id=session_123');
+        vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123',
+        );
 
         await signOut();
 

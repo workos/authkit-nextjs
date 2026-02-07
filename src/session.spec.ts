@@ -177,7 +177,10 @@ describe('session.ts', () => {
         );
       }).rejects.toThrow('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
 
-      Object.defineProperty(envVariables, 'WORKOS_REDIRECT_URI', { value: originalWorkosRedirectUri, configurable: true });
+      Object.defineProperty(envVariables, 'WORKOS_REDIRECT_URI', {
+        value: originalWorkosRedirectUri,
+        configurable: true,
+      });
     });
 
     it('should throw an error if the cookie password is not set', async () => {
@@ -200,7 +203,10 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', { value: originalWorkosCookiePassword, configurable: true });
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', {
+        value: originalWorkosCookiePassword,
+        configurable: true,
+      });
     });
 
     it('should throw an error if the cookie password is less than 32 characters', async () => {
@@ -223,7 +229,10 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', { value: originalWorkosCookiePassword, configurable: true });
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', {
+        value: originalWorkosCookiePassword,
+        configurable: true,
+      });
     });
 
     it('should return early if there is no session', async () => {
@@ -319,8 +328,7 @@ describe('session.ts', () => {
         throw new Error('Invalid token');
       });
 
-      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-        .mockRejectedValue(new Error('Failed to refresh'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Failed to refresh'));
 
       const request = new NextRequest(new URL('http://example.com'));
 
@@ -536,8 +544,9 @@ describe('session.ts', () => {
           throw new Error('Invalid token');
         });
 
-        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Failed to refresh'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(
+          new Error('Failed to refresh'),
+        );
 
         const request = new NextRequest(new URL('http://example.com'));
 
@@ -774,8 +783,9 @@ describe('session.ts', () => {
         user: mockSession.user,
       });
 
-      vi.spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const nextCookies = await cookies();
       nextCookies.set(
@@ -817,8 +827,9 @@ describe('session.ts', () => {
         user: mockSession.user,
       });
 
-      vi.spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const result = await refreshSession({ organizationId: 'org_456' });
 
@@ -1085,8 +1096,7 @@ describe('session.ts', () => {
           throw new Error('Invalid token');
         });
 
-        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Refresh failed'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
         const request = new NextRequest(new URL('http://example.com/page'));
         request.headers.set('accept', 'text/html');
