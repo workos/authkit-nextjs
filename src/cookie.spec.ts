@@ -1,14 +1,13 @@
-import { describe, it, expect } from '@jest/globals';
-
-// Mock at the top of the file
-jest.mock('./env-variables');
-
 describe('cookie.ts', () => {
   beforeEach(() => {
     // Clear all mocks before each test
-    jest.clearAllMocks();
-    // Reset modules
-    jest.resetModules();
+    vi.clearAllMocks();
+    // Reset modules to ensure fresh imports
+    vi.resetModules();
+    // Re-mock env-variables with a fresh copy each time
+    vi.doMock('./env-variables', async (importOriginal) => {
+      return { ...(await importOriginal<typeof import('./env-variables')>()) };
+    });
   });
 
   describe('getCookieOptions', () => {

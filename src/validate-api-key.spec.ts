@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-
 import { validateApiKey } from './validate-api-key.js';
 import { getWorkOS } from './workos.js';
 
-// These are mocked in jest.setup.ts
+// These are mocked in vitest.setup.ts
 import { headers } from 'next/headers';
 
 const workos = getWorkOS();
@@ -11,7 +9,7 @@ const workos = getWorkOS();
 describe('validate-api-key.ts', () => {
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     const nextHeaders = await headers();
     // @ts-expect-error - _reset is part of the mock
@@ -34,7 +32,7 @@ describe('validate-api-key.ts', () => {
         },
       };
 
-      jest.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockApiKeyResponse);
+      vi.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockApiKeyResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer sk_test_1234567890');
@@ -97,7 +95,7 @@ describe('validate-api-key.ts', () => {
 
     it('should return { apiKey: null } when WorkOS validation fails', async () => {
       const mockResponse = { apiKey: null };
-      jest.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockResponse);
+      vi.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer invalid_key');

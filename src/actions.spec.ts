@@ -12,23 +12,25 @@ import { signOut, switchToOrganization } from './auth.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 
-jest.mock('../src/auth.js', () => ({
-  signOut: jest.fn().mockResolvedValue(true),
-  switchToOrganization: jest.fn().mockResolvedValue({ organizationId: 'org_123' }),
+vi.mock('../src/auth.js', () => ({
+  signOut: vi.fn().mockResolvedValue(true),
+  switchToOrganization: vi.fn().mockResolvedValue({ organizationId: 'org_123' }),
 }));
 
-const fakeWorkosInstance = {
-  organizations: {
-    getOrganization: jest.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
+const { fakeWorkosInstance } = vi.hoisted(() => ({
+  fakeWorkosInstance: {
+    organizations: {
+      getOrganization: vi.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
+    },
   },
-};
-jest.mock('../src/workos.js', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
+}));
+vi.mock('../src/workos.js', () => ({
+  getWorkOS: vi.fn(() => fakeWorkosInstance),
 }));
 
-jest.mock('../src/session.js', () => ({
-  withAuth: jest.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
-  refreshSession: jest.fn().mockResolvedValue({ session: 'newSession', accessToken: 'refreshed_token' }),
+vi.mock('../src/session.js', () => ({
+  withAuth: vi.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
+  refreshSession: vi.fn().mockResolvedValue({ session: 'newSession', accessToken: 'refreshed_token' }),
 }));
 
 describe('actions', () => {

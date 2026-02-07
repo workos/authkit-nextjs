@@ -14,7 +14,7 @@ describe('MinMaxButton', () => {
   afterEach(() => {
     // Clean up after each test
     document.body.innerHTML = '';
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('sets minimized value when clicked', () => {
@@ -34,7 +34,7 @@ describe('MinMaxButton', () => {
     const root = document.querySelector('[data-workos-impersonation-root]');
 
     // Mock querySelector to return null for this test
-    jest.spyOn(document, 'querySelector').mockReturnValue(null);
+    vi.spyOn(document, 'querySelector').mockReturnValue(null);
 
     act(() => {
       getByRole('button').click();

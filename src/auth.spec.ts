@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import * as session from './session.js';
 import * as cache from 'next/cache';
 import * as workosModule from './workos.js';
 
-// These are mocked in jest.setup.ts
+// These are mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateSession, generateTestToken } from './test-helpers.js';
@@ -14,44 +12,44 @@ import { getWorkOS } from './workos.js';
 
 const workos = getWorkOS();
 
-jest.mock('next/cache', () => {
-  const actual = jest.requireActual<typeof cache>('next/cache');
+vi.mock('next/cache', async () => {
+  const actual = await vi.importActual<typeof cache>('next/cache');
   return {
     ...actual,
-    revalidateTag: jest.fn(),
-    revalidatePath: jest.fn(),
+    revalidateTag: vi.fn(),
+    revalidatePath: vi.fn(),
   };
 });
 
 // Create a fake WorkOS instance that will be used only in the "on error" tests
 const fakeWorkosInstance = {
   userManagement: {
-    authenticateWithRefreshToken: jest.fn(),
-    getAuthorizationUrl: jest.fn(),
-    getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
-    getLogoutUrl: jest.fn(),
+    authenticateWithRefreshToken: vi.fn(),
+    getAuthorizationUrl: vi.fn(),
+    getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    getLogoutUrl: vi.fn(),
   },
 };
 
-const revalidatePath = jest.mocked(cache.revalidatePath);
-const revalidateTag = jest.mocked(cache.revalidateTag);
+const revalidatePath = vi.mocked(cache.revalidatePath);
+const revalidateTag = vi.mocked(cache.revalidateTag);
 // We'll only use these in the "on error" tests
 const authenticateWithRefreshToken = fakeWorkosInstance.userManagement.authenticateWithRefreshToken;
 const getAuthorizationUrl = fakeWorkosInstance.userManagement.getAuthorizationUrl;
 
-jest.mock('../src/session', () => {
-  const actual = jest.requireActual<typeof session>('../src/session');
+vi.mock('../src/session', async () => {
+  const actual = await vi.importActual<typeof session>('../src/session');
 
   return {
     ...actual,
-    refreshSession: jest.fn(actual.refreshSession),
+    refreshSession: vi.fn(actual.refreshSession),
   };
 });
 
 describe('auth.ts', () => {
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Reset the cookie store
     const nextCookies = await cookies();
@@ -139,10 +137,10 @@ describe('auth.ts', () => {
         const mockWorkOS = {
           userManagement: fakeWorkosInstance.userManagement,
           // Add minimal properties to satisfy TypeScript
-          createHttpClient: jest.fn(),
-          createWebhookClient: jest.fn(),
-          createActionsClient: jest.fn(),
-          createIronSessionProvider: jest.fn(),
+          createHttpClient: vi.fn(),
+          createWebhookClient: vi.fn(),
+          createActionsClient: vi.fn(),
+          createIronSessionProvider: vi.fn(),
           apiKey: 'test',
           clientId: 'test',
           host: 'test',
@@ -154,12 +152,12 @@ describe('auth.ts', () => {
 
         // Apply the mock for these tests only
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        jest.spyOn(workosModule, 'getWorkOS').mockImplementation(() => mockWorkOS as any);
+        vi.spyOn(workosModule, 'getWorkOS').mockImplementation(() => mockWorkOS as any);
       });
 
       afterEach(() => {
         // Restore all mocks after each test
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
       });
 
       it('should redirect to sign in when error is "sso_required"', async () => {
@@ -245,8 +243,7 @@ describe('auth.ts', () => {
 
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
-        jest
-          .spyOn(workos.userManagement, 'getLogoutUrl')
+        vi.spyOn(workos.userManagement, 'getLogoutUrl')
           .mockReturnValue('https://user-management-logout.com/signed-out');
         const mockSession = {
           accessToken: await generateTestToken(),
@@ -306,8 +303,7 @@ describe('auth.ts', () => {
 
         nextCookies.set('wos-session', encryptedSession);
 
-        jest
-          .spyOn(workos.userManagement, 'getLogoutUrl')
+        vi.spyOn(workos.userManagement, 'getLogoutUrl')
           .mockReturnValue('https://api.workos.com/user_management/sessions/logout?session_id=session_123');
 
         await signOut();

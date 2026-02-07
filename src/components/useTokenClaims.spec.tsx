@@ -3,25 +3,25 @@ import { render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useAuth } from './authkit-provider.js';
 
-jest.mock('../actions.js', () => ({
-  getAccessTokenAction: jest.fn(),
-  refreshAccessTokenAction: jest.fn(),
+vi.mock('../actions.js', () => ({
+  getAccessTokenAction: vi.fn(),
+  refreshAccessTokenAction: vi.fn(),
 }));
 
-jest.mock('./authkit-provider.js', () => {
-  const originalModule = jest.requireActual('./authkit-provider.js');
+vi.mock('./authkit-provider.js', async () => {
+  const originalModule = await vi.importActual<typeof import('./authkit-provider.js')>('./authkit-provider.js');
   return {
     ...originalModule,
-    useAuth: jest.fn(),
+    useAuth: vi.fn(),
   };
 });
 
-jest.mock('./useAccessToken.js', () => ({
-  useAccessToken: jest.fn(() => ({ accessToken: undefined })),
+vi.mock('./useAccessToken.js', () => ({
+  useAccessToken: vi.fn(() => ({ accessToken: undefined })),
 }));
 
-jest.mock('jose', () => ({
-  decodeJwt: jest.fn((token: string) => {
+vi.mock('jose', () => ({
+  decodeJwt: vi.fn((token: string) => {
     if (token === 'malformed-token' || token === 'throw-error-token') {
       throw new Error('Invalid JWT');
     }
@@ -42,21 +42,21 @@ import { useTokenClaims } from './useTokenClaims.js';
 
 describe('useTokenClaims', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useFakeTimers();
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     // Reset useAccessToken mock to default
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: undefined });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: undefined });
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   const TokenClaimsTestComponent = () => {
@@ -69,7 +69,7 @@ describe('useTokenClaims', () => {
   };
 
   it('should return empty object when no access token is available', async () => {
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: undefined });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: undefined });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 
@@ -101,7 +101,7 @@ describe('useTokenClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: token });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 
@@ -129,7 +129,7 @@ describe('useTokenClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: token });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 
@@ -147,7 +147,7 @@ describe('useTokenClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: token });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 
@@ -175,7 +175,7 @@ describe('useTokenClaims', () => {
     };
     const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
 
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: token });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: token });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 
@@ -185,7 +185,7 @@ describe('useTokenClaims', () => {
   });
 
   it('should return empty object when decodeJwt throws an error', async () => {
-    (useAccessToken as jest.Mock).mockReturnValue({ accessToken: 'malformed-token' });
+    (useAccessToken as Mock).mockReturnValue({ accessToken: 'malformed-token' });
 
     const { getByTestId } = render(<TokenClaimsTestComponent />);
 

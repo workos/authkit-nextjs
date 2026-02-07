@@ -1,20 +1,20 @@
 import { tokenStore, TokenStore } from './tokenStore.js';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 
-jest.mock('../actions.js', () => ({
-  getAccessTokenAction: jest.fn(),
-  refreshAccessTokenAction: jest.fn(),
+vi.mock('../actions.js', () => ({
+  getAccessTokenAction: vi.fn(),
+  refreshAccessTokenAction: vi.fn(),
 }));
 
-const mockGetAccessTokenAction = getAccessTokenAction as jest.Mock;
-const mockRefreshAccessTokenAction = refreshAccessTokenAction as jest.Mock;
+const mockGetAccessTokenAction = getAccessTokenAction as Mock;
+const mockRefreshAccessTokenAction = refreshAccessTokenAction as Mock;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _global = global as any;
 
 describe('tokenStore', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.resetAllMocks();
+    vi.useFakeTimers();
+    vi.resetAllMocks();
     tokenStore.reset();
 
     // Clean up DOM globals
@@ -23,10 +23,10 @@ describe('tokenStore', () => {
   });
 
   afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
     tokenStore.reset();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
 
     // Clean up DOM globals
     delete _global.document;
@@ -213,7 +213,7 @@ describe('tokenStore', () => {
       };
       const validToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(validPayload))}.mock-signature`;
 
-      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
       mockGetAccessTokenAction.mockResolvedValue(validToken);
 
       await tokenStore.getAccessTokenSilently();
@@ -227,7 +227,7 @@ describe('tokenStore', () => {
 
   describe('subscriber management', () => {
     it('should notify subscribers when state changes', () => {
-      const listener = jest.fn();
+      const listener = vi.fn();
       const unsubscribe = tokenStore.subscribe(listener);
 
       // Trigger a state change
@@ -256,14 +256,14 @@ describe('tokenStore', () => {
       mockGetAccessTokenAction.mockResolvedValue(validToken);
 
       // Subscribe to create a listener
-      const listener = jest.fn();
+      const listener = vi.fn();
       const unsubscribe = tokenStore.subscribe(listener);
 
       // Get token to schedule a refresh
       await tokenStore.getAccessTokenSilently();
 
       // Spy on clearTimeout
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
       // Unsubscribe the last (only) subscriber - should clear timeout
       unsubscribe();
@@ -354,7 +354,7 @@ describe('tokenStore', () => {
 
     it('should consume eager auth cookie on first getAccessToken call', async () => {
       const eagerToken = 'eager-auth-token';
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       // Mock document.cookie with both getter and setter
       let cookieValue = `workos-access-token=${eagerToken};`;
@@ -404,7 +404,7 @@ describe('tokenStore', () => {
         iat: now - 40,
       };
       const fastToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(fastPayload))}.mock-signature`;
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       let cookieValue = `workos-access-token=${fastToken};`;
 
@@ -433,7 +433,7 @@ describe('tokenStore', () => {
         configurable: true,
       });
 
-      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
 
       // Call getAccessTokenSilently to trigger fast cookie consumption and refresh scheduling
       const token = await tokenStore.getAccessTokenSilently();
@@ -480,7 +480,7 @@ describe('tokenStore', () => {
 
     it('should handle HTTP protocol for cookie deletion', async () => {
       const eagerToken = 'http-token';
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       let cookieValue = `workos-access-token=${eagerToken};`;
 
@@ -624,7 +624,7 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Spy on clearTimeout
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
       // Clear token should clear the refresh timeout
       tokenStore.clearToken();
@@ -738,7 +738,7 @@ describe('tokenStore', () => {
       mockGetAccessTokenAction.mockClear();
       mockRefreshAccessTokenAction.mockResolvedValue(existingToken); // Same token
 
-      const listener = jest.fn();
+      const listener = vi.fn();
       tokenStore.subscribe(listener);
 
       // Force a silent refresh that returns the same token
@@ -752,7 +752,7 @@ describe('tokenStore', () => {
 
   describe('TokenStore constructor', () => {
     const setupMockEnv = (cookieValue = '', protocol = 'https:') => {
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       Object.defineProperty(_global, 'document', {
         value: { cookie: cookieValue },
