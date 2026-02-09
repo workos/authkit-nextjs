@@ -34,10 +34,10 @@
     "test:coverage": "vitest run --coverage",
     "prettier": "prettier \"src/**/*.{js,ts,tsx}\" --check",
     "format": "prettier \"src/**/*.{js,ts,tsx}\" --write",
-    "type-check": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workos-inc/node": "^7.72.0",
+    "@workos-inc/node": "^8.2.0",
     "iron-session": "^8.0.1",
     "jose": "^5.2.3",
     "path-to-regexp": "^6.2.2"
