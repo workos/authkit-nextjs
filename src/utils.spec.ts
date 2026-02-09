@@ -3,23 +3,21 @@ import { redirectWithFallback, errorResponseWithFallback } from './utils.js';
 
 describe('utils', () => {
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
+    vi.restoreAllMocks();
   });
 
   describe('redirectWithFallback', () => {
     it('uses NextResponse.redirect when available', () => {
       const redirectUrl = 'https://example.com';
-      const mockRedirect = jest.fn().mockReturnValue('redirected');
-      const originalRedirect = NextResponse.redirect;
+      const mockRedirect = vi.fn().mockReturnValue('redirected');
 
-      NextResponse.redirect = mockRedirect;
+      vi.spyOn(NextResponse, 'redirect').mockImplementation(mockRedirect);
 
       const result = redirectWithFallback(redirectUrl);
 
       expect(mockRedirect).toHaveBeenCalledWith(redirectUrl, { headers: undefined });
       expect(result).toBe('redirected');
-
-      NextResponse.redirect = originalRedirect;
     });
 
     it('uses headers when provided', () => {
@@ -35,9 +33,9 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse exists but redirect is undefined', async () => {
       const redirectUrl = 'https://example.com';
 
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: {
           // exists but has no redirect method
         },
@@ -55,10 +53,10 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse is undefined', async () => {
       const redirectUrl = 'https://example.com';
 
-      jest.resetModules();
+      vi.resetModules();
 
       // Mock with undefined NextResponse
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: undefined,
       }));
 
@@ -81,8 +79,8 @@ describe('utils', () => {
     };
 
     it('uses NextResponse.json when available', () => {
-      const mockJson = jest.fn().mockReturnValue('error json response');
-      NextResponse.json = mockJson;
+      const mockJson = vi.fn().mockReturnValue('error json response');
+      vi.spyOn(NextResponse, 'json').mockImplementation(mockJson);
 
       const result = errorResponseWithFallback(errorBody);
 
@@ -90,25 +88,10 @@ describe('utils', () => {
       expect(result).toBe('error json response');
     });
 
-    it('falls back to standard Response when NextResponse is not available', () => {
-      const originalJson = NextResponse.json;
-
-      // @ts-expect-error - This is to test the fallback
-      delete NextResponse.json;
-
-      const result = errorResponseWithFallback(errorBody);
-
-      expect(result).toBeInstanceOf(Response);
-      expect(result.status).toBe(500);
-      expect(result.headers.get('Content-Type')).toBe('application/json');
-
-      NextResponse.json = originalJson;
-    });
-
     it('falls back to standard Response when NextResponse exists but json is undefined', async () => {
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: {
           // exists but has no json method
         },
@@ -124,9 +107,9 @@ describe('utils', () => {
     });
 
     it('falls back to standard Response when NextResponse is undefined', async () => {
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: undefined,
       }));
 

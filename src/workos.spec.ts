@@ -4,7 +4,7 @@ import { getWorkOS, VERSION } from './workos.js';
 describe('workos', () => {
   const workos = getWorkOS();
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('initializes WorkOS with the correct configuration', () => {
@@ -35,7 +35,7 @@ describe('workos', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
-      jest.resetModules();
+      vi.resetModules();
       process.env = { ...originalEnv };
     });
 

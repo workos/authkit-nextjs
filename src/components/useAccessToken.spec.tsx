@@ -6,41 +6,37 @@ import { useAuth } from './authkit-provider.js';
 import { useAccessToken } from './useAccessToken.js';
 import { tokenStore } from './tokenStore.js';
 
-jest.mock('../actions.js', () => ({
-  getAccessTokenAction: jest.fn(),
-  refreshAccessTokenAction: jest.fn(),
+vi.mock('../actions.js', () => ({
+  getAccessTokenAction: vi.fn(),
+  refreshAccessTokenAction: vi.fn(),
 }));
 
-jest.mock('./authkit-provider.js', () => {
-  const originalModule = jest.requireActual('./authkit-provider.js');
+vi.mock('./authkit-provider.js', async () => {
+  const originalModule = await vi.importActual<typeof import('./authkit-provider.js')>('./authkit-provider.js');
   return {
     ...originalModule,
-    useAuth: jest.fn(),
+    useAuth: vi.fn(),
   };
 });
 
 describe('useAccessToken', () => {
   beforeEach(() => {
     tokenStore.reset();
-    jest.resetAllMocks();
-    jest.useFakeTimers();
+    vi.resetAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    // Reset mock implementations to avoid test interference
-    (getAccessTokenAction as jest.Mock).mockReset();
-    (refreshAccessTokenAction as jest.Mock).mockReset();
-
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
   });
 
   afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
     tokenStore.reset();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const TestComponent = () => {
@@ -60,7 +56,7 @@ describe('useAccessToken', () => {
   it('should fetch an access token on mount and show loading state initially', async () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(mockToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(mockToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -92,8 +88,8 @@ describe('useAccessToken', () => {
     const refreshedToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as jest.Mock).mockResolvedValueOnce(refreshedToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -115,8 +111,8 @@ describe('useAccessToken', () => {
     const refreshedToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
-    (refreshAccessTokenAction as jest.Mock).mockResolvedValueOnce(refreshedToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -141,10 +137,10 @@ describe('useAccessToken', () => {
   });
 
   it('should handle the not loggged in state', async () => {
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: undefined,
       sessionId: undefined,
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const { getByTestId } = render(<TestComponent />);
@@ -157,7 +153,7 @@ describe('useAccessToken', () => {
 
   it('should handle errors during token fetch', async () => {
     const error = new Error('Failed to fetch token');
-    (getAccessTokenAction as jest.Mock).mockRejectedValueOnce(error);
+    (getAccessTokenAction as Mock).mockRejectedValueOnce(error);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -176,8 +172,8 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
     const error = new Error('Failed to refresh token');
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
-    (refreshAccessTokenAction as jest.Mock).mockRejectedValueOnce(error);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
+    (refreshAccessTokenAction as Mock).mockRejectedValueOnce(error);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -200,13 +196,13 @@ describe('useAccessToken', () => {
   it('should reset token state when user is undefined', async () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(mockToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(mockToken);
 
     // First render with user
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const { getByTestId, rerender } = render(<TestComponent />);
@@ -215,10 +211,10 @@ describe('useAccessToken', () => {
       expect(getByTestId('token')).toHaveTextContent(mockToken);
     });
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: undefined,
       sessionId: undefined,
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     rerender(<TestComponent />);
@@ -230,7 +226,7 @@ describe('useAccessToken', () => {
 
   it('should handle invalid tokens gracefully', async () => {
     const invalidToken = 'invalid-token';
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(invalidToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(invalidToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -246,7 +242,7 @@ describe('useAccessToken', () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
-    (getAccessTokenAction as jest.Mock).mockRejectedValueOnce(error).mockResolvedValueOnce(mockToken);
+    (getAccessTokenAction as Mock).mockRejectedValueOnce(error).mockResolvedValueOnce(mockToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -257,7 +253,7 @@ describe('useAccessToken', () => {
     });
 
     act(() => {
-      jest.advanceTimersByTime(5 * 60 * 1000); // RETRY_DELAY
+      vi.advanceTimersByTime(5 * 60 * 1000); // RETRY_DELAY
     });
 
     // Loading should remain false during retry
@@ -283,8 +279,8 @@ describe('useAccessToken', () => {
     const expiringToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
     const error = new Error('Failed to refresh token');
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as jest.Mock).mockRejectedValueOnce(error);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
+    (refreshAccessTokenAction as Mock).mockRejectedValueOnce(error);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -301,7 +297,7 @@ describe('useAccessToken', () => {
 
   it('should handle token with an invalid payload format', async () => {
     const badPayloadToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalidpayload.mock-signature';
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(badPayloadToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(badPayloadToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -313,7 +309,7 @@ describe('useAccessToken', () => {
   });
 
   it('should immediately try to update token when token is undefined', async () => {
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -327,17 +323,17 @@ describe('useAccessToken', () => {
 
   it('should react to sessionId changes', async () => {
     // Clear any previous mocks to ensure clean state
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     const token1 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-1';
     const token2 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(token1).mockResolvedValueOnce(token2);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(token1).mockResolvedValueOnce(token2);
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user1' },
       sessionId: 'session1',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const { rerender } = render(<TestComponent />);
@@ -346,10 +342,10 @@ describe('useAccessToken', () => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
     });
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user1' }, // Same user ID
       sessionId: 'session2',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     rerender(<TestComponent />);
@@ -360,8 +356,8 @@ describe('useAccessToken', () => {
   });
 
   it('should prevent concurrent token fetches via updateToken', async () => {
-    jest.clearAllMocks();
-    (getAccessTokenAction as jest.Mock).mockReset();
+    vi.clearAllMocks();
+    (getAccessTokenAction as Mock).mockReset();
 
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
@@ -374,7 +370,7 @@ describe('useAccessToken', () => {
       }, 0);
     });
 
-    (getAccessTokenAction as jest.Mock).mockImplementation(() => {
+    (getAccessTokenAction as Mock).mockImplementation(() => {
       fetchCalls++;
       return tokenPromise;
     });
@@ -397,7 +393,7 @@ describe('useAccessToken', () => {
   });
 
   it('should prevent concurrent manual refresh operations', async () => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     let refreshCalls = 0;
 
@@ -412,12 +408,12 @@ describe('useAccessToken', () => {
       setTimeout(() => resolve(refreshedToken), 10);
     });
 
-    (refreshAccessTokenAction as jest.Mock).mockImplementation(() => {
+    (refreshAccessTokenAction as Mock).mockImplementation(() => {
       refreshCalls++;
       return refreshPromise;
     });
 
-    (getAccessTokenAction as jest.Mock).mockImplementation(() => {
+    (getAccessTokenAction as Mock).mockImplementation(() => {
       return Promise.resolve(mockToken);
     });
 
@@ -446,7 +442,7 @@ describe('useAccessToken', () => {
 
   it('should handle non-Error objects thrown during token fetch', async () => {
     // Simulate a string error being thrown
-    (getAccessTokenAction as jest.Mock).mockImplementation(() => {
+    (getAccessTokenAction as Mock).mockImplementation(() => {
       throw 'String error message';
     });
 
@@ -461,13 +457,13 @@ describe('useAccessToken', () => {
 
   it('should show loading state immediately on first render when user exists but no token', () => {
     // Mock user with no token initially
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
-    (getAccessTokenAction as jest.Mock).mockImplementation(
+    (getAccessTokenAction as Mock).mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve('token'), 100)),
     );
 
@@ -482,12 +478,12 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJleGlzdGluZyIsInNpZCI6InNlc3Npb24xMjMiLCJleHAiOjk5OTk5OTk5OTl9.existing';
 
     await act(async () => {
-      (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(existingToken);
+      (getAccessTokenAction as Mock).mockResolvedValueOnce(existingToken);
       await tokenStore.getAccessTokenSilently();
     });
 
     // Reset the mock to track new calls
-    (getAccessTokenAction as jest.Mock).mockClear();
+    (getAccessTokenAction as Mock).mockClear();
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -511,8 +507,8 @@ describe('useAccessToken', () => {
       resolveRefreshPromise = resolve;
     });
 
-    (refreshAccessTokenAction as jest.Mock).mockReturnValue(refreshPromise);
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(initialToken);
+    (refreshAccessTokenAction as Mock).mockReturnValue(refreshPromise);
+    (getAccessTokenAction as Mock).mockResolvedValue(initialToken);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -541,7 +537,7 @@ describe('useAccessToken', () => {
   it('should clear refresh timeout on unmount', async () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(mockToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(mockToken);
 
     const { getByTestId, unmount } = render(<TestComponent />);
 
@@ -555,7 +551,7 @@ describe('useAccessToken', () => {
   it('should handle edge cases when token data is null', async () => {
     // Create a token that resembles a JWT but with a null payload
     const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.bnVsbA==.mock-signature'; // "null" in base64
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(token);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(token);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -570,7 +566,7 @@ describe('useAccessToken', () => {
   it('should handle errors with string messages instead of Error objects', async () => {
     const error = 'String error message';
     const errorObj = new Error(error);
-    (getAccessTokenAction as jest.Mock).mockRejectedValueOnce(errorObj);
+    (getAccessTokenAction as Mock).mockRejectedValueOnce(errorObj);
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -585,9 +581,9 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
     const stringError = 'String error directly'; // Not wrapped in Error object
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValueOnce(initialToken);
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
     // Mock refreshAccessTokenAction to reject with a string, not an Error object
-    (refreshAccessTokenAction as jest.Mock).mockImplementation(() => {
+    (refreshAccessTokenAction as Mock).mockImplementation(() => {
       return Promise.reject(stringError); // Directly reject with string
     });
 
@@ -613,12 +609,12 @@ describe('useAccessToken', () => {
     const token =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(token);
+    (getAccessTokenAction as Mock).mockResolvedValue(token);
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const { getByTestId, rerender } = render(<TestComponent />);
@@ -628,10 +624,10 @@ describe('useAccessToken', () => {
       expect(getAccessTokenAction).toHaveBeenCalledTimes(1);
     });
 
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_456' }, // Different user
       sessionId: 'session_123', // Same session
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     rerender(<TestComponent />);
@@ -642,10 +638,10 @@ describe('useAccessToken', () => {
   });
 
   it('should handle getAccessToken when user is not authenticated', async () => {
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: null,
       sessionId: undefined,
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const TestComponentWithGetAccessToken = () => {
@@ -670,11 +666,11 @@ describe('useAccessToken', () => {
     const mockToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
-    (getAccessTokenAction as jest.Mock).mockResolvedValue(mockToken);
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (getAccessTokenAction as Mock).mockResolvedValue(mockToken);
+    (useAuth as Mock).mockImplementation(() => ({
       user: { id: 'user_123' },
       sessionId: 'session_123',
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const TestComponentWithGetAccessToken = () => {
@@ -696,7 +692,7 @@ describe('useAccessToken', () => {
 
     // Advance timers to trigger getAccessToken call
     act(() => {
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
     });
 
     await waitFor(() => {
@@ -705,10 +701,10 @@ describe('useAccessToken', () => {
   });
 
   it('should handle manual refresh when user is not authenticated', async () => {
-    (useAuth as jest.Mock).mockImplementation(() => ({
+    (useAuth as Mock).mockImplementation(() => ({
       user: null,
       sessionId: undefined,
-      refreshAuth: jest.fn().mockResolvedValue({}),
+      refreshAuth: vi.fn().mockResolvedValue({}),
     }));
 
     const TestComponentWithRefresh = () => {

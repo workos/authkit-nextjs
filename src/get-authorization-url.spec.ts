@@ -1,25 +1,24 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { headers } from 'next/headers';
 import { getWorkOS } from './workos.js';
 
-jest.mock('next/headers');
-
 // Mock dependencies
-const fakeWorkosInstance = {
-  userManagement: {
-    getAuthorizationUrl: jest.fn(),
+const { fakeWorkosInstance } = vi.hoisted(() => ({
+  fakeWorkosInstance: {
+    userManagement: {
+      getAuthorizationUrl: vi.fn(),
+    },
   },
-};
+}));
 
-jest.mock('./workos', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
+vi.mock('./workos', () => ({
+  getWorkOS: vi.fn(() => fakeWorkosInstance),
 }));
 
 describe('getAuthorizationUrl', () => {
   const workos = getWorkOS();
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('uses x-redirect-uri header when redirectUri option is not provided', async () => {
@@ -27,7 +26,7 @@ describe('getAuthorizationUrl', () => {
     nextHeaders.set('x-redirect-uri', 'http://test-redirect.com');
 
     // Mock workos.userManagement.getAuthorizationUrl
-    jest.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
     await getAuthorizationUrl({});
 
@@ -39,7 +38,7 @@ describe('getAuthorizationUrl', () => {
   });
 
   it('works when called with no arguments', async () => {
-    jest.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
     await getAuthorizationUrl(); // Call with no arguments
 
@@ -47,7 +46,7 @@ describe('getAuthorizationUrl', () => {
   });
 
   it('works when prompt is provided', async () => {
-    jest.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
     await getAuthorizationUrl({ prompt: 'consent' });
 

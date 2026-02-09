@@ -10,12 +10,15 @@ import { jwtVerify } from 'jose';
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 
-jest.mock('jose', () => ({
-  jwtVerify: jest.fn(),
-  createRemoteJWKSet: jest.fn(),
-  SignJWT: jest.requireActual('jose').SignJWT,
-  decodeJwt: jest.requireActual('jose').decodeJwt,
-}));
+vi.mock('jose', async () => {
+  const actual = await vi.importActual<typeof import('jose')>('jose');
+  return {
+    jwtVerify: vi.fn(),
+    createRemoteJWKSet: vi.fn(),
+    SignJWT: actual.SignJWT,
+    decodeJwt: actual.decodeJwt,
+  };
+});
 
 // logging is disabled by default, flip this to true to still have logs in the console
 const DEBUG = false;
@@ -47,11 +50,11 @@ describe('session.ts', () => {
     } as User,
   };
 
-  let consoleLogSpy: jest.SpyInstance;
+  let consoleLogSpy: MockInstance;
 
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Reset the cookie store
     const nextCookies = await cookies();
@@ -63,9 +66,9 @@ describe('session.ts', () => {
     nextHeaders._reset();
     nextHeaders.set('x-workos-middleware', 'true');
 
-    (jwtVerify as jest.Mock).mockReset();
+    (jwtVerify as Mock).mockReset();
 
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args) => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
       if (DEBUG) {
         console.info(...args);
       }
@@ -74,7 +77,7 @@ describe('session.ts', () => {
 
   afterEach(() => {
     consoleLogSpy.mockRestore();
-    jest.resetModules();
+    vi.resetModules();
   });
 
   describe('withAuth', () => {
@@ -159,7 +162,7 @@ describe('session.ts', () => {
     it('should throw an error if the redirect URI is not set', async () => {
       const originalWorkosRedirectUri = envVariables.WORKOS_REDIRECT_URI;
 
-      jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', '');
+      Object.defineProperty(envVariables, 'WORKOS_REDIRECT_URI', { value: '', configurable: true });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -174,13 +177,16 @@ describe('session.ts', () => {
         );
       }).rejects.toThrow('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
 
-      jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
+      Object.defineProperty(envVariables, 'WORKOS_REDIRECT_URI', {
+        value: originalWorkosRedirectUri,
+        configurable: true,
+      });
     });
 
     it('should throw an error if the cookie password is not set', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', { value: '', configurable: true });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -197,13 +203,16 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', {
+        value: originalWorkosCookiePassword,
+        configurable: true,
+      });
     });
 
     it('should throw an error if the cookie password is less than 32 characters', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', { value: 'short', configurable: true });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -220,7 +229,10 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      Object.defineProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', {
+        value: originalWorkosCookiePassword,
+        configurable: true,
+      });
     });
 
     it('should return early if there is no session', async () => {
@@ -241,7 +253,7 @@ describe('session.ts', () => {
     });
 
     it('should return 200 if the session is valid', async () => {
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const nextCookies = await cookies();
       nextCookies.set(
@@ -249,7 +261,7 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         return true;
       });
 
@@ -272,11 +284,11 @@ describe('session.ts', () => {
     it('should attempt to refresh the session when the access token is invalid', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -308,17 +320,15 @@ describe('session.ts', () => {
     });
 
     it('should delete the cookie when refreshing fails', async () => {
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
-      jest
-        .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-        .mockRejectedValue(new Error('Failed to refresh'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Failed to refresh'));
 
       const request = new NextRequest(new URL('http://example.com'));
 
@@ -354,7 +364,7 @@ describe('session.ts', () => {
 
     describe('middleware auth', () => {
       it('should redirect unauthenticated users on protected routes', async () => {
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
 
         const request = new NextRequest(new URL('http://example.com/protected'));
         const result = await updateSessionMiddleware(
@@ -476,11 +486,11 @@ describe('session.ts', () => {
 
       it('should throw an error if the provided regex is invalid and a non-Error object is thrown', async () => {
         // Reset modules to ensure clean import state
-        jest.resetModules();
+        vi.resetModules();
 
         // Import first, then spy
         const pathToRegexp = await import('path-to-regexp');
-        const parseSpy = jest.spyOn(pathToRegexp, 'parse').mockImplementation(() => {
+        const parseSpy = vi.spyOn(pathToRegexp, 'parse').mockImplementation(() => {
           throw 'invalid regex';
         });
 
@@ -504,6 +514,9 @@ describe('session.ts', () => {
 
         // Verify the mock was called
         expect(parseSpy).toHaveBeenCalled();
+
+        // Restore the spy to prevent leaking to subsequent tests
+        parseSpy.mockRestore();
       });
 
       it('should default to the WORKOS_REDIRECT_URI environment variable if no redirect URI is provided', async () => {
@@ -523,17 +536,17 @@ describe('session.ts', () => {
       });
 
       it('should delete the cookie and redirect when refreshing fails', async () => {
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
 
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
-        jest
-          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Failed to refresh'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(
+          new Error('Failed to refresh'),
+        );
 
         const request = new NextRequest(new URL('http://example.com'));
 
@@ -634,12 +647,12 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       // Mock successful refresh
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -667,12 +680,12 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       // Mock refresh failure
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
       const request = new NextRequest(new URL('http://example.com/protected'));
       request.cookies.set(
@@ -694,15 +707,15 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       const newAccessToken = await generateTestToken();
-      const mockSuccessCallback = jest.fn();
+      const mockSuccessCallback = vi.fn();
 
       // Mock successful refresh
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: newAccessToken,
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -733,15 +746,15 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       const mockError = new Error('Refresh failed');
-      const mockErrorCallback = jest.fn();
+      const mockErrorCallback = vi.fn();
 
       // Mock refresh failure
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(mockError);
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(mockError);
 
       const request = new NextRequest(new URL('http://example.com/protected'));
       request.cookies.set(
@@ -764,15 +777,15 @@ describe('session.ts', () => {
 
   describe('refreshSession', () => {
     it('should refresh session successfully', async () => {
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
       });
 
-      jest
-        .spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const nextCookies = await cookies();
       nextCookies.set(
@@ -808,15 +821,15 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken({ org_id: 'org_456' }),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
       });
 
-      jest
-        .spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const result = await refreshSession({ organizationId: 'org_456' });
 
@@ -835,8 +848,8 @@ describe('session.ts', () => {
         'wos-session',
         await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
-      expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('Failed to refresh session: fail');
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
+      await expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('Failed to refresh session: fail');
     });
 
     it('throws if authenticateWithRefreshToken fails with error', async () => {
@@ -850,7 +863,7 @@ describe('session.ts', () => {
         'wos-session',
         await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
       await expect(refreshSession()).rejects.toThrow('Failed to refresh session: error');
     });
   });
@@ -860,7 +873,7 @@ describe('session.ts', () => {
       const nextCookies = await cookies();
       // @ts-expect-error - _reset is part of the mock
       nextCookies._reset();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should return all token claims when accessToken is provided', async () => {
@@ -954,7 +967,7 @@ describe('session.ts', () => {
 
   describe('eager auth functionality', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     describe('isInitialDocumentRequest', () => {
@@ -1048,12 +1061,12 @@ describe('session.ts', () => {
         // Setup invalid session that needs refresh
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
         const newAccessToken = await generateTestToken();
-        jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
           accessToken: newAccessToken,
           refreshToken: 'new-refresh-token',
           user: mockSession.user,
@@ -1079,13 +1092,11 @@ describe('session.ts', () => {
         // Setup invalid session
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
-        jest
-          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Refresh failed'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
         const request = new NextRequest(new URL('http://example.com/page'));
         request.headers.set('accept', 'text/html');

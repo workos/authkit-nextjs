@@ -3,19 +3,21 @@ import { handleAuth } from './authkit-callback-route.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Mocked in jest.setup.ts
+// Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
 
 // Mock dependencies
-const fakeWorkosInstance = {
-  userManagement: {
-    authenticateWithCode: jest.fn(),
-    getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+const { fakeWorkosInstance } = vi.hoisted(() => ({
+  fakeWorkosInstance: {
+    userManagement: {
+      authenticateWithCode: vi.fn(),
+      getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    },
   },
-};
+}));
 
-jest.mock('../src/workos', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
+vi.mock('../src/workos', () => ({
+  getWorkOS: vi.fn(() => fakeWorkosInstance),
 }));
 
 describe('authkit-callback-route', () => {
@@ -51,12 +53,12 @@ describe('authkit-callback-route', () => {
 
     beforeAll(() => {
       // Silence console.error during tests
-      jest.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     beforeEach(async () => {
       // Reset all mocks
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       // Create a new request with searchParams
       request = new NextRequest(new URL('http://example.com/callback'));
@@ -72,7 +74,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle successful authentication', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -89,7 +91,7 @@ describe('authkit-callback-route', () => {
 
     it('should handle authentication failure', async () => {
       // Mock authentication failure
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue(new Error('Auth failed'));
+      (workos.userManagement.authenticateWithCode as Mock).mockRejectedValue(new Error('Auth failed'));
 
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
@@ -103,7 +105,7 @@ describe('authkit-callback-route', () => {
 
     it('should handle authentication failure if a non-Error object is thrown', async () => {
       // Mock authentication failure
-      jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
 
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
@@ -117,7 +119,7 @@ describe('authkit-callback-route', () => {
 
     it('should handle authentication failure with custom onError handler', async () => {
       // Mock authentication failure
-      jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
       request.nextUrl.searchParams.set('code', 'invalid-code');
 
       const handler = handleAuth({
@@ -145,7 +147,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should respect custom returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       request.nextUrl.searchParams.set('code', 'test-code');
 
@@ -156,7 +158,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle state parameter with returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -169,7 +171,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should extract custom search params from returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -182,7 +184,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle full URL in returnPathname by extracting only the pathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       const state = btoa(JSON.stringify({ returnPathname: 'https://example.com/invite/k0123456789' }));
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -200,7 +202,7 @@ describe('authkit-callback-route', () => {
       const originalRedirect = NextResponse.redirect;
       (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
 
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -232,7 +234,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should use baseURL if provided', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -248,7 +250,7 @@ describe('authkit-callback-route', () => {
         user: { id: 'user_123' },
       };
 
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      (workos.userManagement.authenticateWithCode as Mock).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -260,12 +262,12 @@ describe('authkit-callback-route', () => {
     });
 
     it('should call onSuccess if provided', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess: onSuccess });
       await handler(request);
 
@@ -276,7 +278,7 @@ describe('authkit-callback-route', () => {
 
     it('should allow onSuccess to update session', async () => {
       const newAccessToken = 'new-access-token';
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Set up request with code
       request.nextUrl.searchParams.set('code', 'test-code');
@@ -293,7 +295,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should pass custom state data to onSuccess callback', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Create state with new format: internal.user
       const internalState = btoa(JSON.stringify({ returnPathname: '/dashboard' }))
@@ -305,7 +307,7 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
@@ -323,7 +325,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle state without custom data', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // State with only returnPathname
       const state = btoa(JSON.stringify({ returnPathname: '/profile' }));
@@ -331,7 +333,7 @@ describe('authkit-callback-route', () => {
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', state);
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
@@ -345,7 +347,7 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle backward compatibility with old state format', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Old format: just returnPathname
       const state = btoa(JSON.stringify({ returnPathname: '/old-path' }));

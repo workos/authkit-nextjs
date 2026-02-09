@@ -7,23 +7,23 @@ import * as React from 'react';
 import { handleSignOutAction } from '../actions.js';
 
 // Mock the useAuth hook
-jest.mock('./authkit-provider', () => ({
-  useAuth: jest.fn(),
+vi.mock('./authkit-provider', () => ({
+  useAuth: vi.fn(),
 }));
 
 // Mock the getOrganizationAction
-jest.mock('../actions', () => ({
-  getOrganizationAction: jest.fn(),
-  handleSignOutAction: jest.fn(),
+vi.mock('../actions', () => ({
+  getOrganizationAction: vi.fn(),
+  handleSignOutAction: vi.fn(),
 }));
 
 describe('Impersonation', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should return null if not impersonating', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: null,
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -34,7 +34,7 @@ describe('Impersonation', () => {
   });
 
   it('should render impersonation banner when impersonating', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -45,13 +45,13 @@ describe('Impersonation', () => {
   });
 
   it('should render with organization info when organizationId is provided', async () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: 'org_123',
     });
 
-    (getOrganizationAction as jest.Mock).mockResolvedValue({
+    (getOrganizationAction as Mock).mockResolvedValue({
       id: 'org_123',
       name: 'Test Org',
     });
@@ -64,7 +64,7 @@ describe('Impersonation', () => {
   });
 
   it('should render at the bottom by default', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -76,7 +76,7 @@ describe('Impersonation', () => {
   });
 
   it('should render at the top when side prop is "top"', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -88,7 +88,7 @@ describe('Impersonation', () => {
   });
 
   it('should merge custom styles with default styles', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -97,11 +97,11 @@ describe('Impersonation', () => {
     const customStyle = { backgroundColor: 'red' };
     const { container } = render(<Impersonation style={customStyle} />);
     const root = container.querySelector('[data-workos-impersonation-root]');
-    expect(root).toHaveStyle({ backgroundColor: 'red' });
+    expect((root as HTMLElement).style.backgroundColor).toBe('red');
   });
 
   it('should should sign out when the Stop button is called', async () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -114,7 +114,7 @@ describe('Impersonation', () => {
   });
 
   it('should pass returnTo prop to handleSignOutAction when provided', async () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -129,7 +129,7 @@ describe('Impersonation', () => {
   });
 
   it('should not call getOrganizationAction when organizationId is not provided', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: { id: '123', email: 'user@example.com' },
       organizationId: null,
@@ -140,7 +140,7 @@ describe('Impersonation', () => {
   });
 
   it('should not call getOrganizationAction when impersonator is not present', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: null,
       user: { id: '123', email: 'user@example.com' },
       organizationId: 'org_123',
@@ -151,7 +151,7 @@ describe('Impersonation', () => {
   });
 
   it('should not call getOrganizationAction when user is not present', () => {
-    (useAuth as jest.Mock).mockReturnValue({
+    (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
       user: null,
       organizationId: 'org_123',
@@ -167,10 +167,10 @@ describe('Impersonation', () => {
       name: 'Test Org',
     };
 
-    (getOrganizationAction as jest.Mock).mockResolvedValue(mockOrg);
+    (getOrganizationAction as Mock).mockResolvedValue(mockOrg);
 
     const { rerender } = await act(async () => {
-      (useAuth as jest.Mock).mockReturnValue({
+      (useAuth as Mock).mockReturnValue({
         impersonator: { email: 'admin@example.com' },
         user: { id: '123', email: 'user@example.com' },
         organizationId: 'org_123',
@@ -188,7 +188,7 @@ describe('Impersonation', () => {
 
     // Rerender with the same organizationId
     await act(async () => {
-      (useAuth as jest.Mock).mockReturnValue({
+      (useAuth as Mock).mockReturnValue({
         impersonator: { email: 'admin@example.com' },
         user: { id: '123', email: 'user@example.com' },
         organizationId: 'org_123',
@@ -212,10 +212,10 @@ describe('Impersonation', () => {
       name: 'Test Org 2',
     };
 
-    (getOrganizationAction as jest.Mock).mockResolvedValueOnce(mockOrg1).mockResolvedValueOnce(mockOrg2);
+    (getOrganizationAction as Mock).mockResolvedValueOnce(mockOrg1).mockResolvedValueOnce(mockOrg2);
 
     const { rerender } = await act(async () => {
-      (useAuth as jest.Mock).mockReturnValue({
+      (useAuth as Mock).mockReturnValue({
         impersonator: { email: 'admin@example.com' },
         user: { id: '123', email: 'user@example.com' },
         organizationId: 'org_123',
@@ -234,7 +234,7 @@ describe('Impersonation', () => {
 
     // Rerender with a different organizationId
     await act(async () => {
-      (useAuth as jest.Mock).mockReturnValue({
+      (useAuth as Mock).mockReturnValue({
         impersonator: { email: 'admin@example.com' },
         user: { id: '123', email: 'user@example.com' },
         organizationId: 'org_456',
