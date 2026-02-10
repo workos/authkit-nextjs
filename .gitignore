@@ -4,3 +4,9 @@ dist
 coverage
 .idea
 package-lock.json
+
+# Example app
+example/.next
+example/.env.local
+example/next-env.d.ts
+example/tsconfig.tsbuildinfo
