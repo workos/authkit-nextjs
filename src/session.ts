@@ -18,6 +18,7 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
+import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
@@ -202,14 +203,23 @@ async function updateSession(
       console.log('No session found from cookie');
     }
 
+    const { url: authorizationUrl, pkceCookieValue } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+      screenHint: options.screenHint,
+    });
+
+    if (pkceCookieValue) {
+      newRequestHeaders.append(
+        'Set-Cookie',
+        `${PKCE_COOKIE_NAME}=${pkceCookieValue}; ${getCookieOptions(request.url, true)}`,
+      );
+    }
+
     return {
       session: { user: null },
       headers: newRequestHeaders,
-      authorizationUrl: await getAuthorizationUrl({
-        returnPathname: getReturnPathname(request.url),
-        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
-        screenHint: options.screenHint,
-      }),
+      authorizationUrl,
     };
   }
 
@@ -340,13 +350,22 @@ async function updateSession(
 
     options.onSessionRefreshError?.({ error: e, request });
 
+    const { url: authorizationUrl, pkceCookieValue: refreshPkceCookieValue } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+    });
+
+    if (refreshPkceCookieValue) {
+      newRequestHeaders.append(
+        'Set-Cookie',
+        `${PKCE_COOKIE_NAME}=${refreshPkceCookieValue}; ${getCookieOptions(request.url, true)}`,
+      );
+    }
+
     return {
       session: { user: null },
       headers: newRequestHeaders,
-      authorizationUrl: await getAuthorizationUrl({
-        returnPathname: getReturnPathname(request.url),
-        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
-      }),
+      authorizationUrl,
     };
   }
 }
@@ -453,7 +472,9 @@ async function redirectToSignIn() {
 
   const returnPathname = getReturnPathname(url);
 
-  redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
+  const { url: authkitUrl, pkceCookieValue } = await getAuthorizationUrl({ returnPathname, screenHint });
+  await setPKCECookie(pkceCookieValue);
+  redirect(authkitUrl);
 }
 
 export async function getTokenClaims<T = Record<string, unknown>>(

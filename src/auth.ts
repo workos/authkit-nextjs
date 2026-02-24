@@ -8,6 +8,7 @@ import { WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getCookieOptions } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { AccessToken, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import { setPKCECookie } from './pkce.js';
 import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -33,7 +34,16 @@ export async function getSignInUrl({
   prompt?: 'consent';
   state?: string;
 } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
+  const { url, pkceCookieValue } = await getAuthorizationUrl({
+    organizationId,
+    screenHint: 'sign-in',
+    loginHint,
+    redirectUri,
+    prompt,
+    state,
+  });
+  await setPKCECookie(pkceCookieValue);
+  return url;
 }
 
 export async function getSignUpUrl({
@@ -49,7 +59,16 @@ export async function getSignUpUrl({
   prompt?: 'consent';
   state?: string;
 } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
+  const { url, pkceCookieValue } = await getAuthorizationUrl({
+    organizationId,
+    screenHint: 'sign-up',
+    loginHint,
+    redirectUri,
+    prompt,
+    state,
+  });
+  await setPKCECookie(pkceCookieValue);
+  return url;
 }
 
 /**
@@ -108,7 +127,8 @@ export async function switchToOrganization(
       redirect(cause.rawData.authkit_redirect_url);
     } else {
       if (cause?.error === 'sso_required' || cause?.error === 'mfa_enrollment') {
-        const url = await getAuthorizationUrl({ organizationId });
+        const { url, pkceCookieValue } = await getAuthorizationUrl({ organizationId });
+        await setPKCECookie(pkceCookieValue);
         return redirect(url);
       }
       throw error;

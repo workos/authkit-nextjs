@@ -29,6 +29,13 @@ const fakeWorkosInstance = {
     getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
     getLogoutUrl: vi.fn(),
   },
+  pkce: {
+    generate: vi.fn().mockResolvedValue({
+      codeVerifier: 'test-code-verifier',
+      codeChallenge: 'test-code-challenge',
+      codeChallengeMethod: 'S256' as const,
+    }),
+  },
 };
 
 const revalidatePath = vi.mocked(cache.revalidatePath);
@@ -133,9 +140,16 @@ describe('auth.ts', () => {
         nextHeaders.set('x-url', 'http://localhost/test');
         await generateSession();
 
+        fakeWorkosInstance.pkce.generate.mockResolvedValue({
+          codeVerifier: 'test-code-verifier',
+          codeChallenge: 'test-code-challenge',
+          codeChallengeMethod: 'S256' as const,
+        });
+
         // Create a WorkOS-like object that matches what our tests need
         const mockWorkOS = {
           userManagement: fakeWorkosInstance.userManagement,
+          pkce: fakeWorkosInstance.pkce,
           // Add minimal properties to satisfy TypeScript
           createHttpClient: vi.fn(),
           createWebhookClient: vi.fn(),
