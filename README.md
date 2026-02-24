@@ -56,6 +56,7 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
+| `WORKOS_DISABLE_PKCE`    | None                  | Set to `'true'` to disable PKCE on authorization requests                                 |
 
 Example usage:
 
