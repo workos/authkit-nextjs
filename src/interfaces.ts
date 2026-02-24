@@ -61,6 +61,11 @@ export interface AccessToken {
   feature_flags?: string[];
 }
 
+export interface GetAuthURLResult {
+  url: string;
+  pkceCookieValue?: string;
+}
+
 export interface GetAuthURLOptions {
   screenHint?: 'sign-up' | 'sign-in';
   returnPathname?: string;

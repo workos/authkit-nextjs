@@ -7,7 +7,8 @@ import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
 import { getCookieOptions } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import type { AccessToken, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import type { AccessToken, GetAuthURLOptions, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import { setPKCECookie } from './pkce.js';
 import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -18,6 +19,12 @@ import { getWorkOS } from './workos.js';
 function revalidateTagCompat(tag: string): void {
   const fn = revalidateTag as (tag: string, profile: string) => void;
   return fn(tag, 'max');
+}
+
+async function getAuthURLAndSetPKCECookie(options: GetAuthURLOptions): Promise<string> {
+  const { url, pkceCookieValue } = await getAuthorizationUrl(options);
+  await setPKCECookie(pkceCookieValue);
+  return url;
 }
 
 export async function getSignInUrl({
@@ -33,7 +40,7 @@ export async function getSignInUrl({
   prompt?: 'consent';
   state?: string;
 } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
+  return getAuthURLAndSetPKCECookie({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
 }
 
 export async function getSignUpUrl({
@@ -49,7 +56,7 @@ export async function getSignUpUrl({
   prompt?: 'consent';
   state?: string;
 } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
+  return getAuthURLAndSetPKCECookie({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
 }
 
 /**
@@ -108,8 +115,7 @@ export async function switchToOrganization(
       redirect(cause.rawData.authkit_redirect_url);
     } else {
       if (cause?.error === 'sso_required' || cause?.error === 'mfa_enrollment') {
-        const url = await getAuthorizationUrl({ organizationId });
-        return redirect(url);
+        return redirect(await getAuthURLAndSetPKCECookie({ organizationId }));
       }
       throw error;
     }

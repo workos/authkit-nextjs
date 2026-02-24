@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
+import { PKCE_COOKIE_NAME, getPKCECodeVerifier } from './pkce.js';
 import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
@@ -61,11 +62,15 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
     if (code) {
       try {
+        const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME);
+        const codeVerifier = await getPKCECodeVerifier(pkceCookie?.value);
+
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
         const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
           await getWorkOS().userManagement.authenticateWithCode({
             clientId: WORKOS_CLIENT_ID,
             code,
+            codeVerifier,
           });
 
         // If baseURL is provided, use it instead of request.nextUrl
@@ -89,6 +94,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // This is to support Next.js 13.
         const response = redirectWithFallback(url.toString());
         preventCaching(response.headers);
+
+        if (pkceCookie) {
+          response.headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`);
+        }
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
 
