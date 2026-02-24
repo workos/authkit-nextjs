@@ -26,14 +26,24 @@ export async function getSignInUrl({
   redirectUri,
   prompt,
   state,
+  returnTo,
 }: {
   organizationId?: string;
   loginHint?: string;
   redirectUri?: string;
   prompt?: 'consent';
   state?: string;
+  returnTo?: string;
 } = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
+  return getAuthorizationUrl({
+    organizationId,
+    screenHint: 'sign-in',
+    loginHint,
+    redirectUri,
+    prompt,
+    state,
+    returnPathname: returnTo,
+  });
 }
 
 export async function getSignUpUrl({
