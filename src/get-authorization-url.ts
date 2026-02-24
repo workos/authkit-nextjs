@@ -19,8 +19,6 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}): Promise<Get
   const finalState =
     internalState && customState ? `${internalState}.${customState}` : internalState || customState || undefined;
 
-  let pkceCookieValue: string | undefined;
-
   const baseOptions = {
     provider: 'authkit' as const,
     clientId: WORKOS_CLIENT_ID,
@@ -32,22 +30,20 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}): Promise<Get
     prompt,
   };
 
-  let url: string;
-
-  if (WORKOS_DISABLE_PKCE !== 'true') {
-    const pkce = await getWorkOS().pkce.generate();
-    pkceCookieValue = await sealData(
-      { codeVerifier: pkce.codeVerifier },
-      { password: WORKOS_COOKIE_PASSWORD, ttl: 600 },
-    );
-    url = getWorkOS().userManagement.getAuthorizationUrl({
-      ...baseOptions,
-      codeChallenge: pkce.codeChallenge,
-      codeChallengeMethod: pkce.codeChallengeMethod,
-    });
-  } else {
-    url = getWorkOS().userManagement.getAuthorizationUrl(baseOptions);
+  if (WORKOS_DISABLE_PKCE === 'true') {
+    return { url: getWorkOS().userManagement.getAuthorizationUrl(baseOptions), pkceCookieValue: undefined };
   }
+
+  const pkce = await getWorkOS().pkce.generate();
+  const pkceCookieValue = await sealData(
+    { codeVerifier: pkce.codeVerifier },
+    { password: WORKOS_COOKIE_PASSWORD, ttl: 600 },
+  );
+  const url = getWorkOS().userManagement.getAuthorizationUrl({
+    ...baseOptions,
+    codeChallenge: pkce.codeChallenge,
+    codeChallengeMethod: pkce.codeChallengeMethod,
+  });
 
   return { url, pkceCookieValue };
 }

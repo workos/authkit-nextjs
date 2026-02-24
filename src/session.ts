@@ -26,6 +26,12 @@ import { parse, tokensToRegexp } from 'path-to-regexp';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
 
+function appendPKCESetCookieHeader(headers: Headers, pkceCookieValue: string | undefined, requestUrl: string): void {
+  if (pkceCookieValue) {
+    headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${pkceCookieValue}; ${getCookieOptions(requestUrl, true)}`);
+  }
+}
+
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
 const signUpPathsHeaderName = 'x-sign-up-paths';
@@ -209,12 +215,7 @@ async function updateSession(
       screenHint: options.screenHint,
     });
 
-    if (pkceCookieValue) {
-      newRequestHeaders.append(
-        'Set-Cookie',
-        `${PKCE_COOKIE_NAME}=${pkceCookieValue}; ${getCookieOptions(request.url, true)}`,
-      );
-    }
+    appendPKCESetCookieHeader(newRequestHeaders, pkceCookieValue, request.url);
 
     return {
       session: { user: null },
@@ -350,17 +351,12 @@ async function updateSession(
 
     options.onSessionRefreshError?.({ error: e, request });
 
-    const { url: authorizationUrl, pkceCookieValue: refreshPkceCookieValue } = await getAuthorizationUrl({
+    const { url: authorizationUrl, pkceCookieValue } = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
       redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
     });
 
-    if (refreshPkceCookieValue) {
-      newRequestHeaders.append(
-        'Set-Cookie',
-        `${PKCE_COOKIE_NAME}=${refreshPkceCookieValue}; ${getCookieOptions(request.url, true)}`,
-      );
-    }
+    appendPKCESetCookieHeader(newRequestHeaders, pkceCookieValue, request.url);
 
     return {
       session: { user: null },
