@@ -2,6 +2,7 @@ import { getWorkOS } from './workos.js';
 import { handleAuth } from './authkit-callback-route.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
+import { sealData } from 'iron-session';
 
 // Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
@@ -12,6 +13,9 @@ const { fakeWorkosInstance } = vi.hoisted(() => ({
     userManagement: {
       authenticateWithCode: vi.fn(),
       getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    },
+    pkce: {
+      generate: vi.fn(),
     },
   },
 }));
@@ -360,6 +364,87 @@ describe('authkit-callback-route', () => {
 
       // Should still redirect correctly
       expect(response.headers.get('Location')).toContain('/old-path');
+    });
+
+    describe('PKCE', () => {
+      it('should pass codeVerifier from cookie to authenticateWithCode', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Seal a verifier into a cookie value
+        const sealedVerifier = await sealData(
+          { codeVerifier: 'test-verifier-123' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Set the PKCE cookie on the request
+        request.cookies.set('wos-pkce-verifier', sealedVerifier);
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: 'test-verifier-123',
+          }),
+        );
+      });
+
+      it('should proceed without codeVerifier when PKCE cookie is missing', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: undefined,
+          }),
+        );
+      });
+
+      it('should proceed without codeVerifier when PKCE cookie is corrupted', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Set a corrupted cookie
+        request.cookies.set('wos-pkce-verifier', 'not-a-valid-sealed-value');
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: undefined,
+          }),
+        );
+      });
+
+      it('should delete PKCE cookie after successful authentication', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedVerifier = await sealData(
+          { codeVerifier: 'test-verifier-123' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        request.cookies.set('wos-pkce-verifier', sealedVerifier);
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        // The response should have a Set-Cookie header to delete the PKCE cookie
+        const setCookieHeaders = response.headers.getSetCookie();
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-pkce-verifier='));
+        expect(pkceDeletionCookie).toBeDefined();
+        expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
     });
   });
 });
