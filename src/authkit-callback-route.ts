@@ -62,7 +62,6 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
     if (code) {
       try {
-        // Read the PKCE verifier from the encrypted cookie (if present)
         const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME);
         const codeVerifier = await getPKCECodeVerifier(pkceCookie?.value);
 
@@ -96,7 +95,6 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         const response = redirectWithFallback(url.toString());
         preventCaching(response.headers);
 
-        // Clean up the PKCE verifier cookie
         if (pkceCookie) {
           response.headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`);
         }
