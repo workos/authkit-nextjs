@@ -1,11 +1,8 @@
 name: Release
 
 on:
-  # Support manually pushing a new release
-  workflow_dispatch: {}
-  # Trigger when a release is published
-  release:
-    types: [published]
+  workflow_dispatch:
+  workflow_call:
 
 defaults:
   run:
@@ -19,9 +16,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
@@ -33,10 +30,5 @@ jobs:
       - name: Build project
         run: pnpm run build
 
-      - name: Push Release
-        if: ${{ !github.event.release.prerelease }}
+      - name: Publish
         run: pnpm publish --tag latest --access=public --provenance --no-git-checks
-
-      - name: Push Pre-Release
-        if: ${{ github.event.release.prerelease }}
-        run: pnpm publish --tag next --access=public --provenance --no-git-checks
