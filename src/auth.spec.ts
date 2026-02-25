@@ -74,6 +74,15 @@ describe('auth.ts', () => {
       expect(url).toBeDefined();
       expect(() => new URL(url)).not.toThrow();
     });
+
+    it('should include returnTo as returnPathname in the state parameter', async () => {
+      const url = await getSignInUrl({ returnTo: '/dashboard' });
+      const parsedUrl = new URL(url);
+      const state = parsedUrl.searchParams.get('state');
+      expect(state).toBeDefined();
+      const decoded = JSON.parse(atob(state!.replace(/-/g, '+').replace(/_/g, '/')));
+      expect(decoded.returnPathname).toBe('/dashboard');
+    });
   });
 
   it('should not include prompt when not specified for getSignInUrl', async () => {
@@ -100,6 +109,15 @@ describe('auth.ts', () => {
     it('should include prompt=consent when explicitly specified for getSignUpUrl', async () => {
       const url = await getSignUpUrl({ prompt: 'consent' });
       expect(url).toContain('prompt=consent');
+    });
+
+    it('should include returnTo as returnPathname in the state parameter', async () => {
+      const url = await getSignUpUrl({ returnTo: '/welcome' });
+      const parsedUrl = new URL(url);
+      const state = parsedUrl.searchParams.get('state');
+      expect(state).toBeDefined();
+      const decoded = JSON.parse(atob(state!.replace(/-/g, '+').replace(/_/g, '/')));
+      expect(decoded.returnPathname).toBe('/welcome');
     });
   });
 
