@@ -294,6 +294,22 @@ describe('authkit-callback-route', () => {
       expect(session?.accessToken).toBe(newAccessToken);
     });
 
+    it('should allow onSuccess redirect using NextResponse', async () => {
+      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Set up request with code
+      request.nextUrl.searchParams.set('code', 'test-code');
+
+      const handler = handleAuth({
+        onSuccess: async (data) => {
+          return NextResponse.redirect('https://example.com/dashboard');
+        },
+      });
+
+      const response = await handler(request);
+      expect(response.headers.get('Location')).toBe('https://example.com/dashboard');
+    });
+
     it('should pass custom state data to onSuccess callback', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
