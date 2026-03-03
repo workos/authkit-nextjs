@@ -11,19 +11,19 @@
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
-    "@radix-ui/themes": "^3.2.1",
+    "@radix-ui/themes": "^3.3.0",
     "@workos-inc/authkit-nextjs": "workspace:*",
-    "next": "^16.0.9",
+    "next": "^16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.5",
-    "prettier": "^3.7.4",
+    "@types/node": "^22.19.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "prettier": "^3.8.1",
     "typescript": "^5.9.3"
   }
 }
