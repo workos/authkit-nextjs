@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
-    "@radix-ui/themes": "^3.2.1",
+    "@radix-ui/themes": "^3.3.0",
     "@workos-inc/authkit-nextjs": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -19,12 +19,12 @@
     "vinext": "latest"
   },
   "devDependencies": {
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@cloudflare/vite-plugin": "latest",
-    "@vitejs/plugin-rsc": "^0.5.19",
+    "@types/node": "^22.19.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-rsc": "^0.5.21",
     "typescript": "^5.9.3",
-    "vite": "^7.0.0"
+    "vite": "^7.3.1"
   }
 }

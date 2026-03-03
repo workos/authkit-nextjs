@@ -530,7 +530,7 @@ describe('tokenStore', () => {
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 
@@ -547,7 +547,7 @@ describe('tokenStore', () => {
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 
@@ -699,7 +699,7 @@ describe('tokenStore', () => {
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 

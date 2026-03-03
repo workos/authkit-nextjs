@@ -71,7 +71,7 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
       setEntitlements(auth.entitlements);
       setFeatureFlags(auth.featureFlags);
       setImpersonator(auth.impersonator);
-    } catch (error) {
+    } catch {
       setUser(null);
       setSessionId(undefined);
       setOrganizationId(undefined);
