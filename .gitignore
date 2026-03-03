@@ -5,12 +5,9 @@ coverage
 .idea
 package-lock.json
 
-# Example app
-example/.next
-example/.env.local
-example/next-env.d.ts
-example/tsconfig.tsbuildinfo
-
-# Vinext example app
-example-vinext/.env.local
-example-vinext/node_modules
+# Example apps
+examples/next/.next
+examples/next/.env.local
+examples/next/next-env.d.ts
+examples/next/tsconfig.tsbuildinfo
+examples/vinext/.env.local

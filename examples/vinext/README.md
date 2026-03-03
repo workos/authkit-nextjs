@@ -51,7 +51,7 @@ This example demonstrates how to use [`@workos-inc/authkit-nextjs`](https://gith
 
 ## How It Works
 
-This example mirrors the structure of the [`/example`](../example) Next.js app. The key difference is that it runs on vinext (Vite) instead of Next.js, while importing the same `@workos-inc/authkit-nextjs` library.
+This example mirrors the structure of the [`examples/next`](../next) Next.js app. The key difference is that it runs on vinext (Vite) instead of Next.js, while importing the same `@workos-inc/authkit-nextjs` library.
 
 Vinext shims the Next.js API surface (`next/headers`, `next/server`, `next/navigation`, etc.), so the AuthKit library works without a separate integration package.
 
