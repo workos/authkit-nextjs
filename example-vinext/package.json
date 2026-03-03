@@ -1,0 +1,26 @@
+{
+  "name": "example-vinext",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "start": "vinext start"
+  },
+  "dependencies": {
+    "@workos-inc/authkit-nextjs": "workspace:*",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-server-dom-webpack": "^19.2.4",
+    "vinext": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-rsc": "^0.5.19",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  }
+}

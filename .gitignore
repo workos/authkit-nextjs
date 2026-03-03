@@ -10,3 +10,7 @@ example/.next
 example/.env.local
 example/next-env.d.ts
 example/tsconfig.tsbuildinfo
+
+# Vinext example app
+example-vinext/.env.local
+example-vinext/node_modules

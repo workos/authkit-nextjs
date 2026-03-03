@@ -54,8 +54,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   }
 
   return async function GET(request: NextRequest) {
-    const code = request.nextUrl.searchParams.get('code');
-    const state = request.nextUrl.searchParams.get('state');
+    // Fall back to standard URL parsing when nextUrl is not available (e.g., vinext)
+    const requestUrl = request.nextUrl ?? new URL(request.url);
+    const code = requestUrl.searchParams.get('code');
+    const state = requestUrl.searchParams.get('state');
 
     const { state: customState, returnPathname: returnPathnameState } = handleState(state);
 
@@ -71,7 +73,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         // If baseURL is provided, use it instead of request.nextUrl
         // This is useful if the app is being run in a container like docker where
         // the hostname can be different from the one in the request
-        const url = baseURL ? new URL(baseURL) : request.nextUrl.clone();
+        const url = baseURL ? new URL(baseURL) : new URL(requestUrl.toString());
 
         // Cleanup params
         url.searchParams.delete('code');

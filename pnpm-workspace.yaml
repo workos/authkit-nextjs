@@ -1,6 +1,7 @@
 packages:
   - '.'
   - 'example/'
+  - 'example-vinext/'
 
 approveBuilds: esbuild
 
