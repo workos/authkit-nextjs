@@ -75,8 +75,53 @@ src/
 ## Known Limitations
 
 - **Experimental**: vinext is an experimental project. Some edge cases may behave differently than Next.js.
-- **No Radix UI**: Radix UI uses `React.createContext()` at module scope, which fails in vinext's RSC environment. This example uses plain HTML + inline styles instead. The Next.js example uses Radix UI.
+- **Radix UI requires `"use client"` layout**: vinext's RSC plugin doesn't handle barrel re-exports of `"use client"` modules the same way Next.js does. The layout is marked `"use client"` to work around this.
 - **No `withAuth()` in server components**: vinext doesn't propagate `headers()` AsyncLocalStorage context into RSC rendering, so `withAuth()` can't be called from server components. This example uses client-side `useAuth()` instead. Route handlers and middleware work fine.
 - **`switchToOrganization` revalidation**: The `revalidatePath`/`revalidateTag` calls used by `switchToOrganization()` may not function identically to Next.js ISR. The library wraps these in try-catch for graceful degradation.
-- **Local dev only**: This example is configured for local development. Cloudflare Workers deployment requires additional configuration (wrangler.toml, KV stores) not included here.
 - **Image optimization**: vinext does not support Next.js build-time image optimization.
+
+## Deploy to Cloudflare Workers
+
+### Prerequisites
+
+- A [Cloudflare](https://cloudflare.com) account
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) installed and authenticated (`wrangler login`)
+
+### Set secrets
+
+Set your WorkOS credentials as Workers secrets. Update the redirect URI to your Workers URL:
+
+```bash
+wrangler secret put WORKOS_CLIENT_ID
+wrangler secret put WORKOS_API_KEY
+wrangler secret put WORKOS_COOKIE_PASSWORD
+wrangler secret put NEXT_PUBLIC_WORKOS_REDIRECT_URI
+# Enter: https://authkit-vinext-example.<your-subdomain>.workers.dev/callback
+```
+
+Then add this same callback URL as a redirect URI in your [WorkOS Dashboard](https://dashboard.workos.com).
+
+### Deploy
+
+```bash
+pnpm run deploy
+```
+
+`vinext deploy` auto-generates the Cloudflare-specific build configuration (including `@cloudflare/vite-plugin` and RSC entries) and deploys to Workers. The `wrangler.jsonc` in this directory provides the Worker name and `nodejs_compat` flag.
+
+### Local development with wrangler
+
+To test with the Workers runtime locally (instead of `vinext dev` which uses Node.js), create a `.dev.vars` file:
+
+```bash
+cp .dev.vars.example .dev.vars
+# Fill in your credentials
+```
+
+Then run:
+
+```bash
+wrangler dev
+```
+
+This runs your app in the local workerd runtime, matching production behavior more closely than `vinext dev`.
