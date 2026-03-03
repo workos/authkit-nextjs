@@ -1,17 +1,16 @@
-import type { Metadata } from "next";
+"use client";
+
+// Import the base CSS styles for the radix-ui components.
+import "@radix-ui/themes/styles.css";
+
 import NextLink from "next/link";
-import { SignInButton } from "./components/sign-in-button";
+import { Theme, Card, Container, Flex, Button, Box } from "@radix-ui/themes";
 import { Footer } from "./components/footer";
+import { SignInButton } from "./components/sign-in-button";
 import {
   AuthKitProvider,
   Impersonation,
 } from "@workos-inc/authkit-nextjs/components";
-
-export const metadata: Metadata = {
-  title: "Example AuthKit App (vinext)",
-  description:
-    "Example vinext application demonstrating how to use AuthKit on Vite.",
-};
 
 export default function RootLayout({
   children,
@@ -20,39 +19,53 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ padding: 0, margin: 0, fontFamily: "system-ui, sans-serif", backgroundColor: "#f5f5f5" }}>
-        <AuthKitProvider>
-          <Impersonation />
-          <div style={{ maxWidth: 800, margin: "0 auto", padding: 20 }}>
-            <div
-              style={{
-                backgroundColor: "#fff",
-                borderRadius: 8,
-                padding: 32,
-                minHeight: "70vh",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
-                <nav style={{ display: "flex", gap: 12 }}>
-                  <NextLink href="/" style={{ padding: "8px 16px", borderRadius: 6, backgroundColor: "#f0f0f0", textDecoration: "none", color: "#333", fontSize: 14 }}>
-                    Home
-                  </NextLink>
-                  <NextLink href="/account" style={{ padding: "8px 16px", borderRadius: 6, backgroundColor: "#f0f0f0", textDecoration: "none", color: "#333", fontSize: 14 }}>
-                    Account
-                  </NextLink>
-                </nav>
-                <SignInButton />
-              </header>
+      <head>
+        <title>Example AuthKit App (vinext)</title>
+        <meta
+          name="description"
+          content="Example vinext application demonstrating how to use AuthKit on Vite."
+        />
+      </head>
+      <body style={{ padding: 0, margin: 0 }}>
+        <Theme
+          accentColor="iris"
+          panelBackground="solid"
+          style={{ backgroundColor: "var(--gray-1)" }}
+        >
+          <AuthKitProvider>
+            <Impersonation />
+            <Container style={{ backgroundColor: "var(--gray-1)" }}>
+              <Flex direction="column" gap="5" p="5" height="100vh">
+                <Box asChild flexGrow="1">
+                  <Card size="4">
+                    <Flex direction="column" height="100%">
+                      <Flex asChild justify="between">
+                        <header>
+                          <Flex gap="4">
+                            <Button asChild variant="soft">
+                              <NextLink href="/">Home</NextLink>
+                            </Button>
 
-              <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {children}
-              </main>
-            </div>
-            <Footer />
-          </div>
-        </AuthKitProvider>
+                            <Button asChild variant="soft">
+                              <NextLink href="/account">Account</NextLink>
+                            </Button>
+                          </Flex>
+
+                          <SignInButton />
+                        </header>
+                      </Flex>
+
+                      <Flex flexGrow="1" align="center" justify="center">
+                        <main>{children}</main>
+                      </Flex>
+                    </Flex>
+                  </Card>
+                </Box>
+                <Footer />
+              </Flex>
+            </Container>
+          </AuthKitProvider>
+        </Theme>
       </body>
     </html>
   );

@@ -1,34 +1,40 @@
-const cardStyle = {
-  flex: 1,
-  padding: 24,
-  borderRadius: 8,
-  backgroundColor: "#fff",
-  border: "1px solid #eee",
-  textDecoration: "none" as const,
-  color: "inherit" as const,
-};
+import { Card, Grid, Heading, Text } from "@radix-ui/themes";
 
 export function Footer() {
   return (
-    <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
-      <a href="https://workos.com/docs" rel="noreferrer" target="_blank" style={cardStyle}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Documentation</h3>
-        <p style={{ margin: 0, color: "#666", fontSize: 14 }}>
-          View integration guides and SDK documentation.
-        </p>
-      </a>
-      <a href="https://workos.com/docs/reference" rel="noreferrer" target="_blank" style={cardStyle}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>API Reference</h3>
-        <p style={{ margin: 0, color: "#666", fontSize: 14 }}>
-          Every WorkOS API method and endpoint documented.
-        </p>
-      </a>
-      <a href="https://workos.com" rel="noreferrer" target="_blank" style={cardStyle}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>WorkOS</h3>
-        <p style={{ margin: 0, color: "#666", fontSize: 14 }}>
-          Learn more about other WorkOS products.
-        </p>
-      </a>
-    </div>
+    <Grid columns={{ initial: "1", sm: "3" }} gap={{ initial: "3", sm: "5" }}>
+      <Card size="4" asChild variant="classic">
+        <a href="https://workos.com/docs" rel="noreferrer" target="_blank">
+          <Heading size="4" mb="1">
+            Documentation
+          </Heading>
+          <Text color="gray">
+            View integration guides and SDK documentation.
+          </Text>
+        </a>
+      </Card>
+      <Card size="4" asChild variant="classic">
+        <a
+          href="https://workos.com/docs/reference"
+          rel="noreferrer"
+          target="_blank"
+        >
+          <Heading size="4" mb="1">
+            API Reference
+          </Heading>
+          <Text color="gray">
+            Every WorkOS API method and endpoint documented.
+          </Text>
+        </a>
+      </Card>
+      <Card size="4" asChild variant="classic">
+        <a href="https://workos.com" rel="noreferrer" target="_blank">
+          <Heading size="4" mb="1">
+            WorkOS
+          </Heading>
+          <Text color="gray">Learn more about other WorkOS products.</Text>
+        </a>
+      </Card>
+    </Grid>
   );
 }

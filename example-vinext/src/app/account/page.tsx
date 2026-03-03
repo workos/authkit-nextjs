@@ -1,17 +1,17 @@
 "use client";
 
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { Text, Heading, TextField, Flex, Box } from "@radix-ui/themes";
 
 export default function AccountPage() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div style={{ textAlign: "center" }}>Loading...</div>;
+    return null;
   }
 
   if (!user) {
-    // Middleware should redirect, but handle edge case
-    return <div style={{ textAlign: "center" }}>Not signed in. Redirecting...</div>;
+    return null;
   }
 
   const userFields = [
@@ -22,35 +22,31 @@ export default function AccountPage() {
   ].filter(([, value]) => value);
 
   return (
-    <div>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, marginBottom: 8 }}>Account details</h1>
-        <p style={{ color: "#666", fontSize: 18 }}>
+    <>
+      <Flex direction="column" gap="2" mb="7">
+        <Heading size="8" align="center">
+          Account details
+        </Heading>
+        <Text size="5" align="center" color="gray">
           Below are your account details
-        </p>
-      </div>
+        </Text>
+      </Flex>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 400, margin: "0 auto" }}>
+      <Flex direction="column" justify="center" gap="3" width="400px">
         {userFields.map(([label, value]) => (
-          <label key={String(label)} style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, width: 100, flexShrink: 0 }}>
-              {label}
-            </span>
-            <input
-              value={String(value) || ""}
-              readOnly
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                borderRadius: 6,
-                border: "1px solid #ddd",
-                fontSize: 14,
-                backgroundColor: "#fafafa",
-              }}
-            />
-          </label>
+          <Flex asChild align="center" gap="6" key={String(label)}>
+            <label>
+              <Text weight="bold" size="3" style={{ width: 100 }}>
+                {label}
+              </Text>
+
+              <Box flexGrow="1">
+                <TextField.Root value={String(value) || ""} readOnly />
+              </Box>
+            </label>
+          </Flex>
         ))}
-      </div>
-    </div>
+      </Flex>
+    </>
   );
 }
