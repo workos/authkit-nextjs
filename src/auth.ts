@@ -97,7 +97,12 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
     const { domain, path, sameSite, secure } = getCookieOptions();
-    nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
+    try {
+      nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
+    } catch {
+      // Some environments (e.g., vinext) only accept a string cookie name
+      nextCookies.delete(cookieName);
+    }
 
     if (sessionId) {
       redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
@@ -135,15 +140,19 @@ export async function switchToOrganization(
     }
   }
 
-  switch (revalidationStrategy) {
-    case 'path':
-      revalidatePath(pathname);
-      break;
-    case 'tag':
-      for (const tag of revalidationTags) {
-        revalidateTagCompat(tag);
-      }
-      break;
+  try {
+    switch (revalidationStrategy) {
+      case 'path':
+        revalidatePath(pathname);
+        break;
+      case 'tag':
+        for (const tag of revalidationTags) {
+          revalidateTagCompat(tag);
+        }
+        break;
+    }
+  } catch {
+    // revalidatePath/revalidateTag may not be available in non-Next.js environments (e.g., vinext)
   }
   if (revalidationStrategy !== 'none') {
     redirect(pathname);

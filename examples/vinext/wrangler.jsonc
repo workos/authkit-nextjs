@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "example-vinext",
+  "compatibility_date": "2026-03-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS",
+  },
+  "images": {
+    "binding": "IMAGES",
+  },
+  "observability": {
+    "logs": {
+      "enabled": false,
+      "invocation_logs": true,
+    },
+  },
+}
