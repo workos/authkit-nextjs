@@ -96,7 +96,19 @@ describe('actions', () => {
     it('should refresh access token', async () => {
       const result = await refreshAccessTokenAction();
       expect(refreshSession).toHaveBeenCalled();
-      expect(result).toEqual('refreshed_token');
+      expect(result).toEqual({ accessToken: 'refreshed_token' });
+    });
+
+    it('should catch errors and return them as data instead of throwing', async () => {
+      vi.mocked(refreshSession).mockRejectedValueOnce(new Error('Rate limit exceeded'));
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'Rate limit exceeded' });
+    });
+
+    it('should handle non-Error objects in catch', async () => {
+      vi.mocked(refreshSession).mockRejectedValueOnce('string error');
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'string error' });
     });
   });
 });
