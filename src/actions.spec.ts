@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   checkSessionAction,
   handleSignOutAction,
@@ -9,6 +10,7 @@ import {
   refreshAccessTokenAction,
 } from '../src/actions.js';
 import { signOut, switchToOrganization } from './auth.js';
+import { TokenRefreshError } from '../src/errors.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 
@@ -97,6 +99,30 @@ describe('actions', () => {
       const result = await refreshAccessTokenAction();
       expect(refreshSession).toHaveBeenCalled();
       expect(result).toEqual('refreshed_token');
+    });
+
+    it('should return undefined on TokenRefreshError instead of throwing', async () => {
+      (refreshSession as Mock).mockRejectedValueOnce(new TokenRefreshError('Rate limit exceeded'));
+      const result = await refreshAccessTokenAction();
+      expect(result).toBeUndefined();
+    });
+
+    it('should rethrow non-TokenRefreshError errors', async () => {
+      (refreshSession as Mock).mockRejectedValueOnce(new Error('Network error'));
+      await expect(refreshAccessTokenAction()).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('refreshAuthAction', () => {
+    it('should return NoUserInfo on TokenRefreshError instead of throwing', async () => {
+      (refreshSession as Mock).mockRejectedValueOnce(new TokenRefreshError('Rate limit exceeded'));
+      const result = await refreshAuthAction({ ensureSignedIn: false });
+      expect(result).toEqual({ user: null });
+    });
+
+    it('should rethrow non-TokenRefreshError errors', async () => {
+      (refreshSession as Mock).mockRejectedValueOnce(new Error('Network error'));
+      await expect(refreshAuthAction({ ensureSignedIn: false })).rejects.toThrow('Network error');
     });
   });
 });

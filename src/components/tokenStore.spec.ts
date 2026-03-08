@@ -518,6 +518,31 @@ describe('tokenStore', () => {
   });
 
   describe('error recovery', () => {
+    it('should preserve existing token when refresh returns undefined (soft failure)', async () => {
+      const existingToken = 'existing-valid-token';
+
+      // Set up existing token
+      mockGetAccessTokenAction.mockResolvedValue(existingToken);
+      await tokenStore.getAccessTokenSilently();
+
+      // Simulate server action catching TokenRefreshError and returning undefined
+      mockRefreshAccessTokenAction.mockResolvedValue(undefined);
+
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+      // Manual refresh should preserve stale token and schedule retry
+      const result = await tokenStore.refreshToken();
+
+      expect(result).toBe(existingToken);
+      const state = tokenStore.getSnapshot();
+      expect(state.token).toBe(existingToken);
+      expect(state.loading).toBe(false);
+      // A retry should be scheduled
+      expect(setTimeoutSpy).toHaveBeenCalled();
+
+      setTimeoutSpy.mockRestore();
+    });
+
     it('should preserve existing token when refresh fails', async () => {
       const existingToken = 'existing-valid-token';
 

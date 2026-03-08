@@ -353,6 +353,16 @@ export class TokenStore {
           }
         }
 
+        // If refresh returned undefined but we had a valid token, treat as a soft failure:
+        // keep the stale token and schedule a retry instead of clearing the token.
+        if (!token && previousToken) {
+          this.scheduleRefresh();
+          if (!silent) {
+            this.setState({ loading: false });
+          }
+          return previousToken;
+        }
+
         // Only update state if token actually changed or if loading was true
         if (token !== previousToken || !silent) {
           this.setState({

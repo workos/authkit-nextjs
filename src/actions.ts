@@ -1,6 +1,7 @@
 'use server';
 
 import { signOut, switchToOrganization } from './auth.js';
+import { TokenRefreshError } from './errors.js';
 import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
@@ -45,7 +46,14 @@ export const refreshAuthAction = async ({
   ensureSignedIn?: boolean;
   organizationId?: string;
 }) => {
-  return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+  try {
+    return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+  } catch (error) {
+    if (error instanceof TokenRefreshError) {
+      return sanitize({ user: null } as NoUserInfo);
+    }
+    throw error;
+  }
 };
 
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
@@ -66,6 +74,13 @@ export async function getAccessTokenAction() {
  * It is used to fetch the access token from the server.
  */
 export async function refreshAccessTokenAction() {
-  const auth = await refreshSession();
-  return auth.accessToken;
+  try {
+    const auth = await refreshSession();
+    return auth.accessToken;
+  } catch (error) {
+    if (error instanceof TokenRefreshError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
