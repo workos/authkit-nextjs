@@ -128,3 +128,8 @@ export function handleAuthkitHeaders(
 
   return applyResponseHeaders(NextResponse.next({ request: { headers: requestHeaders } }), responseHeaders);
 }
+
+/**
+ * Alias for `handleAuthkitHeaders` that aligns with the Next.js 16+ `proxy.ts` convention.
+ */
+export const handleAuthkitProxy: typeof handleAuthkitHeaders = handleAuthkitHeaders;
