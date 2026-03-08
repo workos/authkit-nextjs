@@ -1,10 +1,11 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
 import { AuthKitError, TokenRefreshError } from './errors.js';
-import { authkit, authkitMiddleware } from './middleware.js';
+import { authkit, authkitMiddleware, authkitProxy } from './middleware.js';
 export {
   applyResponseHeaders,
   handleAuthkitHeaders,
+  handleAuthkitProxy,
   partitionAuthkitHeaders,
   isAuthkitRequestHeader,
   AUTHKIT_REQUEST_HEADERS,
@@ -24,6 +25,7 @@ export {
   TokenRefreshError,
   authkit,
   authkitMiddleware,
+  authkitProxy,
   getSignInUrl,
   getSignUpUrl,
   getTokenClaims,
