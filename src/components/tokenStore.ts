@@ -1,6 +1,18 @@
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 import { decodeJwt } from '../jwt.js';
 
+/**
+ * Unwraps the result from refreshAccessTokenAction.
+ * Throws if the server action returned an error, so the token store's
+ * existing error handling (catch block) handles it uniformly.
+ */
+function unwrapRefreshResult(result: Awaited<ReturnType<typeof refreshAccessTokenAction>>): string | undefined {
+  if ('error' in result) {
+    throw new Error(result.error);
+  }
+  return result.accessToken;
+}
+
 interface TokenState {
   token: string | undefined;
   loading: boolean;
@@ -323,7 +335,7 @@ export class TokenStore {
 
         if (!silent) {
           // Manual refresh - always force refresh
-          token = await refreshAccessTokenAction();
+          token = unwrapRefreshResult(await refreshAccessTokenAction());
         } else {
           // Silent refresh - only fetch from server if we don't have a local token
           if (!previousToken) {
@@ -342,14 +354,14 @@ export class TokenStore {
 
             // If the token from server is expiring, refresh it
             if (!token || (tokenData && tokenData.isExpiring)) {
-              const refreshedToken = await refreshAccessTokenAction();
+              const refreshedToken = unwrapRefreshResult(await refreshAccessTokenAction());
               if (refreshedToken) {
                 token = refreshedToken;
               }
             }
           } else {
             // We have a local token that needs refreshing (already checked by getAccessTokenSilently)
-            token = await refreshAccessTokenAction();
+            token = unwrapRefreshResult(await refreshAccessTokenAction());
           }
         }
 

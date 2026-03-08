@@ -89,7 +89,7 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ accessToken: refreshedToken });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -112,7 +112,7 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
-    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ accessToken: refreshedToken });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -167,7 +167,32 @@ describe('useAccessToken', () => {
     });
   });
 
-  it('should handle errors during manual refresh', async () => {
+  it('should handle server action error result during manual refresh', async () => {
+    const initialToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
+
+    (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ error: 'Rate limit exceeded' });
+
+    const { getByTestId } = render(<TestComponent />);
+
+    await waitFor(() => {
+      expect(getByTestId('token')).toHaveTextContent(initialToken);
+    });
+
+    await act(async () => {
+      getByTestId('refresh').click();
+    });
+
+    await waitFor(() => {
+      expect(refreshAccessTokenAction).toHaveBeenCalledTimes(1);
+      expect(getByTestId('error')).toHaveTextContent('Rate limit exceeded');
+      // Token should be preserved on error
+      expect(getByTestId('token')).toHaveTextContent(initialToken);
+    });
+  });
+
+  it('should handle network errors during manual refresh', async () => {
     const initialToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
     const error = new Error('Failed to refresh token');
@@ -277,10 +302,9 @@ describe('useAccessToken', () => {
       iat: currentTimeInSeconds - 35,
     };
     const expiringToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
-    const error = new Error('Failed to refresh token');
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as Mock).mockRejectedValueOnce(error);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ error: 'Failed to refresh token' });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -403,9 +427,9 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const refreshPromise = new Promise<string>((resolve) => {
+    const refreshPromise = new Promise<{ accessToken: string }>((resolve) => {
       // Slow promise
-      setTimeout(() => resolve(refreshedToken), 10);
+      setTimeout(() => resolve({ accessToken: refreshedToken }), 10);
     });
 
     (refreshAccessTokenAction as Mock).mockImplementation(() => {
@@ -525,7 +549,7 @@ describe('useAccessToken', () => {
     });
 
     act(() => {
-      resolveRefreshPromise!(refreshedToken);
+      resolveRefreshPromise!({ accessToken: refreshedToken });
     });
 
     await waitFor(() => {

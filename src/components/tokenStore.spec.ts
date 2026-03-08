@@ -49,8 +49,8 @@ describe('tokenStore', () => {
       const mockToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
-      let resolvePromise: (value: string) => void;
-      const slowPromise = new Promise<string>((resolve) => {
+      let resolvePromise: (value: { accessToken: string }) => void;
+      const slowPromise = new Promise<{ accessToken: string }>((resolve) => {
         resolvePromise = resolve;
       });
 
@@ -64,7 +64,7 @@ describe('tokenStore', () => {
       expect(tokenStore.isRefreshing()).toBe(true);
 
       // Complete the refresh
-      resolvePromise!(mockToken);
+      resolvePromise!({ accessToken: mockToken });
       await refreshPromise;
 
       expect(tokenStore.isRefreshing()).toBe(false);
@@ -124,12 +124,14 @@ describe('tokenStore', () => {
       const refreshedToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-      // Set expiring token first
+      // Set expiring token first; also set refresh mock since getAccessTokenSilently
+      // will attempt to refresh the expiring token
       mockGetAccessTokenAction.mockResolvedValue(expiringToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: expiringToken });
       await tokenStore.getAccessTokenSilently();
 
-      // Setup refresh mock
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      // Setup refresh mock for the actual test
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
 
       // Now call getAccessToken - should trigger refresh
       const token = await tokenStore.getAccessToken();
@@ -192,7 +194,7 @@ describe('tokenStore', () => {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
       mockGetAccessTokenAction.mockResolvedValue(expiredToken);
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
 
       const token = await tokenStore.getAccessTokenSilently();
 
@@ -287,15 +289,17 @@ describe('tokenStore', () => {
       const refreshedToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-      // First set an expiring token
+      // First set an expiring token; also set refresh mock since getAccessTokenSilently
+      // will attempt to refresh the expiring token
       mockGetAccessTokenAction.mockResolvedValue(expiringToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: expiringToken });
       await tokenStore.getAccessTokenSilently();
 
       // Clear mocks
       mockGetAccessTokenAction.mockClear();
 
       // Setup refresh to return new token
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
 
       // Call getAccessToken again - should trigger refresh due to expiring token
       const token = await tokenStore.getAccessToken();
@@ -525,7 +529,30 @@ describe('tokenStore', () => {
       mockGetAccessTokenAction.mockResolvedValue(existingToken);
       await tokenStore.getAccessTokenSilently();
 
-      // Now simulate network error during refresh
+      // Simulate server action returning error result (e.g., rate limit)
+      mockRefreshAccessTokenAction.mockResolvedValue({ error: 'Rate limit exceeded' });
+
+      try {
+        await tokenStore.refreshToken();
+      } catch {
+        // Expected to throw
+      }
+
+      const state = tokenStore.getSnapshot();
+      expect(state.token).toBe(existingToken); // Token preserved for retry
+      expect(state.error).toBeTruthy();
+      expect(state.error?.message).toBe('Rate limit exceeded');
+      expect(state.loading).toBe(false);
+    });
+
+    it('should handle network-level failures from server action', async () => {
+      const existingToken = 'existing-valid-token';
+
+      // Set up existing token
+      mockGetAccessTokenAction.mockResolvedValue(existingToken);
+      await tokenStore.getAccessTokenSilently();
+
+      // Simulate network error (server action rejects entirely)
       mockRefreshAccessTokenAction.mockRejectedValue(new Error('Network error'));
 
       try {
@@ -642,8 +669,8 @@ describe('tokenStore', () => {
       let callCount = 0;
 
       // Mock the action to track calls and be slow
-      let resolvePromise: (value: string) => void;
-      const slowPromise = new Promise<string>((resolve) => {
+      let resolvePromise: (value: { accessToken: string }) => void;
+      const slowPromise = new Promise<{ accessToken: string }>((resolve) => {
         resolvePromise = resolve;
       });
 
@@ -662,7 +689,7 @@ describe('tokenStore', () => {
       const promise2 = tokenStore.refreshToken();
 
       // Verify both calls eventually get the same result
-      resolvePromise!(mockToken);
+      resolvePromise!({ accessToken: mockToken });
 
       const [result1, result2] = await Promise.all([promise1, promise2]);
 
@@ -691,10 +718,25 @@ describe('tokenStore', () => {
   });
 
   describe('refresh state management', () => {
-    it('should preserve Error instances without conversion', async () => {
+    it('should create Error from server action error result', async () => {
+      // Mock refresh to return error result (the new pattern)
+      mockRefreshAccessTokenAction.mockResolvedValue({ error: 'Token refresh failed' });
+
+      try {
+        await tokenStore.refreshToken();
+      } catch {
+        // Expected to throw
+      }
+
+      const state = tokenStore.getSnapshot();
+      expect(state.error).toBeInstanceOf(Error);
+      expect(state.error?.message).toBe('Token refresh failed');
+    });
+
+    it('should preserve Error instances from network failures', async () => {
       const errorInstance = new Error('actual error instance');
 
-      // Mock refresh to throw an Error instance
+      // Mock refresh to reject (network-level failure)
       mockRefreshAccessTokenAction.mockRejectedValue(errorInstance);
 
       try {
@@ -717,7 +759,7 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Mock refresh to return new token
-      mockRefreshAccessTokenAction.mockResolvedValue(newToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: newToken });
 
       // Call manual refresh which should update state
       const result = await tokenStore.refreshToken();
@@ -736,7 +778,7 @@ describe('tokenStore', () => {
 
       // Clear mocks and set up spy on setState
       mockGetAccessTokenAction.mockClear();
-      mockRefreshAccessTokenAction.mockResolvedValue(existingToken); // Same token
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: existingToken }); // Same token
 
       const listener = vi.fn();
       tokenStore.subscribe(listener);

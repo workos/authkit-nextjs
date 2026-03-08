@@ -64,8 +64,17 @@ export async function getAccessTokenAction() {
 /**
  * This action is used to refresh the access token from the auth object.
  * It is used to fetch the access token from the server.
+ *
+ * Returns a result object instead of throwing to prevent Next.js from
+ * treating server action errors as 500s.
  */
-export async function refreshAccessTokenAction() {
-  const auth = await refreshSession();
-  return auth.accessToken;
+export async function refreshAccessTokenAction(): Promise<
+  { accessToken: string | undefined; error?: never } | { accessToken?: never; error: string }
+> {
+  try {
+    const auth = await refreshSession();
+    return { accessToken: auth.accessToken };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
