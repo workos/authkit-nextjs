@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { getCookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getPKCECodeVerifier } from './pkce.js';
@@ -98,7 +99,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         preventCaching(response.headers);
 
         if (pkceCookie) {
-          response.headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=; Path=/; Max-Age=0`);
+          response.headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true)}`);
         }
 
         if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
