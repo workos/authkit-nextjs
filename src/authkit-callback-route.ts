@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getCookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { PKCE_COOKIE_NAME, getPKCECodeVerifier } from './pkce.js';
+import { PKCE_COOKIE_NAME, getAuthCookieData } from './pkce.js';
 import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
@@ -30,7 +30,7 @@ function handleState(state: string | null) {
       const decoded = JSON.parse(atob(state));
       if (decoded.returnPathname) {
         returnPathname = decoded.returnPathname;
-      } else {
+      } else if (!decoded.nonce) {
         userState = state;
       }
     } catch {
@@ -63,10 +63,17 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
     const { state: customState, returnPathname: returnPathnameState } = handleState(state);
 
+    const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME);
+    const deleteCookie = `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true)}`;
+
     if (code) {
       try {
-        const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME);
-        const codeVerifier = await getPKCECodeVerifier(pkceCookie?.value);
+        const { codeVerifier, state: storedState } = await getAuthCookieData(pkceCookie?.value);
+
+        // Verify the OAuth state parameter matches the stored state (CSRF protection)
+        if (storedState !== (state ?? undefined)) {
+          throw new Error('OAuth state mismatch');
+        }
 
         // Use the code returned to us by AuthKit and authenticate the user with WorkOS
         const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
@@ -99,10 +106,12 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         preventCaching(response.headers);
 
         if (pkceCookie) {
-          response.headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true)}`);
+          response.headers.append('Set-Cookie', deleteCookie);
         }
 
-        if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
+        if (!accessToken || !refreshToken) {
+          throw new Error('response is missing tokens');
+        }
 
         await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
@@ -127,11 +136,19 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
         console.error(errorRes);
 
-        return await errorResponse(request, error);
+        const response = await errorResponse(request, error);
+        if (pkceCookie) {
+          response.headers.append('Set-Cookie', deleteCookie);
+        }
+        return response;
       }
     }
 
-    return await errorResponse(request);
+    const response = await errorResponse(request);
+    if (pkceCookie) {
+      response.headers.append('Set-Cookie', deleteCookie);
+    }
+    return response;
   };
 
   async function errorResponse(request: NextRequest, error?: unknown) {

@@ -56,7 +56,7 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
-| `WORKOS_DISABLE_PKCE`    | None                  | Set to `'true'` to disable PKCE on authorization requests                                 |
+| `WORKOS_DISABLE_PKCE`    | None                  | Set to `'true'` to disable PKCE on authorization requests. See [Security](#security) for details |
 
 Example usage:
 
@@ -907,6 +907,21 @@ import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({ debug: true });
 ```
+
+### Security
+
+#### PKCE and CSRF protection
+
+This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) by default to protect the OAuth authorization code flow. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing an encrypted code verifier and the OAuth state parameter. This cookie is automatically cleaned up after the callback completes.
+
+PKCE provides CSRF protection as a side effect — the code verifier in the cookie binds the authorization request to the user's browser. When PKCE is disabled via `WORKOS_DISABLE_PKCE=true`, a cryptographic nonce is generated and used as the OAuth state parameter to maintain CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/).
+
+> [!WARNING]
+> Disabling PKCE removes defense-in-depth against authorization code interception. Only disable it if your deployment environment is incompatible with PKCE.
+
+#### Cookie requirements
+
+The `wos-auth-verifier` cookie must survive the round-trip from sign-in initiation to the callback. Environments that strip cookies (certain reverse proxies, aggressive cookie policies) may cause authentication failures. If you see `OAuth state mismatch` errors, verify that cookies are not being stripped between your application and the user's browser.
 
 ### Troubleshooting
 

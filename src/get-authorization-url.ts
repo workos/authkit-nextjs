@@ -33,7 +33,7 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}): Promise<Get
   if (WORKOS_ENABLE_PKCE === 'true') {
     const pkce = await getWorkOS().pkce.generate();
     const pkceCookieValue = await sealData(
-      { codeVerifier: pkce.codeVerifier },
+      { codeVerifier: pkce.codeVerifier, state: finalState },
       { password: WORKOS_COOKIE_PASSWORD, ttl: 600 },
     );
     const url = getWorkOS().userManagement.getAuthorizationUrl({
@@ -45,7 +45,13 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}): Promise<Get
     return { url, pkceCookieValue };
   }
 
-  return { url: getWorkOS().userManagement.getAuthorizationUrl(baseOptions), pkceCookieValue: undefined };
+  // Without PKCE, state is the only CSRF protection (RFC 9700 Section 4.7.1)
+  const csrfState = finalState ?? btoa(JSON.stringify({ nonce: crypto.randomUUID() }));
+  const pkceCookieValue = await sealData({ state: csrfState }, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
+  return {
+    url: getWorkOS().userManagement.getAuthorizationUrl({ ...baseOptions, state: csrfState }),
+    pkceCookieValue,
+  };
 }
 
 export { getAuthorizationUrl };
