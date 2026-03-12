@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { getCookieOptions } from './cookie.js';
 import { WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 
-export const PKCE_COOKIE_NAME = 'wos-pkce-verifier';
+export const PKCE_COOKIE_NAME = 'wos-auth-verifier';
 const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
 
 /**
@@ -24,19 +24,24 @@ export async function setPKCECookie(pkceCookieValue: string | undefined): Promis
   });
 }
 
+interface AuthCookieData {
+  codeVerifier?: string;
+  state?: string;
+}
+
 /**
- * Read and unseal the PKCE code verifier from the cookie.
- * Returns undefined if the cookie is missing or corrupted.
+ * Read and unseal the auth cookie containing PKCE code verifier and OAuth state.
+ * Returns empty object if the cookie is missing or corrupted.
  */
-export async function getPKCECodeVerifier(cookieValue: string | undefined): Promise<string | undefined> {
-  if (!cookieValue) return undefined;
+export async function getAuthCookieData(cookieValue: string | undefined): Promise<AuthCookieData> {
+  if (!cookieValue) return {};
   try {
-    const unsealed = await unsealData<{ codeVerifier: string }>(cookieValue, {
+    const unsealed = await unsealData<AuthCookieData>(cookieValue, {
       password: WORKOS_COOKIE_PASSWORD,
     });
-    return unsealed.codeVerifier;
+    return { codeVerifier: unsealed.codeVerifier, state: unsealed.state };
   } catch {
-    // Cookie corrupted or expired — caller will proceed without PKCE
-    return undefined;
+    // Cookie corrupted or expired — caller will proceed without verification
+    return {};
   }
 }

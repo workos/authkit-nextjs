@@ -115,7 +115,25 @@ describe('getAuthorizationUrl', () => {
           codeChallenge: expect.any(String),
         }),
       );
-      expect(result.pkceCookieValue).toBeUndefined();
+      // Cookie should still be set with a nonce for CSRF protection
+      expect(result.pkceCookieValue).toBeDefined();
+    });
+
+    it('generates a CSRF nonce state when PKCE is disabled and no state provided', async () => {
+      process.env.WORKOS_DISABLE_PKCE = 'true';
+
+      vi.resetModules();
+      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
+
+      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+      await freshGetAuthorizationUrl({});
+
+      // The state sent to WorkOS should be a base64 JSON containing a nonce
+      const call = vi.mocked(workos.userManagement.getAuthorizationUrl).mock.calls[0][0];
+      const decoded = JSON.parse(atob(call.state as string));
+      expect(decoded.nonce).toBeDefined();
+      expect(typeof decoded.nonce).toBe('string');
     });
   });
 });
