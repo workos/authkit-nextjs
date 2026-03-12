@@ -40,7 +40,8 @@
     "@workos-inc/node": "^8.7.0",
     "iron-session": "^8.0.4",
     "jose": "^5.10.0",
-    "path-to-regexp": "^6.3.0"
+    "path-to-regexp": "^6.3.0",
+    "valibot": "^1.2.0"
   },
   "peerDependencies": {
     "next": "^13.5.9 || ^14.2.26 || ^15.2.3 || ^16",
