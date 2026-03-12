@@ -182,7 +182,7 @@ describe('getAuthorizationUrl', () => {
   });
 
   describe('PKCE', () => {
-    it('skips PKCE by default', async () => {
+    it('skips PKCE by default but still sets CSRF cookie', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
       const result = await getAuthorizationUrl({});
@@ -193,7 +193,8 @@ describe('getAuthorizationUrl', () => {
           codeChallenge: expect.any(String),
         }),
       );
-      expect(result.pkceCookieValue).toBeUndefined();
+      // Cookie should still be set for CSRF protection
+      expect(result.pkceCookieValue).toBeDefined();
     });
 
     it('generates PKCE pair when WORKOS_ENABLE_PKCE is set to true', async () => {
@@ -232,6 +233,18 @@ describe('getAuthorizationUrl', () => {
       // pkceCookieValue should be a sealed (encrypted) string
       expect(typeof result.pkceCookieValue).toBe('string');
       expect(result.pkceCookieValue!.length).toBeGreaterThan(0);
+    });
+
+    it('generates a CSRF nonce state by default when no state provided', async () => {
+      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+      await getAuthorizationUrl({});
+
+      // The state sent to WorkOS should be a base64 JSON containing a nonce
+      const call = vi.mocked(workos.userManagement.getAuthorizationUrl).mock.calls[0][0];
+      const decoded = JSON.parse(atob(call.state as string));
+      expect(decoded.nonce).toBeDefined();
+      expect(typeof decoded.nonce).toBe('string');
     });
   });
 });
