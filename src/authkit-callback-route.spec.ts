@@ -389,9 +389,7 @@ describe('authkit-callback-route', () => {
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
-      expect(onSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({ state: undefined }),
-      );
+      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ state: undefined }));
     });
 
     describe('state verification', () => {
