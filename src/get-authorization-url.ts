@@ -31,7 +31,10 @@ async function fetchClaimNonce(baseURL: string): Promise<string | null> {
     const data = await response.json();
     return data.nonce;
   } catch (error) {
-    console.warn('[authkit-nextjs]: Failed to exchange WORKOS_CLAIM_TOKEN. Try removing WORKOS_CLAIM_TOKEN from your environment variables.', error);
+    console.warn(
+      '[authkit-nextjs]: Failed to exchange WORKOS_CLAIM_TOKEN. Try removing WORKOS_CLAIM_TOKEN from your environment variables.',
+      error,
+    );
     return null;
   }
 }
