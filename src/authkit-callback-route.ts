@@ -41,25 +41,33 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       const state = requestUrl.searchParams.get('state');
       const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME)?.value;
 
-      // For starters, all of these are mandatory
-      if (!code || !state || !pkceCookie) {
+      if (!code || !state) {
         throw new Error('Missing required auth parameter');
       }
 
-      // Now all code paths have a 'state' and we know it's not 'undefined' so we can safely check
-      // Verify the OAuth state parameter matches the stored state (CSRF protection)
-      if (state !== pkceCookie) {
-        throw new Error('OAuth state mismatch');
+      // Determine which sealed value to unseal: cookie (with CSRF check) or URL state (degraded)
+      let sealedValue: string;
+      if (pkceCookie) {
+        // Full CSRF protection: verify the state param matches the cookie (two-channel check)
+        if (state !== pkceCookie) {
+          throw new Error('OAuth state mismatch');
+        }
+        sealedValue = pkceCookie;
+      } else {
+        // Graceful degradation: cookie missing (e.g., proxy not propagating Set-Cookie on redirects)
+        // Fall back to unsealing from the URL state param — no CSRF cross-check possible
+        console.warn(
+          '[AuthKit] CSRF cookie missing — falling back to URL state.',
+          'Ensure Set-Cookie headers are propagated on redirects.',
+        );
+        sealedValue = state;
       }
 
-      // Unseal the required information
-      // NOTE: nonce is not required for any particular security guarantee in the current implementation
-      // so we don't use it, but it's the only mandatory information to ensure 'state' is never undefined
       const {
         codeVerifier,
         customState,
         returnPathname: returnPathnameState,
-      } = await getStateFromPKCECookieValue(pkceCookie);
+      } = await getStateFromPKCECookieValue(sealedValue);
 
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =

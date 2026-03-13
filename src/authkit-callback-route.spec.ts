@@ -133,9 +133,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle authentication failure with custom onError handler', async () => {
-      // Mock authentication failure
       vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({
         onError: () => {
@@ -428,17 +430,20 @@ describe('authkit-callback-route', () => {
         expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
       });
 
-      it('should reject callback when state is present but no cookie exists', async () => {
+      it('should gracefully degrade when state is present but no cookie exists', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
+        // Seal valid state but only set it as URL param, not as cookie
+        const sealedState = await sealData({ nonce: 'foo' }, { password: process.env.WORKOS_COOKIE_PASSWORD! });
         request.nextUrl.searchParams.set('code', 'test-code');
-        request.nextUrl.searchParams.set('state', 'some-state');
+        request.nextUrl.searchParams.set('state', sealedState);
 
         const handler = handleAuth();
         const response = await handler(request);
 
-        expect(response.status).toBe(500);
-        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        // Should succeed by falling back to unsealing from URL state
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalled();
+        expect(response.status).not.toBe(500);
       });
 
       it('should pass when state matches stored state', async () => {
@@ -513,16 +518,26 @@ describe('authkit-callback-route', () => {
         );
       });
 
-      it('should return an error response when PKCE cookie is missing', async () => {
+      it('should proceed without codeVerifier when cookie is missing but state is valid', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
+        // Seal state with codeVerifier but only set as URL param, not cookie
+        const sealedState = await sealData(
+          { nonce: 'foo', codeVerifier: 'test-verifier-123' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
         request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
 
         const handler = handleAuth();
-        const response = await handler(request);
+        await handler(request);
 
-        expect(response.status).toBe(500);
-        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: 'test-verifier-123',
+          }),
+        );
       });
 
       it('should return an error response when PKCE cookie is corrupted', async () => {
