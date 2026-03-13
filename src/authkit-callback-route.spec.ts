@@ -6,6 +6,7 @@ import { sealData } from 'iron-session';
 
 // Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
+import { State } from './interfaces.js';
 
 // Mock dependencies
 const { fakeWorkosInstance } = vi.hoisted(() => ({
@@ -52,6 +53,12 @@ describe('authkit-callback-route', () => {
     },
   };
 
+  async function setAuthCookie(req: NextRequest, state: State): Promise<string> {
+    const sealedState = await sealData(state, { password: process.env.WORKOS_COOKIE_PASSWORD! });
+    req.cookies.set('wos-auth-verifier', sealedState);
+    return sealedState;
+  }
+
   describe('handleAuth', () => {
     let request: NextRequest;
 
@@ -80,8 +87,10 @@ describe('authkit-callback-route', () => {
     it('should handle successful authentication', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -153,7 +162,9 @@ describe('authkit-callback-route', () => {
     it('should respect custom returnPathname', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({ returnPathname: '/dashboard' });
       const response = await handler(request);
@@ -164,9 +175,9 @@ describe('authkit-callback-route', () => {
     it('should handle state parameter with returnPathname', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', returnPathname: '/custom-path' });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -177,9 +188,12 @@ describe('authkit-callback-route', () => {
     it('should extract custom search params from returnPathname', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        returnPathname: '/custom-path?foo=bar&baz=qux',
+      });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -190,9 +204,13 @@ describe('authkit-callback-route', () => {
     it('should handle full URL in returnPathname by extracting only the pathname', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const state = btoa(JSON.stringify({ returnPathname: 'https://example.com/invite/k0123456789' }));
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        returnPathname: 'https://example.com/invite/k0123456789',
+      });
+
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -240,8 +258,10 @@ describe('authkit-callback-route', () => {
     it('should use baseURL if provided', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({ baseURL: 'https://base.com' });
       const response = await handler(request);
@@ -268,8 +288,10 @@ describe('authkit-callback-route', () => {
     it('should call onSuccess if provided', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess: onSuccess });
@@ -284,8 +306,9 @@ describe('authkit-callback-route', () => {
       const newAccessToken = 'new-access-token';
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({
         onSuccess: async (data) => {
@@ -301,15 +324,14 @@ describe('authkit-callback-route', () => {
     it('should pass custom state data to onSuccess callback', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Create state with new format: internal.user
-      const internalState = btoa(JSON.stringify({ returnPathname: '/dashboard' }))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-      const userState = 'custom-user-state-string';
-      const state = `${internalState}.${userState}`;
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        returnPathname: '/dashboard',
+        customState: 'custom-user-state-string',
+      });
 
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
@@ -332,10 +354,10 @@ describe('authkit-callback-route', () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // State with only returnPathname
-      const state = btoa(JSON.stringify({ returnPathname: '/profile' }));
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', returnPathname: '/profile' });
 
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
@@ -350,35 +372,127 @@ describe('authkit-callback-route', () => {
       );
     });
 
-    it('should handle backward compatibility with old state format', async () => {
+    it('should NOT handle backward compatibility with old state format', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Old format: just returnPathname
-      const state = btoa(JSON.stringify({ returnPathname: '/old-path' }));
-
+      // @ts-expect-error we're purposely testing backward compatibility with an old format that doesn't match the current State interface
+      const sealedState = await setAuthCookie(request, { returnPathname: '/old-path' });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
 
-      // Should still redirect correctly
-      expect(response.headers.get('Location')).toContain('/old-path');
+      // Should error
+      expect(response.status).toBe(500);
+      expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+    });
+
+    it('should not leak nonce-only state as custom state in onSuccess', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      // Simulate a nonce-only state (no returnPathname, no custom state)
+      const nonceState = await setAuthCookie(request, { nonce: 'test-nonce' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', nonceState);
+
+      const onSuccess = vi.fn();
+      const handler = handleAuth({ onSuccess });
+      await handler(request);
+
+      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ state: undefined }));
+    });
+
+    describe('state verification', () => {
+      it('should reject callback when state does not match stored state', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const state = 'attacker-state';
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', state);
+        await setAuthCookie(request, { nonce: 'legitimate-state' });
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+      });
+
+      it('should reject callback when state is present but no cookie exists', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', 'some-state');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+      });
+
+      it('should pass when state matches stored state', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, { nonce: 'foo' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalled();
+        expect(response.status).not.toBe(500);
+      });
+
+      it('should return 500 when neither state nor cookie exist', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
+      });
     });
 
     describe('PKCE', () => {
-      it('should pass codeVerifier from cookie to authenticateWithCode', async () => {
+      it('should pass codeVerifier and verify state when both are in the cookie', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-        // Seal a verifier into a cookie value
-        const sealedVerifier = await sealData(
-          { codeVerifier: 'test-verifier-123' },
-          { password: process.env.WORKOS_COOKIE_PASSWORD! },
-        );
-
-        // Set the PKCE cookie on the request
-        request.cookies.set('wos-pkce-verifier', sealedVerifier);
+        const sealedState = await setAuthCookie(request, {
+          codeVerifier: 'test-verifier-456',
+          returnPathname: '/dashboard',
+          nonce: 'foo',
+        });
         request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: 'test-verifier-456',
+          }),
+        );
+        expect(response.headers.get('Location')).toContain('/dashboard');
+      });
+
+      it('should pass codeVerifier from cookie to authenticateWithCode', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, {
+          nonce: 'foo',
+          codeVerifier: 'test-verifier-123',
+        });
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
 
         const handler = handleAuth();
         await handler(request);
@@ -391,57 +505,65 @@ describe('authkit-callback-route', () => {
         );
       });
 
-      it('should proceed without codeVerifier when PKCE cookie is missing', async () => {
+      it('should return an error response when PKCE cookie is missing', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-        request.nextUrl.searchParams.set('code', 'test-code');
-
-        const handler = handleAuth();
-        await handler(request);
-
-        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'test-code',
-            codeVerifier: undefined,
-          }),
-        );
-      });
-
-      it('should proceed without codeVerifier when PKCE cookie is corrupted', async () => {
-        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
-
-        // Set a corrupted cookie
-        request.cookies.set('wos-pkce-verifier', 'not-a-valid-sealed-value');
-        request.nextUrl.searchParams.set('code', 'test-code');
-
-        const handler = handleAuth();
-        await handler(request);
-
-        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: 'test-code',
-            codeVerifier: undefined,
-          }),
-        );
-      });
-
-      it('should delete PKCE cookie after successful authentication', async () => {
-        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
-
-        const sealedVerifier = await sealData(
-          { codeVerifier: 'test-verifier-123' },
-          { password: process.env.WORKOS_COOKIE_PASSWORD! },
-        );
-
-        request.cookies.set('wos-pkce-verifier', sealedVerifier);
         request.nextUrl.searchParams.set('code', 'test-code');
 
         const handler = handleAuth();
         const response = await handler(request);
 
-        // The response should have a Set-Cookie header to delete the PKCE cookie
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+      });
+
+      it('should return an error response when PKCE cookie is corrupted', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Set a corrupted cookie
+        request.cookies.set('wos-auth-verifier', 'not-a-valid-sealed-value');
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', 'not-a-valid-sealed-value');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+      });
+
+      it('should delete PKCE cookie after successful authentication', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        // The response should be a redirect (success) and have a Set-Cookie header to delete the PKCE cookie
+        expect(response.status).toBe(307);
+
         const setCookieHeaders = response.headers.getSetCookie();
-        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-pkce-verifier='));
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-auth-verifier='));
+        expect(pkceDeletionCookie).toBeDefined();
+        expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
+
+      it('should delete PKCE cookie after failed authentication', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue(new Error('Auth failed'));
+
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
+        request.nextUrl.searchParams.set('code', 'bad-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        const setCookieHeaders = response.headers.getSetCookie();
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-auth-verifier='));
         expect(pkceDeletionCookie).toBeDefined();
         expect(pkceDeletionCookie).toContain('Max-Age=0');
       });

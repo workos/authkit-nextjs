@@ -22,60 +22,29 @@ function revalidateTagCompat(tag: string): void {
 }
 
 async function getAuthURLAndSetPKCECookie(options: GetAuthURLOptions): Promise<string> {
-  const { url, pkceCookieValue } = await getAuthorizationUrl(options);
-  await setPKCECookie(pkceCookieValue);
+  const { url, sealedState } = await getAuthorizationUrl(options);
+  await setPKCECookie(sealedState);
+
   return url;
 }
 
-export async function getSignInUrl({
-  organizationId,
-  loginHint,
-  redirectUri,
-  prompt,
-  state,
-  returnTo,
-}: {
-  organizationId?: string;
-  loginHint?: string;
-  redirectUri?: string;
-  prompt?: 'consent';
-  state?: string;
+type GetSignUrlOptions = Omit<GetAuthURLOptions, 'screenHint' | 'returnPathname'> & {
   returnTo?: string;
-} = {}) {
+};
+
+export async function getSignInUrl(authUrlOptions: GetSignUrlOptions = {}) {
   return getAuthURLAndSetPKCECookie({
-    organizationId,
+    ...authUrlOptions,
+    returnPathname: authUrlOptions.returnTo,
     screenHint: 'sign-in',
-    loginHint,
-    redirectUri,
-    prompt,
-    state,
-    returnPathname: returnTo,
   });
 }
 
-export async function getSignUpUrl({
-  organizationId,
-  loginHint,
-  redirectUri,
-  prompt,
-  state,
-  returnTo,
-}: {
-  organizationId?: string;
-  loginHint?: string;
-  redirectUri?: string;
-  prompt?: 'consent';
-  state?: string;
-  returnTo?: string;
-} = {}) {
+export async function getSignUpUrl(authUrlOptions: GetSignUrlOptions = {}) {
   return getAuthURLAndSetPKCECookie({
-    organizationId,
+    ...authUrlOptions,
+    returnPathname: authUrlOptions.returnTo,
     screenHint: 'sign-up',
-    loginHint,
-    redirectUri,
-    prompt,
-    state,
-    returnPathname: returnTo,
   });
 }
 
