@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   checkSessionAction,
   getAuthAction,
@@ -57,11 +57,22 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
   const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(initialAuth?.featureFlags);
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(initialAuth?.impersonator);
   const [loading, setLoading] = useState(!initialAuth);
+  const redirectingRef = useRef(false);
 
   const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+    if (redirectingRef.current) return;
     setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
+
+      // If the server returned a sign-in URL, redirect client-side to avoid
+      // CORS errors that occur when redirect() is called from a server action.
+      if ('signInUrl' in auth && auth.signInUrl) {
+        redirectingRef.current = true;
+        window.location.href = auth.signInUrl as string;
+        return;
+      }
+
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -105,9 +116,18 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
 
   const refreshAuth = useCallback(
     async ({ ensureSignedIn = false, organizationId }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
+      if (redirectingRef.current) return;
       try {
         setLoading(true);
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+
+        // If the server returned a sign-in URL, redirect client-side to avoid
+        // CORS errors that occur when redirect() is called from a server action.
+        if ('signInUrl' in auth && auth.signInUrl) {
+          redirectingRef.current = true;
+          window.location.href = auth.signInUrl as string;
+          return;
+        }
 
         setUser(auth.user);
         setSessionId(auth.sessionId);
