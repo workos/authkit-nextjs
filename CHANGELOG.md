@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.0](https://github.com/workos/authkit-nextjs/compare/v2.16.1...v2.17.0) (2026-03-13)
+
+
+### Features
+
+* Automatically pass claim nonce for unclaimed environments ([#389](https://github.com/workos/authkit-nextjs/issues/389)) ([67dfc92](https://github.com/workos/authkit-nextjs/commit/67dfc921660e1b87e202472a18fa5e5868352275))
+
 ## [2.16.1](https://github.com/workos/authkit-nextjs/compare/v2.16.0...v2.16.1) (2026-03-13)
 
 
