@@ -27,7 +27,7 @@ describe('getAuthorizationUrl', () => {
   const workos = getWorkOS();
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.WORKOS_DISABLE_PKCE;
+    delete process.env.WORKOS_ENABLE_PKCE;
     fakeWorkosInstance.pkce.generate.mockResolvedValue({
       codeVerifier: 'test-code-verifier',
       codeChallenge: 'test-code-challenge',
@@ -182,10 +182,30 @@ describe('getAuthorizationUrl', () => {
   });
 
   describe('PKCE', () => {
-    it('generates PKCE pair and includes codeChallenge in authorization URL', async () => {
+    it('skips PKCE by default', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
       const result = await getAuthorizationUrl({});
+
+      expect(fakeWorkosInstance.pkce.generate).not.toHaveBeenCalled();
+      expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          codeChallenge: expect.any(String),
+        }),
+      );
+      expect(result.pkceCookieValue).toBeUndefined();
+    });
+
+    it('generates PKCE pair when WORKOS_ENABLE_PKCE is set to true', async () => {
+      process.env.WORKOS_ENABLE_PKCE = 'true';
+
+      // Re-import to pick up the new env var
+      vi.resetModules();
+      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
+
+      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+      const result = await freshGetAuthorizationUrl({});
 
       expect(fakeWorkosInstance.pkce.generate).toHaveBeenCalled();
       expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
@@ -199,20 +219,9 @@ describe('getAuthorizationUrl', () => {
       expect(result.pkceCookieValue).not.toBe('');
     });
 
-    it('returns sealed cookie value for the verifier', async () => {
-      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+    it('returns sealed cookie value for the verifier when PKCE is enabled', async () => {
+      process.env.WORKOS_ENABLE_PKCE = 'true';
 
-      const result = await getAuthorizationUrl({});
-
-      // pkceCookieValue should be a sealed (encrypted) string
-      expect(typeof result.pkceCookieValue).toBe('string');
-      expect(result.pkceCookieValue!.length).toBeGreaterThan(0);
-    });
-
-    it('skips PKCE when WORKOS_DISABLE_PKCE is set to true', async () => {
-      process.env.WORKOS_DISABLE_PKCE = 'true';
-
-      // Re-import to pick up the new env var
       vi.resetModules();
       const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
 
@@ -220,13 +229,9 @@ describe('getAuthorizationUrl', () => {
 
       const result = await freshGetAuthorizationUrl({});
 
-      expect(fakeWorkosInstance.pkce.generate).not.toHaveBeenCalled();
-      expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          codeChallenge: expect.any(String),
-        }),
-      );
-      expect(result.pkceCookieValue).toBeUndefined();
+      // pkceCookieValue should be a sealed (encrypted) string
+      expect(typeof result.pkceCookieValue).toBe('string');
+      expect(result.pkceCookieValue!.length).toBeGreaterThan(0);
     });
   });
 });
