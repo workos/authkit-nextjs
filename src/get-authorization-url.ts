@@ -6,7 +6,7 @@ import { getWorkOS } from './workos.js';
 import { UserManagementAuthorizationURLOptions } from '@workos-inc/node';
 
 async function getAuthorizationUrl({
-  returnPathname = '/',
+  returnPathname,
   screenHint,
   organizationId,
   loginHint,

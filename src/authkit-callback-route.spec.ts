@@ -554,8 +554,9 @@ describe('authkit-callback-route', () => {
       it('should delete PKCE cookie after failed authentication', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue(new Error('Auth failed'));
 
-        await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
         request.nextUrl.searchParams.set('code', 'bad-code');
+        request.nextUrl.searchParams.set('state', sealedState);
 
         const handler = handleAuth();
         const response = await handler(request);
