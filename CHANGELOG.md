@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.1](https://github.com/workos/authkit-nextjs/compare/v2.16.0...v2.16.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* make PKCE opt-in to avoid breaking custom middleware proxies ([#392](https://github.com/workos/authkit-nextjs/issues/392)) ([9e09fcb](https://github.com/workos/authkit-nextjs/commit/9e09fcb85f16c73f3ed3bc00e2799fadc685feca))
+
 ## [2.16.0](https://github.com/workos/authkit-nextjs/compare/v2.15.0...v2.16.0) (2026-03-11)
 
 
