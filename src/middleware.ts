@@ -18,3 +18,8 @@ export function authkitMiddleware({
 export async function authkit(request: NextRequest, options: AuthkitOptions = {}): Promise<AuthkitResponse> {
   return await updateSession(request, options);
 }
+
+/**
+ * Alias for `authkitMiddleware` that aligns with the Next.js 16+ `proxy.ts` convention.
+ */
+export const authkitProxy: typeof authkitMiddleware = authkitMiddleware;
