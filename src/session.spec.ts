@@ -1,3 +1,4 @@
+import type { Mock, MockInstance } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';

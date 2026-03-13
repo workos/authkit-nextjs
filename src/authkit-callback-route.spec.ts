@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { getWorkOS } from './workos.js';
 import { handleAuth } from './authkit-callback-route.js';
 import { getSessionFromCookie, saveSession } from './session.js';

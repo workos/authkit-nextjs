@@ -1,21 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2018",
-    "lib": ["DOM", "ESNext", "DOM.Iterable"],
-    "jsx": "react",
-    "sourceMap": true,
-    "declaration": true,
-    "importHelpers": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "alwaysStrict": true,
-    "skipLibCheck": true,
-    "outDir": "./dist/esm",
-    "declarationDir": "./dist/esm/types",
-    "module": "ES2020",
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
-  },
-  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "vitest.config.ts", "vitest.setup.ts", "/dist/**/*", "examples"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }

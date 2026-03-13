@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { render, act, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Impersonation } from './impersonation.js';
