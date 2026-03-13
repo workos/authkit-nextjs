@@ -1,6 +1,6 @@
 import { sealData } from 'iron-session';
 import { headers } from 'next/headers';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_DISABLE_PKCE, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_ENABLE_PKCE, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { GetAuthURLOptions, GetAuthURLResult } from './interfaces.js';
 import { getWorkOS } from './workos.js';
 
@@ -30,22 +30,22 @@ async function getAuthorizationUrl(options: GetAuthURLOptions = {}): Promise<Get
     prompt,
   };
 
-  if (WORKOS_DISABLE_PKCE === 'true') {
-    return { url: getWorkOS().userManagement.getAuthorizationUrl(baseOptions), pkceCookieValue: undefined };
+  if (WORKOS_ENABLE_PKCE === 'true') {
+    const pkce = await getWorkOS().pkce.generate();
+    const pkceCookieValue = await sealData(
+      { codeVerifier: pkce.codeVerifier },
+      { password: WORKOS_COOKIE_PASSWORD, ttl: 600 },
+    );
+    const url = getWorkOS().userManagement.getAuthorizationUrl({
+      ...baseOptions,
+      codeChallenge: pkce.codeChallenge,
+      codeChallengeMethod: pkce.codeChallengeMethod,
+    });
+
+    return { url, pkceCookieValue };
   }
 
-  const pkce = await getWorkOS().pkce.generate();
-  const pkceCookieValue = await sealData(
-    { codeVerifier: pkce.codeVerifier },
-    { password: WORKOS_COOKIE_PASSWORD, ttl: 600 },
-  );
-  const url = getWorkOS().userManagement.getAuthorizationUrl({
-    ...baseOptions,
-    codeChallenge: pkce.codeChallenge,
-    codeChallengeMethod: pkce.codeChallengeMethod,
-  });
-
-  return { url, pkceCookieValue };
+  return { url: getWorkOS().userManagement.getAuthorizationUrl(baseOptions), pkceCookieValue: undefined };
 }
 
 export { getAuthorizationUrl };
