@@ -44,7 +44,7 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
         '--wi-bw': 'var(--workos-impersonation-border-width, 1px)',
 
         ...props.style,
-      }}
+      } as React.CSSProperties}
     >
       <div
         style={{
@@ -57,7 +57,7 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
 						inset 0 0 0 calc(var(--wi-frame-size) * 2 + var(--wi-bw)) var(--wi-bc)
 					`,
           'transition': 'all 500ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
+        } as React.CSSProperties}
       />
 
       <div

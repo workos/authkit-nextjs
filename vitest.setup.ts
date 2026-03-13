@@ -1,5 +1,12 @@
 /// <reference types="vitest/globals" />
 
+import type { Mock as VitestMock, MockInstance as VitestMockInstance } from 'vitest';
+
+declare global {
+  type Mock = VitestMock;
+  type MockInstance = VitestMockInstance;
+}
+
 process.env.WORKOS_API_KEY = 'sk_test_1234567890';
 process.env.WORKOS_CLIENT_ID = 'client_1234567890';
 process.env.WORKOS_COOKIE_PASSWORD = 'kR620keEzOIzPThfnMEAba8XYgKdQ5vg';

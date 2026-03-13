@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "outDir": null,
+    "declarationDir": null,
+    "declaration": false,
+    "noEmit": true,
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.spec.tsx", "vitest.setup.ts"],
+  "exclude": []
+}
