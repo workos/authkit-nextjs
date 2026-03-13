@@ -89,7 +89,7 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ accessToken: refreshedToken });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -112,7 +112,7 @@ describe('useAccessToken', () => {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
-    (refreshAccessTokenAction as Mock).mockResolvedValueOnce(refreshedToken);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ accessToken: refreshedToken });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -170,10 +170,12 @@ describe('useAccessToken', () => {
   it('should handle errors during manual refresh', async () => {
     const initialToken =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwic2lkIjoic2Vzc2lvbl8xMjMiLCJleHAiOjk5OTk5OTk5OTl9.mock-signature';
-    const error = new Error('Failed to refresh token');
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
-    (refreshAccessTokenAction as Mock).mockRejectedValueOnce(error);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({
+      accessToken: undefined,
+      error: 'Failed to refresh token',
+    });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -277,10 +279,12 @@ describe('useAccessToken', () => {
       iat: currentTimeInSeconds - 35,
     };
     const expiringToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
-    const error = new Error('Failed to refresh token');
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(expiringToken);
-    (refreshAccessTokenAction as Mock).mockRejectedValueOnce(error);
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({
+      accessToken: undefined,
+      error: 'Failed to refresh token',
+    });
 
     const { getByTestId } = render(<TestComponent />);
 
@@ -410,7 +414,7 @@ describe('useAccessToken', () => {
 
     (refreshAccessTokenAction as Mock).mockImplementation(() => {
       refreshCalls++;
-      return refreshPromise;
+      return refreshPromise.then((t) => ({ accessToken: t }));
     });
 
     (getAccessTokenAction as Mock).mockImplementation(() => {
@@ -507,7 +511,7 @@ describe('useAccessToken', () => {
       resolveRefreshPromise = resolve;
     });
 
-    (refreshAccessTokenAction as Mock).mockReturnValue(refreshPromise);
+    (refreshAccessTokenAction as Mock).mockReturnValue(refreshPromise.then((t) => ({ accessToken: t })));
     (getAccessTokenAction as Mock).mockResolvedValue(initialToken);
 
     const { getByTestId } = render(<TestComponent />);
@@ -582,10 +586,8 @@ describe('useAccessToken', () => {
     const stringError = 'String error directly'; // Not wrapped in Error object
 
     (getAccessTokenAction as Mock).mockResolvedValueOnce(initialToken);
-    // Mock refreshAccessTokenAction to reject with a string, not an Error object
-    (refreshAccessTokenAction as Mock).mockImplementation(() => {
-      return Promise.reject(stringError); // Directly reject with string
-    });
+    // Mock refreshAccessTokenAction to return an error result (as server actions do)
+    (refreshAccessTokenAction as Mock).mockResolvedValueOnce({ accessToken: undefined, error: stringError });
 
     const { getByTestId } = render(<TestComponent />);
 
