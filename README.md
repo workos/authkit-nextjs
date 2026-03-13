@@ -56,7 +56,7 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
-| `WORKOS_DISABLE_PKCE`    | None                  | Set to `'true'` to disable PKCE on authorization requests. See [Security](#security) for details |
+| `WORKOS_ENABLE_PKCE`     | None                  | Set to `'true'` to enable PKCE on authorization requests. See [Security](#security) for details |
 
 Example usage:
 
@@ -912,12 +912,9 @@ export default authkitMiddleware({ debug: true });
 
 #### PKCE and CSRF protection
 
-This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) by default to protect the OAuth authorization code flow. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing an encrypted code verifier and the OAuth state parameter. This cookie is automatically cleaned up after the callback completes.
+This library uses a sealed (encrypted) OAuth state parameter containing a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/). During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
 
-PKCE provides CSRF protection as a side effect — the code verifier in the cookie binds the authorization request to the user's browser. When PKCE is disabled via `WORKOS_DISABLE_PKCE=true`, a cryptographic nonce is generated and used as the OAuth state parameter to maintain CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/).
-
-> [!WARNING]
-> Disabling PKCE removes defense-in-depth against authorization code interception. Only disable it if your deployment environment is incompatible with PKCE.
+For additional security, you can enable [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) by setting `WORKOS_ENABLE_PKCE=true`. When enabled, a code verifier is included in the sealed state and a code challenge is sent with the authorization request, providing defense-in-depth against authorization code interception.
 
 #### Cookie requirements
 

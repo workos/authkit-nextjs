@@ -103,10 +103,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle authentication failure', async () => {
-      // Mock authentication failure
       (workos.userManagement.authenticateWithCode as Mock).mockRejectedValue(new Error('Auth failed'));
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -117,10 +118,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle authentication failure if a non-Error object is thrown', async () => {
-      // Mock authentication failure
       vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -226,8 +228,9 @@ describe('authkit-callback-route', () => {
 
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -241,6 +244,10 @@ describe('authkit-callback-route', () => {
     it('should use Response if NextResponse.json is not available', async () => {
       const originalJson = NextResponse.json;
       (NextResponse as Partial<typeof NextResponse>).json = undefined;
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -270,14 +277,15 @@ describe('authkit-callback-route', () => {
     });
 
     it('should throw an error if response is missing tokens', async () => {
-      const mockAuthResponse = {
+      const incompleteAuthResponse = {
         user: { id: 'user_123' },
       };
 
-      (workos.userManagement.authenticateWithCode as Mock).mockResolvedValue(mockAuthResponse);
+      (workos.userManagement.authenticateWithCode as Mock).mockResolvedValue(incompleteAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
