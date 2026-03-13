@@ -26,10 +26,8 @@ import { parse, tokensToRegexp } from 'path-to-regexp';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
 
-function appendPKCESetCookieHeader(headers: Headers, pkceCookieValue: string | undefined, requestUrl: string): void {
-  if (pkceCookieValue) {
-    headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${pkceCookieValue}; ${getCookieOptions(requestUrl, true)}`);
-  }
+function appendPKCESetCookieHeader(headers: Headers, sealedState: string, requestUrl: string): void {
+  headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${sealedState}; ${getCookieOptions(requestUrl, true)}`);
 }
 
 const sessionHeaderName = 'x-workos-session';
@@ -209,13 +207,13 @@ async function updateSession(
       console.log('No session found from cookie');
     }
 
-    const { url: authorizationUrl, pkceCookieValue } = await getAuthorizationUrl({
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
       redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
       screenHint: options.screenHint,
     });
 
-    appendPKCESetCookieHeader(newRequestHeaders, pkceCookieValue, request.url);
+    appendPKCESetCookieHeader(newRequestHeaders, sealedState, request.url);
 
     return {
       session: { user: null },
@@ -351,12 +349,12 @@ async function updateSession(
 
     options.onSessionRefreshError?.({ error: e, request });
 
-    const { url: authorizationUrl, pkceCookieValue } = await getAuthorizationUrl({
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
       redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
     });
 
-    appendPKCESetCookieHeader(newRequestHeaders, pkceCookieValue, request.url);
+    appendPKCESetCookieHeader(newRequestHeaders, sealedState, request.url);
 
     return {
       session: { user: null },
@@ -468,8 +466,8 @@ async function redirectToSignIn() {
 
   const returnPathname = getReturnPathname(url);
 
-  const { url: authkitUrl, pkceCookieValue } = await getAuthorizationUrl({ returnPathname, screenHint });
-  await setPKCECookie(pkceCookieValue);
+  const { url: authkitUrl, sealedState } = await getAuthorizationUrl({ returnPathname, screenHint });
+  await setPKCECookie(sealedState);
   redirect(authkitUrl);
 }
 
@@ -567,7 +565,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
 function getReturnPathname(url: string): string {
   const newUrl = new URL(url);
 
-  return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
+  return `${newUrl.pathname}${newUrl.search}`;
 }
 
 function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
