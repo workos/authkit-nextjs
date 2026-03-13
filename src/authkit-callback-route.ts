@@ -69,6 +69,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           codeVerifier,
         });
 
+      if (!accessToken || !refreshToken) {
+        throw new Error('response is missing tokens');
+      }
+
       // If baseURL is provided, use it instead of request.nextUrl
       // This is useful if the app is being run in a container like docker where
       // the hostname can be different from the one in the request
@@ -90,13 +94,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       // This is to support Next.js 13.
       const response = redirectWithFallback(url.toString());
       preventCaching(response.headers);
-
-      // We delete the PKCE cookie regardless of success or failure
       response.headers.append('Set-Cookie', deleteCookie);
-
-      if (!accessToken || !refreshToken) {
-        throw new Error('response is missing tokens');
-      }
 
       await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 
@@ -115,11 +113,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       return response;
     } catch (error) {
-      const errorRes = {
-        error: error instanceof Error ? error.message : String(error),
-      };
-
-      console.error(errorRes);
+      console.error('[AuthKit callback error]', error);
       const response = await errorResponse(request, error);
       response.headers.append('Set-Cookie', deleteCookie);
       return response;
