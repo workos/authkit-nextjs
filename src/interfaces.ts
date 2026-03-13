@@ -1,5 +1,6 @@
 import type { AuthenticationResponse, OauthTokens, User } from '@workos-inc/node';
 import { type NextRequest } from 'next/server';
+import * as v from 'valibot';
 
 export interface HandleAuthOptions {
   returnPathname?: string;
@@ -61,9 +62,18 @@ export interface AccessToken {
   feature_flags?: string[];
 }
 
+export const StateSchema = v.object({
+  nonce: v.string(),
+  customState: v.optional(v.string()),
+  returnPathname: v.optional(v.string()),
+  codeVerifier: v.optional(v.string()),
+});
+
+export type State = v.InferOutput<typeof StateSchema>;
+
 export interface GetAuthURLResult {
   url: string;
-  pkceCookieValue?: string;
+  sealedState: string;
 }
 
 export interface GetAuthURLOptions {

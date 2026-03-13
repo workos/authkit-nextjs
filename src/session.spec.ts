@@ -9,6 +9,7 @@ import * as envVariables from './env-variables.js';
 import { jwtVerify } from 'jose';
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
+import { getStateFromPKCECookieValue } from './pkce.js';
 
 vi.mock('jose', async () => {
   const actual = await vi.importActual<typeof import('jose')>('jose');
@@ -147,14 +148,12 @@ describe('session.ts', () => {
 
       await withAuth({ ensureSignedIn: true });
 
-      // URL-safe base64 encoding
-      const pathname = encodeURIComponent(
-        btoa(JSON.stringify({ returnPathname: '/protected?test=123' }))
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_'),
-      );
+      // The state is now sealed, se we need to unseal it
+      const redirectUrl = new URL((redirect as Mock).mock.calls[0][0]);
+      const sealedState = redirectUrl.searchParams.get('state')!;
+      const { returnPathname } = await getStateFromPKCECookieValue(sealedState);
 
-      expect(redirect).toHaveBeenCalledWith(expect.stringContaining(pathname));
+      expect(returnPathname).toBe('/protected?test=123');
     });
   });
 

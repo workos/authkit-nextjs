@@ -1,6 +1,7 @@
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { headers } from 'next/headers';
 import { getWorkOS } from './workos.js';
+import { getStateFromPKCECookieValue } from './pkce.js';
 
 // Mock dependencies
 const { fakeWorkosInstance } = vi.hoisted(() => ({
@@ -39,7 +40,6 @@ describe('getAuthorizationUrl', () => {
     const nextHeaders = await headers();
     nextHeaders.set('x-redirect-uri', 'http://test-redirect.com');
 
-    // Mock workos.userManagement.getAuthorizationUrl
     vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
     await getAuthorizationUrl({});
@@ -54,7 +54,7 @@ describe('getAuthorizationUrl', () => {
   it('works when called with no arguments', async () => {
     vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
-    await getAuthorizationUrl(); // Call with no arguments
+    await getAuthorizationUrl();
 
     expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalled();
   });
@@ -182,7 +182,7 @@ describe('getAuthorizationUrl', () => {
   });
 
   describe('PKCE', () => {
-    it('skips PKCE by default but still sets CSRF cookie', async () => {
+    it('skips PKCE by default but still sets sealed state', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
       const result = await getAuthorizationUrl({});
@@ -193,14 +193,14 @@ describe('getAuthorizationUrl', () => {
           codeChallenge: expect.any(String),
         }),
       );
-      // Cookie should still be set for CSRF protection
-      expect(result.pkceCookieValue).toBeDefined();
+
+      const { nonce } = await getStateFromPKCECookieValue(result.sealedState);
+      expect(nonce).toBeDefined();
     });
 
     it('generates PKCE pair when WORKOS_ENABLE_PKCE is set to true', async () => {
       process.env.WORKOS_ENABLE_PKCE = 'true';
 
-      // Re-import to pick up the new env var
       vi.resetModules();
       const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
 
@@ -216,8 +216,8 @@ describe('getAuthorizationUrl', () => {
         }),
       );
       expect(result.url).toBe('mock-url');
-      expect(result.pkceCookieValue).toBeDefined();
-      expect(result.pkceCookieValue).not.toBe('');
+      expect(result.sealedState).toBeDefined();
+      expect(result.sealedState).not.toBe('');
     });
 
     it('returns sealed cookie value for the verifier when PKCE is enabled', async () => {
@@ -230,9 +230,8 @@ describe('getAuthorizationUrl', () => {
 
       const result = await freshGetAuthorizationUrl({});
 
-      // pkceCookieValue should be a sealed (encrypted) string
-      expect(typeof result.pkceCookieValue).toBe('string');
-      expect(result.pkceCookieValue!.length).toBeGreaterThan(0);
+      expect(typeof result.sealedState).toBe('string');
+      expect(result.sealedState.length).toBeGreaterThan(0);
     });
 
     it('generates a CSRF nonce state by default when no state provided', async () => {
@@ -240,11 +239,10 @@ describe('getAuthorizationUrl', () => {
 
       await getAuthorizationUrl({});
 
-      // The state sent to WorkOS should be a base64 JSON containing a nonce
       const call = vi.mocked(workos.userManagement.getAuthorizationUrl).mock.calls[0][0];
-      const decoded = JSON.parse(atob(call.state as string));
-      expect(decoded.nonce).toBeDefined();
-      expect(typeof decoded.nonce).toBe('string');
+      const { nonce } = await getStateFromPKCECookieValue(call.state);
+      expect(nonce).toBeDefined();
+      expect(typeof nonce).toBe('string');
     });
   });
 });

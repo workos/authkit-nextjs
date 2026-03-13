@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { generateSession, generateTestToken } from './test-helpers.js';
 import { sealData } from 'iron-session';
 import { getWorkOS } from './workos.js';
+import { getStateFromPKCECookieValue } from './pkce.js';
 
 const workos = getWorkOS();
 
@@ -87,7 +88,7 @@ describe('auth.ts', () => {
       const parsedUrl = new URL(url);
       const state = parsedUrl.searchParams.get('state');
       expect(state).toBeDefined();
-      const decoded = JSON.parse(atob(state!.replace(/-/g, '+').replace(/_/g, '/')));
+      const decoded = await getStateFromPKCECookieValue(state!);
       expect(decoded.returnPathname).toBe('/dashboard');
     });
   });
@@ -123,7 +124,7 @@ describe('auth.ts', () => {
       const parsedUrl = new URL(url);
       const state = parsedUrl.searchParams.get('state');
       expect(state).toBeDefined();
-      const decoded = JSON.parse(atob(state!.replace(/-/g, '+').replace(/_/g, '/')));
+      const decoded = await getStateFromPKCECookieValue(state!);
       expect(decoded.returnPathname).toBe('/welcome');
     });
   });
