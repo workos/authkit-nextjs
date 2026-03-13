@@ -37,7 +37,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workos-inc/node": "^8.7.0",
+    "@workos-inc/node": "^8.9.0",
     "iron-session": "^8.0.4",
     "jose": "^5.10.0",
     "path-to-regexp": "^6.3.0"

@@ -12,6 +12,7 @@ const WORKOS_COOKIE_DOMAIN = getEnvVariable('WORKOS_COOKIE_DOMAIN');
 const WORKOS_COOKIE_MAX_AGE = getEnvVariable('WORKOS_COOKIE_MAX_AGE');
 const WORKOS_COOKIE_NAME = getEnvVariable('WORKOS_COOKIE_NAME');
 const WORKOS_COOKIE_SAMESITE = getEnvVariable('WORKOS_COOKIE_SAMESITE') as 'lax' | 'strict' | 'none' | undefined;
+const WORKOS_CLAIM_TOKEN = getEnvVariable('WORKOS_CLAIM_TOKEN');
 const WORKOS_ENABLE_PKCE = getEnvVariable('WORKOS_ENABLE_PKCE');
 
 // Required env variables
@@ -25,6 +26,7 @@ export {
   WORKOS_API_HTTPS,
   WORKOS_API_KEY,
   WORKOS_API_PORT,
+  WORKOS_CLAIM_TOKEN,
   WORKOS_CLIENT_ID,
   WORKOS_COOKIE_DOMAIN,
   WORKOS_COOKIE_MAX_AGE,
