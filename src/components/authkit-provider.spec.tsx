@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
