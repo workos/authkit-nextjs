@@ -45,29 +45,22 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         throw new Error('Missing required auth parameter');
       }
 
-      // Determine which sealed value to unseal: cookie (with CSRF check) or URL state (degraded)
-      let sealedValue: string;
-      if (pkceCookie) {
-        // Full CSRF protection: verify the state param matches the cookie (two-channel check)
-        if (state !== pkceCookie) {
-          throw new Error('OAuth state mismatch');
-        }
-        sealedValue = pkceCookie;
-      } else {
-        // Graceful degradation: cookie missing (e.g., proxy not propagating Set-Cookie on redirects)
-        // Fall back to unsealing from the URL state param — no CSRF cross-check possible
-        console.warn(
-          '[AuthKit] CSRF cookie missing — falling back to URL state.',
-          'Ensure Set-Cookie headers are propagated on redirects.',
+      // CSRF verification: both channels (cookie + URL state) must be present and match
+      if (!pkceCookie) {
+        throw new Error(
+          'Auth cookie missing — cannot verify OAuth state. Ensure Set-Cookie headers are propagated on redirects.',
         );
-        sealedValue = state;
+      }
+
+      if (state !== pkceCookie) {
+        throw new Error('OAuth state mismatch');
       }
 
       const {
         codeVerifier,
         customState,
         returnPathname: returnPathnameState,
-      } = await getStateFromPKCECookieValue(sealedValue);
+      } = await getStateFromPKCECookieValue(pkceCookie);
 
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
