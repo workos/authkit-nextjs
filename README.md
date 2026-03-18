@@ -56,7 +56,6 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
-| `WORKOS_ENABLE_PKCE`     | None                  | Set to `'true'` to enable PKCE on authorization requests. See [Security](#security) for details |
 
 Example usage:
 
@@ -912,9 +911,10 @@ export default authkitMiddleware({ debug: true });
 
 #### PKCE and CSRF protection
 
-This library uses a sealed (encrypted) OAuth state parameter containing a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/). During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
+This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) and a sealed (encrypted) OAuth state parameter on every authorization request. The state contains a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/) and a code verifier for protection against authorization code interception. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
 
-For additional security, you can enable [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) by setting `WORKOS_ENABLE_PKCE=true`. When enabled, a code verifier is included in the sealed state and a code challenge is sent with the authorization request, providing defense-in-depth against authorization code interception.
+> [!NOTE]
+> **Upgrading to v3:** PKCE is now always enabled. The `WORKOS_ENABLE_PKCE` environment variable is no longer needed and can be removed from your configuration.
 
 #### Cookie requirements
 

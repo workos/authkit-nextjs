@@ -28,7 +28,6 @@ describe('getAuthorizationUrl', () => {
   const workos = getWorkOS();
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.WORKOS_ENABLE_PKCE;
     fakeWorkosInstance.pkce.generate.mockResolvedValue({
       codeVerifier: 'test-code-verifier',
       codeChallenge: 'test-code-challenge',
@@ -160,9 +159,8 @@ describe('getAuthorizationUrl', () => {
       warnSpy.mockRestore();
     });
 
-    it('works with PKCE disabled', async () => {
+    it('includes PKCE and claim nonce together', async () => {
       process.env.WORKOS_CLAIM_TOKEN = 'test-claim-token';
-      process.env.WORKOS_DISABLE_PKCE = 'true';
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(new Response(JSON.stringify({ nonce: 'test-nonce' }), { status: 201 }));
@@ -174,39 +172,22 @@ describe('getAuthorizationUrl', () => {
       const result = await freshGetAuthorizationUrl({});
 
       expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
-        expect.objectContaining({ claimNonce: 'test-nonce' }),
+        expect.objectContaining({
+          claimNonce: 'test-nonce',
+          codeChallenge: 'test-code-challenge',
+          codeChallengeMethod: 'S256',
+        }),
       );
-      expect(result.pkceCookieValue).toBeUndefined();
+      expect(result.sealedState).toBeDefined();
       fetchSpy.mockRestore();
     });
   });
 
   describe('PKCE', () => {
-    it('skips PKCE by default but still sets sealed state', async () => {
+    it('always generates PKCE pair and includes code challenge', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
       const result = await getAuthorizationUrl({});
-
-      expect(fakeWorkosInstance.pkce.generate).not.toHaveBeenCalled();
-      expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          codeChallenge: expect.any(String),
-        }),
-      );
-
-      const { nonce } = await getStateFromPKCECookieValue(result.sealedState);
-      expect(nonce).toBeDefined();
-    });
-
-    it('generates PKCE pair when WORKOS_ENABLE_PKCE is set to true', async () => {
-      process.env.WORKOS_ENABLE_PKCE = 'true';
-
-      vi.resetModules();
-      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
-
-      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
-
-      const result = await freshGetAuthorizationUrl({});
 
       expect(fakeWorkosInstance.pkce.generate).toHaveBeenCalled();
       expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
@@ -220,27 +201,13 @@ describe('getAuthorizationUrl', () => {
       expect(result.sealedState).not.toBe('');
     });
 
-    it('returns sealed cookie value for the verifier when PKCE is enabled', async () => {
-      process.env.WORKOS_ENABLE_PKCE = 'true';
-
-      vi.resetModules();
-      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
-
+    it('seals codeVerifier and nonce into state', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
-      const result = await freshGetAuthorizationUrl({});
+      const result = await getAuthorizationUrl({});
 
-      expect(typeof result.sealedState).toBe('string');
-      expect(result.sealedState.length).toBeGreaterThan(0);
-    });
-
-    it('generates a CSRF nonce state by default when no state provided', async () => {
-      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
-
-      await getAuthorizationUrl({});
-
-      const call = vi.mocked(workos.userManagement.getAuthorizationUrl).mock.calls[0][0];
-      const { nonce } = await getStateFromPKCECookieValue(call.state);
+      const { codeVerifier, nonce } = await getStateFromPKCECookieValue(result.sealedState);
+      expect(codeVerifier).toBe('test-code-verifier');
       expect(nonce).toBeDefined();
       expect(typeof nonce).toBe('string');
     });

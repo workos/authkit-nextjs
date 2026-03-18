@@ -1,12 +1,6 @@
 import { sealData } from 'iron-session';
 import { headers } from 'next/headers';
-import {
-  WORKOS_CLAIM_TOKEN,
-  WORKOS_CLIENT_ID,
-  WORKOS_COOKIE_PASSWORD,
-  WORKOS_ENABLE_PKCE,
-  WORKOS_REDIRECT_URI,
-} from './env-variables.js';
+import { WORKOS_CLAIM_TOKEN, WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { GetAuthURLOptions, GetAuthURLResult, State } from './interfaces.js';
 import { getWorkOS } from './workos.js';
 import { UserManagementAuthorizationURLOptions } from '@workos-inc/node';
@@ -58,18 +52,19 @@ async function getAuthorizationUrl({
     return headersList.get('x-redirect-uri') ?? undefined;
   })();
 
-  // We will always pass state for PKCE & non-PKCE flows, for "Defense in Depth" purposes
-  // The state will be used in the non-PKCE flow as the CSRF token
-  // Passing it as the same shape, and passing it always simplifies code paths
+  const pkce = await getWorkOS().pkce.generate();
+  const claimNonce = WORKOS_CLAIM_TOKEN ? await fetchClaimNonce(getWorkOS().baseURL) : null;
+
   const state = {
     nonce: crypto.randomUUID(),
+    codeVerifier: pkce.codeVerifier,
     customState,
     returnPathname,
   } satisfies State;
 
-  const claimNonce = WORKOS_CLAIM_TOKEN ? await fetchClaimNonce(getWorkOS().baseURL) : null;
+  const sealedState = await sealData(state, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
 
-  const baseOptions = {
+  const url = getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit' as const,
     clientId: WORKOS_CLIENT_ID,
     redirectUri: redirectUriToUse ?? WORKOS_REDIRECT_URI,
@@ -77,35 +72,13 @@ async function getAuthorizationUrl({
     organizationId,
     loginHint,
     prompt,
+    state: sealedState,
+    codeChallenge: pkce.codeChallenge,
+    codeChallengeMethod: pkce.codeChallengeMethod,
     ...(claimNonce && { claimNonce }),
-  } satisfies UserManagementAuthorizationURLOptions;
+  });
 
-  if (WORKOS_ENABLE_PKCE === 'true') {
-    const pkce = await getWorkOS().pkce.generate();
-
-    const pkceState = {
-      ...state,
-      codeVerifier: pkce.codeVerifier,
-    } satisfies State;
-
-    const sealedState = await sealData(pkceState, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
-
-    const url = getWorkOS().userManagement.getAuthorizationUrl({
-      ...baseOptions,
-      state: sealedState,
-      codeChallenge: pkce.codeChallenge,
-      codeChallengeMethod: pkce.codeChallengeMethod,
-    });
-
-    return { url, sealedState };
-  }
-
-  const sealedState = await sealData(state, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
-
-  return {
-    url: getWorkOS().userManagement.getAuthorizationUrl({ ...baseOptions, state: sealedState }),
-    sealedState,
-  };
+  return { url, sealedState };
 }
 
 export { getAuthorizationUrl };
