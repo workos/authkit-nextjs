@@ -3,7 +3,6 @@ import { headers } from 'next/headers';
 import { WORKOS_CLAIM_TOKEN, WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { GetAuthURLOptions, GetAuthURLResult, State } from './interfaces.js';
 import { getWorkOS } from './workos.js';
-import { UserManagementAuthorizationURLOptions } from '@workos-inc/node';
 
 async function fetchClaimNonce(baseURL: string): Promise<string | null> {
   try {
