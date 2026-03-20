@@ -26,7 +26,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "prebuild": "pnpm run clean",
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.app.json",
     "prepublishOnly": "pnpm run lint",
     "lint": "eslint \"src/**/*.ts*\"",
     "test": "vitest run",
@@ -34,7 +34,7 @@
     "test:coverage": "vitest run --coverage",
     "prettier": "prettier \"src/**/*.{js,ts,tsx}\" --check",
     "format": "prettier \"src/**/*.{js,ts,tsx}\" --write",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "tsc --project tsconfig.app.json --noEmit && tsc --project tsconfig.test.json --noEmit"
   },
   "dependencies": {
     "@workos-inc/node": "^8.9.0",

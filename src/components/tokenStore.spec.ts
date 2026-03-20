@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { tokenStore, TokenStore } from './tokenStore.js';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 
