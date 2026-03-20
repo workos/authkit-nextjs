@@ -96,7 +96,25 @@ describe('actions', () => {
     it('should refresh access token', async () => {
       const result = await refreshAccessTokenAction();
       expect(refreshSession).toHaveBeenCalled();
-      expect(result).toEqual('refreshed_token');
+      expect(result).toEqual({ accessToken: 'refreshed_token' });
+    });
+
+    it('should catch errors and return a generic error instead of throwing', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(refreshSession).mockRejectedValueOnce(new Error('Rate limit exceeded'));
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'Failed to refresh access token' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to refresh access token:', 'Rate limit exceeded');
+      warnSpy.mockRestore();
+    });
+
+    it('should handle non-Error objects in catch', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(refreshSession).mockRejectedValueOnce('string error');
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'Failed to refresh access token' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to refresh access token:', 'string error');
+      warnSpy.mockRestore();
     });
   });
 });

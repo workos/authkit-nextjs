@@ -5,6 +5,11 @@ import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.
 import { refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
+export interface RefreshAccessTokenActionResult {
+  accessToken: string | undefined;
+  error?: string;
+}
+
 /**
  * This function is used to sanitize the auth object.
  * Remove the accessToken from the auth object as it is not needed on the client side.
@@ -64,8 +69,19 @@ export async function getAccessTokenAction() {
 /**
  * This action is used to refresh the access token from the auth object.
  * It is used to fetch the access token from the server.
+ *
+ * Errors are caught and returned as data rather than thrown, to prevent
+ * Next.js from returning 500 responses for server action failures.
  */
-export async function refreshAccessTokenAction() {
-  const auth = await refreshSession();
-  return auth.accessToken;
+export async function refreshAccessTokenAction(): Promise<RefreshAccessTokenActionResult> {
+  try {
+    const auth = await refreshSession();
+    return { accessToken: auth.accessToken };
+  } catch (error) {
+    console.warn('Failed to refresh access token:', error instanceof Error ? error.message : String(error));
+    return {
+      accessToken: undefined,
+      error: 'Failed to refresh access token',
+    };
+  }
 }
