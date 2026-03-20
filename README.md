@@ -56,7 +56,6 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
-| `WORKOS_DISABLE_PKCE`    | None                  | Set to `'true'` to disable PKCE on authorization requests                                 |
 
 Example usage:
 
@@ -914,6 +913,27 @@ import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({ debug: true });
 ```
+
+### Security
+
+#### PKCE and CSRF protection
+
+This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) and a sealed (encrypted) OAuth state parameter on every authorization request. The state contains a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/) and a code verifier for protection against authorization code interception. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
+
+> [!NOTE]
+> **Upgrading to v3:** PKCE is now always enabled. The `WORKOS_ENABLE_PKCE` environment variable is no longer needed and can be removed from your configuration.
+
+#### Cookie requirements
+
+The `wos-auth-verifier` cookie must survive the round-trip from sign-in initiation to the callback. On callback, the library verifies that the cookie is present and matches the URL `state` parameter — this two-channel check is what prevents CSRF attacks.
+
+If the cookie is missing or doesn't match, authentication will fail with one of:
+
+- `Auth cookie missing` — the cookie was not sent back with the callback request. This typically happens when a reverse proxy or CDN strips `Set-Cookie` headers on redirects.
+- `OAuth state mismatch` — the cookie and URL `state` parameter don't match, indicating a possible CSRF attack or cookie corruption.
+
+> [!IMPORTANT]
+> **Upgrading to v3:** Previous versions would silently fall back to verifying only the URL `state` parameter when the cookie was missing. This fallback has been removed because it disabled CSRF protection. If you see `Auth cookie missing` errors after upgrading, ensure that `Set-Cookie` headers are propagated on redirects between your application and the user's browser.
 
 ### Troubleshooting
 

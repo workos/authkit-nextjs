@@ -1,6 +1,7 @@
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import { headers } from 'next/headers';
 import { getWorkOS } from './workos.js';
+import { getStateFromPKCECookieValue } from './pkce.js';
 
 // Mock dependencies
 const { fakeWorkosInstance } = vi.hoisted(() => ({
@@ -27,7 +28,6 @@ describe('getAuthorizationUrl', () => {
   const workos = getWorkOS();
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.WORKOS_ENABLE_PKCE;
     fakeWorkosInstance.pkce.generate.mockResolvedValue({
       codeVerifier: 'test-code-verifier',
       codeChallenge: 'test-code-challenge',
@@ -39,7 +39,6 @@ describe('getAuthorizationUrl', () => {
     const nextHeaders = await headers();
     nextHeaders.set('x-redirect-uri', 'http://test-redirect.com');
 
-    // Mock workos.userManagement.getAuthorizationUrl
     vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
     await getAuthorizationUrl({});
@@ -54,7 +53,7 @@ describe('getAuthorizationUrl', () => {
   it('works when called with no arguments', async () => {
     vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
-    await getAuthorizationUrl(); // Call with no arguments
+    await getAuthorizationUrl();
 
     expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalled();
   });
@@ -160,9 +159,8 @@ describe('getAuthorizationUrl', () => {
       warnSpy.mockRestore();
     });
 
-    it('works with PKCE disabled', async () => {
+    it('includes PKCE and claim nonce together', async () => {
       process.env.WORKOS_CLAIM_TOKEN = 'test-claim-token';
-      process.env.WORKOS_DISABLE_PKCE = 'true';
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(new Response(JSON.stringify({ nonce: 'test-nonce' }), { status: 201 }));
@@ -174,38 +172,22 @@ describe('getAuthorizationUrl', () => {
       const result = await freshGetAuthorizationUrl({});
 
       expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
-        expect.objectContaining({ claimNonce: 'test-nonce' }),
+        expect.objectContaining({
+          claimNonce: 'test-nonce',
+          codeChallenge: 'test-code-challenge',
+          codeChallengeMethod: 'S256',
+        }),
       );
-      expect(result.pkceCookieValue).toBeUndefined();
+      expect(result.sealedState).toBeDefined();
       fetchSpy.mockRestore();
     });
   });
 
   describe('PKCE', () => {
-    it('skips PKCE by default', async () => {
+    it('always generates PKCE pair and includes code challenge', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
       const result = await getAuthorizationUrl({});
-
-      expect(fakeWorkosInstance.pkce.generate).not.toHaveBeenCalled();
-      expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          codeChallenge: expect.any(String),
-        }),
-      );
-      expect(result.pkceCookieValue).toBeUndefined();
-    });
-
-    it('generates PKCE pair when WORKOS_ENABLE_PKCE is set to true', async () => {
-      process.env.WORKOS_ENABLE_PKCE = 'true';
-
-      // Re-import to pick up the new env var
-      vi.resetModules();
-      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
-
-      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
-
-      const result = await freshGetAuthorizationUrl({});
 
       expect(fakeWorkosInstance.pkce.generate).toHaveBeenCalled();
       expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
@@ -215,23 +197,19 @@ describe('getAuthorizationUrl', () => {
         }),
       );
       expect(result.url).toBe('mock-url');
-      expect(result.pkceCookieValue).toBeDefined();
-      expect(result.pkceCookieValue).not.toBe('');
+      expect(result.sealedState).toBeDefined();
+      expect(result.sealedState).not.toBe('');
     });
 
-    it('returns sealed cookie value for the verifier when PKCE is enabled', async () => {
-      process.env.WORKOS_ENABLE_PKCE = 'true';
-
-      vi.resetModules();
-      const { getAuthorizationUrl: freshGetAuthorizationUrl } = await import('./get-authorization-url.js');
-
+    it('seals codeVerifier and nonce into state', async () => {
       vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
 
-      const result = await freshGetAuthorizationUrl({});
+      const result = await getAuthorizationUrl({});
 
-      // pkceCookieValue should be a sealed (encrypted) string
-      expect(typeof result.pkceCookieValue).toBe('string');
-      expect(result.pkceCookieValue!.length).toBeGreaterThan(0);
+      const { codeVerifier, nonce } = await getStateFromPKCECookieValue(result.sealedState);
+      expect(codeVerifier).toBe('test-code-verifier');
+      expect(nonce).toBeDefined();
+      expect(typeof nonce).toBe('string');
     });
   });
 });

@@ -29,6 +29,9 @@ importers:
       react-dom:
         specifier: ^18.0 || ^19.0.0
         version: 19.2.4(react@19.2.4)
+      valibot:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.4.2)
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^6.9.1
@@ -3814,6 +3817,14 @@ packages:
     resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  valibot@1.2.0:
+    resolution: {integrity: sha512-mm1rxUsmOxzrwnX5arGS+U4T25RdvpPjPN4yR0u9pUBov9+zGVtO84tif1eY4r6zWxVxu3KzIyknJy3rxfRZZg==}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   vinext@0.0.18:
     resolution: {integrity: sha512-HTaO+fWYYInbLfRge+TgdEJqyjcV5amwHCUvEI9gp32jGEb/9xS/6NVscgMmjUlAlS4FSmwpgWEv6kwzDuZ2lQ==}
@@ -8019,6 +8030,10 @@ snapshots:
   use-sync-external-store@1.6.0(react@19.2.4):
     dependencies:
       react: 19.2.4
+
+  valibot@1.2.0(typescript@5.4.2):
+    optionalDependencies:
+      typescript: 5.4.2
 
   vinext@0.0.18(next@16.1.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.13)(terser@5.46.0))(webpack@5.105.3):
     dependencies:
