@@ -106,7 +106,7 @@ export interface HandleAuthkitHeadersOptions {
 /**
  * Creates a NextResponse with properly merged AuthKit headers.
  */
-export function handleAuthkitHeaders(
+export function handleAuthkitProxy(
   request: NextRequest,
   authkitHeaders: Headers,
   options: HandleAuthkitHeadersOptions = {},
@@ -128,3 +128,6 @@ export function handleAuthkitHeaders(
 
   return applyResponseHeaders(NextResponse.next({ request: { headers: requestHeaders } }), responseHeaders);
 }
+
+/** @deprecated Use `handleAuthkitProxy` instead. */
+export const handleAuthkitHeaders: typeof handleAuthkitProxy = handleAuthkitProxy;

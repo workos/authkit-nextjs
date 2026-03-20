@@ -3,7 +3,7 @@ import { updateSessionMiddleware, updateSession } from './session.js';
 import { AuthkitMiddlewareOptions, AuthkitOptions, AuthkitResponse } from './interfaces.js';
 import { WORKOS_REDIRECT_URI } from './env-variables.js';
 
-export function authkitMiddleware({
+export function authkitProxy({
   debug = false,
   middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
   redirectUri = WORKOS_REDIRECT_URI,
@@ -14,6 +14,9 @@ export function authkitMiddleware({
     return updateSessionMiddleware(request, debug, middlewareAuth, redirectUri, signUpPaths, eagerAuth);
   };
 }
+
+/** @deprecated Use `authkitProxy` instead. */
+export const authkitMiddleware: typeof authkitProxy = authkitProxy;
 
 export async function authkit(request: NextRequest, options: AuthkitOptions = {}): Promise<AuthkitResponse> {
   return await updateSession(request, options);

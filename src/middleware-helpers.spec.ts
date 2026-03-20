@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   handleAuthkitHeaders,
+  handleAuthkitProxy,
   partitionAuthkitHeaders,
   applyResponseHeaders,
   isAuthkitRequestHeader,
@@ -226,6 +227,12 @@ describe('middleware-helpers', () => {
 
       expect(response.headers.get('vary')).toBe('Accept, Cookie');
       expect(response.headers.getSetCookie()).toHaveLength(2);
+    });
+  });
+
+  describe('handleAuthkitHeaders (deprecated alias)', () => {
+    it('should be the same function reference as handleAuthkitProxy', () => {
+      expect(handleAuthkitHeaders).toBe(handleAuthkitProxy);
     });
   });
 });
