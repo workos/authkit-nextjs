@@ -78,9 +78,10 @@ export async function refreshAccessTokenAction(): Promise<RefreshAccessTokenActi
     const auth = await refreshSession();
     return { accessToken: auth.accessToken };
   } catch (error) {
+    console.warn('Failed to refresh access token:', error instanceof Error ? error.message : String(error));
     return {
       accessToken: undefined,
-      error: error instanceof Error ? error.message : String(error),
+      error: 'Failed to refresh access token',
     };
   }
 }
