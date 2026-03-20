@@ -536,7 +536,10 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Now simulate network error during refresh
-      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: undefined, error: 'Failed to refresh access token' });
+      mockRefreshAccessTokenAction.mockResolvedValue({
+        accessToken: undefined,
+        error: 'Failed to refresh access token',
+      });
 
       try {
         await tokenStore.refreshToken();
