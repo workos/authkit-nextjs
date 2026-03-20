@@ -150,14 +150,21 @@ This library relies on Next.js proxy (called "middleware" in Next.js ≤15) to p
 **For Next.js 16+:** Create a `proxy.ts` file in the root of your project.
 **For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
 
-The code remains the same; only the filename and export name differ:
+```ts
+// proxy.ts (Next.js 16+)
+import { authkitProxy } from '@workos-inc/authkit-nextjs';
+
+export default authkitProxy();
+
+// Match against pages that require auth
+export const config = { matcher: ['/', '/admin'] };
+```
 
 ```ts
-// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
+// middleware.ts (Next.js ≤15)
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware();
-// For Next.js 16+, you can also use: export { default as proxy } from './proxy';
 
 // Match against pages that require auth
 export const config = { matcher: ['/', '/admin'] };

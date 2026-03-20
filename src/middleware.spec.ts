@@ -2,10 +2,6 @@ import { authkitMiddleware, authkitProxy } from './middleware.js';
 
 describe('middleware', () => {
   describe('authkitProxy', () => {
-    it('should be the same function reference as authkitMiddleware', () => {
-      expect(authkitProxy).toBe(authkitMiddleware);
-    });
-
     it('should return a middleware function when called with no options', () => {
       const middleware = authkitProxy();
       expect(typeof middleware).toBe('function');
@@ -18,6 +14,12 @@ describe('middleware', () => {
         signUpPaths: ['/sign-up'],
       });
       expect(typeof middleware).toBe('function');
+    });
+  });
+
+  describe('authkitMiddleware (deprecated alias)', () => {
+    it('should be the same function reference as authkitProxy', () => {
+      expect(authkitMiddleware).toBe(authkitProxy);
     });
   });
 });

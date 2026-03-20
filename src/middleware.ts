@@ -3,7 +3,7 @@ import { updateSessionMiddleware, updateSession } from './session.js';
 import { AuthkitMiddlewareOptions, AuthkitOptions, AuthkitResponse } from './interfaces.js';
 import { WORKOS_REDIRECT_URI } from './env-variables.js';
 
-export function authkitMiddleware({
+export function authkitProxy({
   debug = false,
   middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
   redirectUri = WORKOS_REDIRECT_URI,
@@ -15,11 +15,9 @@ export function authkitMiddleware({
   };
 }
 
+/** @deprecated Use `authkitProxy` instead. */
+export const authkitMiddleware: typeof authkitProxy = authkitProxy;
+
 export async function authkit(request: NextRequest, options: AuthkitOptions = {}): Promise<AuthkitResponse> {
   return await updateSession(request, options);
 }
-
-/**
- * Alias for `authkitMiddleware` that aligns with the Next.js 16+ `proxy.ts` convention.
- */
-export const authkitProxy: typeof authkitMiddleware = authkitMiddleware;

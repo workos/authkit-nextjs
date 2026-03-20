@@ -230,28 +230,9 @@ describe('middleware-helpers', () => {
     });
   });
 
-  describe('handleAuthkitProxy', () => {
-    it('should be the same function reference as handleAuthkitHeaders', () => {
-      expect(handleAuthkitProxy).toBe(handleAuthkitHeaders);
-    });
-
-    it('should work identically to handleAuthkitHeaders', () => {
-      const request = createMockRequest();
-      const response = handleAuthkitProxy(request, createAuthkitHeaders());
-
-      expect(response).toBeInstanceOf(NextResponse);
-      expect(response.status).toBe(200);
-      expect(response.headers.get('set-cookie')).toBe('wos-session=abc123; Path=/; HttpOnly');
-    });
-
-    it('should support redirect option', () => {
-      const request = createMockRequest('https://example.com/page');
-      const response = handleAuthkitProxy(request, createAuthkitHeaders(), {
-        redirect: '/login',
-      });
-
-      expect(response.status).toBe(307);
-      expect(response.headers.get('location')).toBe('https://example.com/login');
+  describe('handleAuthkitHeaders (deprecated alias)', () => {
+    it('should be the same function reference as handleAuthkitProxy', () => {
+      expect(handleAuthkitHeaders).toBe(handleAuthkitProxy);
     });
   });
 });
