@@ -1,17 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
-    "lib": ["DOM", "ESNext", "DOM.Iterable"],
+    "target": "ES2022",
+    "lib": ["DOM", "ESNext"],
     "jsx": "react",
     "sourceMap": true,
     "importHelpers": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    "alwaysStrict": true,
     "skipLibCheck": true,
-    "module": "ES2020",
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "rootDir": "./src"
   }
 }

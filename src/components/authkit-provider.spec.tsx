@@ -229,17 +229,20 @@ describe('AuthKitProvider', () => {
   });
 
   describe('window.location.reload behavior', () => {
-    let originalLocation: Location;
+    let originalLocationDescriptor: PropertyDescriptor | undefined;
 
     beforeEach(() => {
-      originalLocation = window.location;
-      // @ts-expect-error - deleting window.location to mock it
-      delete window.location;
-      window.location = { reload: vi.fn() } as unknown as Location;
+      originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { reload: vi.fn() },
+      });
     });
 
     afterEach(() => {
-      window.location = originalLocation;
+      if (originalLocationDescriptor) {
+        Object.defineProperty(window, 'location', originalLocationDescriptor);
+      }
     });
 
     it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
@@ -314,17 +317,20 @@ describe('useAuth', () => {
   });
 
   describe('client-side redirect for ensureSignedIn', () => {
-    let originalLocation: Location;
+    let originalLocationDescriptor: PropertyDescriptor | undefined;
 
     beforeEach(() => {
-      originalLocation = window.location;
-      // @ts-expect-error - deleting window.location to mock it
-      delete window.location;
-      window.location = { href: '' } as unknown as Location;
+      originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { href: '' },
+      });
     });
 
     afterEach(() => {
-      window.location = originalLocation;
+      if (originalLocationDescriptor) {
+        Object.defineProperty(window, 'location', originalLocationDescriptor);
+      }
     });
 
     it('should redirect via window.location.href when getAuthAction returns signInUrl', async () => {
