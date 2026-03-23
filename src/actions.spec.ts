@@ -44,8 +44,16 @@ describe('actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default mock implementations
-    vi.mocked(withAuth).mockResolvedValue({ user: 'testUser' as never, sessionId: 'session_123', accessToken: 'access_token' });
-    vi.mocked(refreshSession).mockResolvedValue({ user: 'testUser' as never, sessionId: 'session_123', accessToken: 'refreshed_token' });
+    vi.mocked(withAuth).mockResolvedValue({
+      user: 'testUser' as never,
+      sessionId: 'session_123',
+      accessToken: 'access_token',
+    });
+    vi.mocked(refreshSession).mockResolvedValue({
+      user: 'testUser' as never,
+      sessionId: 'session_123',
+      accessToken: 'refreshed_token',
+    });
   });
 
   describe('checkSessionAction', () => {
