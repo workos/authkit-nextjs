@@ -59,19 +59,24 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
   const [loading, setLoading] = useState(!initialAuth);
   const redirectingRef = useRef(false);
 
+  // Redirect client-side to avoid CORS errors that occur when redirect()
+  // is called from a server action to an external URL.
+  const handleSignInRedirect = useCallback((auth: Record<string, unknown>): boolean => {
+    if ('signInUrl' in auth && auth.signInUrl) {
+      redirectingRef.current = true;
+      window.location.href = auth.signInUrl as string;
+      return true;
+    }
+    return false;
+  }, []);
+
   const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
     if (redirectingRef.current) return;
     setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
 
-      // If the server returned a sign-in URL, redirect client-side to avoid
-      // CORS errors that occur when redirect() is called from a server action.
-      if ('signInUrl' in auth && auth.signInUrl) {
-        redirectingRef.current = true;
-        window.location.href = auth.signInUrl as string;
-        return;
-      }
+      if (handleSignInRedirect(auth)) return;
 
       setUser(auth.user);
       setSessionId(auth.sessionId);
@@ -121,13 +126,7 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
         setLoading(true);
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
 
-        // If the server returned a sign-in URL, redirect client-side to avoid
-        // CORS errors that occur when redirect() is called from a server action.
-        if ('signInUrl' in auth && auth.signInUrl) {
-          redirectingRef.current = true;
-          window.location.href = auth.signInUrl as string;
-          return;
-        }
+        if (handleSignInRedirect(auth)) return;
 
         setUser(auth.user);
         setSessionId(auth.sessionId);
