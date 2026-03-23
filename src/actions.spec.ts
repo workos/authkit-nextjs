@@ -44,8 +44,8 @@ describe('actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default mock implementations
-    vi.mocked(withAuth).mockResolvedValue({ user: 'testUser' as never, accessToken: 'access_token' });
-    vi.mocked(refreshSession).mockResolvedValue({ user: 'testUser' as never, accessToken: 'refreshed_token' });
+    vi.mocked(withAuth).mockResolvedValue({ user: 'testUser' as never, sessionId: 'session_123', accessToken: 'access_token' });
+    vi.mocked(refreshSession).mockResolvedValue({ user: 'testUser' as never, sessionId: 'session_123', accessToken: 'refreshed_token' });
   });
 
   describe('checkSessionAction', () => {
@@ -75,7 +75,7 @@ describe('actions', () => {
     it('should return auth details', async () => {
       const result = await getAuthAction();
       expect(withAuth).toHaveBeenCalled();
-      expect(result).toEqual({ user: 'testUser' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
 
     it('should not pass ensureSignedIn to withAuth', async () => {
@@ -93,7 +93,7 @@ describe('actions', () => {
     it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
       const result = await getAuthAction({ ensureSignedIn: true });
       expect(getAuthorizationUrl).not.toHaveBeenCalled();
-      expect(result).toEqual({ user: 'testUser' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });
 
@@ -102,7 +102,7 @@ describe('actions', () => {
       const params = { ensureSignedIn: false, organizationId: 'org_123' };
       const result = await refreshAuthAction(params);
       expect(refreshSession).toHaveBeenCalledWith({ organizationId: 'org_123' });
-      expect(result).toEqual({ user: 'testUser' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
 
     it('should not pass ensureSignedIn to refreshSession', async () => {
@@ -120,7 +120,7 @@ describe('actions', () => {
     it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
       const result = await refreshAuthAction({ ensureSignedIn: true });
       expect(getAuthorizationUrl).not.toHaveBeenCalled();
-      expect(result).toEqual({ user: 'testUser' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });
 
