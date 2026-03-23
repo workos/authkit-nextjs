@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   checkSessionAction,
   getAuthAction,
@@ -57,11 +57,27 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
   const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(initialAuth?.featureFlags);
   const [impersonator, setImpersonator] = useState<Impersonator | undefined>(initialAuth?.impersonator);
   const [loading, setLoading] = useState(!initialAuth);
+  const redirectingRef = useRef(false);
+
+  // Redirect client-side to avoid CORS errors that occur when redirect()
+  // is called from a server action to an external URL.
+  const handleSignInRedirect = useCallback((auth: Record<string, unknown>): boolean => {
+    if ('signInUrl' in auth && auth.signInUrl) {
+      redirectingRef.current = true;
+      window.location.href = auth.signInUrl as string;
+      return true;
+    }
+    return false;
+  }, []);
 
   const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+    if (redirectingRef.current) return;
     setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
+
+      if (handleSignInRedirect(auth)) return;
+
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -105,9 +121,12 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
 
   const refreshAuth = useCallback(
     async ({ ensureSignedIn = false, organizationId }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
+      if (redirectingRef.current) return;
       try {
         setLoading(true);
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+
+        if (handleSignInRedirect(auth)) return;
 
         setUser(auth.user);
         setSessionId(auth.sessionId);

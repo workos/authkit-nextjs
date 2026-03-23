@@ -313,6 +313,82 @@ describe('useAuth', () => {
     });
   });
 
+  describe('client-side redirect for ensureSignedIn', () => {
+    let originalLocation: Location;
+
+    beforeEach(() => {
+      originalLocation = window.location;
+      // @ts-expect-error - deleting window.location to mock it
+      delete window.location;
+      window.location = { href: '' } as unknown as Location;
+    });
+
+    afterEach(() => {
+      window.location = originalLocation;
+    });
+
+    it('should redirect via window.location.href when getAuthAction returns signInUrl', async () => {
+      // First call (initial load): no user, no signInUrl
+      // Second call (ensureSignedIn triggered): no user, signInUrl returned
+      (getAuthAction as Mock)
+        .mockResolvedValueOnce({ user: null })
+        .mockResolvedValueOnce({ user: null, signInUrl: 'https://api.workos.com/authorize?client_id=test' });
+
+      const TestComponent = () => {
+        const auth = useAuth({ ensureSignedIn: true });
+        return <div data-testid="loading">{auth.loading.toString()}</div>;
+      };
+
+      render(
+        <AuthKitProvider>
+          <TestComponent />
+        </AuthKitProvider>,
+      );
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://api.workos.com/authorize?client_id=test');
+      });
+    });
+
+    it('should redirect via window.location.href when refreshAuthAction returns signInUrl', async () => {
+      (getAuthAction as Mock).mockResolvedValueOnce({
+        user: { email: 'test@example.com' },
+        sessionId: 'test-session',
+      });
+      (refreshAuthAction as Mock).mockResolvedValueOnce({
+        user: null,
+        signInUrl: 'https://api.workos.com/authorize?client_id=refresh_test',
+      });
+
+      const TestComponent = () => {
+        const auth = useAuth();
+        return (
+          <div>
+            <button onClick={() => auth.refreshAuth({ ensureSignedIn: true })}>Refresh</button>
+          </div>
+        );
+      };
+
+      const { getByRole } = render(
+        <AuthKitProvider>
+          <TestComponent />
+        </AuthKitProvider>,
+      );
+
+      await waitFor(() => {
+        expect(getAuthAction).toHaveBeenCalledTimes(1);
+      });
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://api.workos.com/authorize?client_id=refresh_test');
+      });
+    });
+  });
+
   it('should throw error when used outside of AuthKitProvider', () => {
     const TestComponent = () => {
       const auth = useAuth();

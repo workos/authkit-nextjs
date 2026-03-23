@@ -3,6 +3,7 @@
 import { signOut, switchToOrganization } from './auth.js';
 import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
+import { getAuthorizationUrl } from './get-authorization-url.js';
 import { getWorkOS } from './workos.js';
 
 export interface RefreshAccessTokenActionResult {
@@ -40,7 +41,19 @@ export const getOrganizationAction = async (organizationId: string) => {
 };
 
 export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
-  return sanitize(await withAuth(options));
+  // Never pass ensureSignedIn to withAuth from a server action, because withAuth
+  // would call redirect() to an external URL, which causes CORS errors when
+  // invoked via a client-side fetch. Instead, return the sign-in URL so the
+  // client can redirect via window.location.href.
+  const auth = await withAuth();
+  const sanitized = sanitize(auth);
+
+  if (options?.ensureSignedIn && !auth.user) {
+    const signInUrl = await getAuthorizationUrl({ screenHint: 'sign-in' });
+    return { ...sanitized, signInUrl };
+  }
+
+  return sanitized;
 };
 
 export const refreshAuthAction = async ({
@@ -50,7 +63,17 @@ export const refreshAuthAction = async ({
   ensureSignedIn?: boolean;
   organizationId?: string;
 }) => {
-  return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+  // Never pass ensureSignedIn to refreshSession from a server action for the
+  // same CORS reason as getAuthAction above.
+  const auth = await refreshSession({ organizationId });
+  const sanitized = sanitize(auth);
+
+  if (ensureSignedIn && !auth.user) {
+    const signInUrl = await getAuthorizationUrl({ screenHint: 'sign-in' });
+    return { ...sanitized, signInUrl };
+  }
+
+  return sanitized;
 };
 
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {

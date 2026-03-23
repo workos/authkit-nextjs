@@ -150,7 +150,7 @@ describe('session.ts', () => {
       await withAuth({ ensureSignedIn: true });
 
       // The state is now sealed, se we need to unseal it
-      const redirectUrl = new URL((redirect as Mock).mock.calls[0][0]);
+      const redirectUrl = new URL((redirect as unknown as Mock).mock.calls[0][0]);
       const sealedState = redirectUrl.searchParams.get('state')!;
       const { returnPathname } = await getStateFromPKCECookieValue(sealedState);
 
