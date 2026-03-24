@@ -9,7 +9,7 @@ package-lock.json
 examples/next/.next
 examples/next/.env.local
 examples/next/next-env.d.ts
-examples/next/tsconfig.tsbuildinfo
+*.tsbuildinfo
 examples/vinext/.env.local
 examples/vinext/.dev.vars
 examples/vinext/.wrangler

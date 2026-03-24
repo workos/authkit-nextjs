@@ -3,7 +3,8 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "./dist/esm",
-    "declarationDir": "./dist/esm/types"
+    "declarationDir": "./dist/esm/types",
+    "types": ["node"]
   },
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "vitest.config.ts", "vitest.setup.ts", "/dist/**/*", "examples"]
 }
