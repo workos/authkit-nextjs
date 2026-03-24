@@ -1,7 +1,7 @@
-import NextLink from "next/link";
-import { withAuth } from "@workos-inc/authkit-nextjs";
-import { Button, Flex, Heading, Text } from "@radix-ui/themes";
-import { SignInButton } from "./components/sign-in-button";
+import NextLink from 'next/link';
+import { withAuth } from '@workos-inc/authkit-nextjs';
+import { Button, Flex, Heading, Text } from '@radix-ui/themes';
+import { SignInButton } from './components/sign-in-button';
 
 export default async function HomePage() {
   const { user } = await withAuth();
@@ -9,9 +9,7 @@ export default async function HomePage() {
     <Flex direction="column" align="center" gap="2">
       {user ? (
         <>
-          <Heading size="8">
-            Welcome back{user?.firstName && `, ${user?.firstName}`}
-          </Heading>
+          <Heading size="8">Welcome back{user?.firstName && `, ${user?.firstName}`}</Heading>
           <Text size="5" color="gray">
             You are now authenticated into the application
           </Text>
