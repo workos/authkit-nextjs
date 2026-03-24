@@ -56,8 +56,9 @@ export function partitionAuthkitHeaders(request: NextRequest, authkitHeaders: He
   const headers = new Headers(authkitHeaders);
   const requestHeaders = new Headers(request.headers);
 
-  // Strip any client-injected authkit headers, then apply trusted ones
-  for (const name of [...requestHeaders.keys()]) {
+  // Snapshot keys before iterating, since we delete headers during the loop
+  const requestHeaderKeys = Array.from(requestHeaders.keys());
+  for (const name of requestHeaderKeys) {
     if (isAuthkitRequestHeader(name)) {
       requestHeaders.delete(name);
     }
