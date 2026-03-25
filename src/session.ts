@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
-import { getCookieOptions, getJwtCookie } from './cookie.js';
+import { getCookieOptions, getJwtCookie, getPKCECookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
@@ -27,10 +27,7 @@ import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
 
 function appendPKCESetCookieHeader(headers: Headers, sealedState: string, requestUrl: string): void {
-  // 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
-  // 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
-  const options = getCookieOptions(requestUrl, true).replace(/SameSite=Strict/i, 'SameSite=Lax');
-  headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${sealedState}; ${options}`);
+  headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${sealedState}; ${getPKCECookieOptions(requestUrl, true)}`);
 }
 
 const sessionHeaderName = 'x-workos-session';

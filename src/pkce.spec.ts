@@ -46,6 +46,20 @@ describe('setPKCECookie SameSite override', () => {
     );
   });
 
+  it('should downgrade mixed-case Strict to lax', async () => {
+    const envVars = await import('./env-variables');
+    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'Strict' });
+
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state');
+
+    expect(mockSet).toHaveBeenCalledWith(
+      'wos-auth-verifier',
+      'sealed-state',
+      expect.objectContaining({ sameSite: 'lax' }),
+    );
+  });
+
   it('should default to lax when no SameSite configured', async () => {
     const { setPKCECookie } = await import('./pkce');
     await setPKCECookie('sealed-state');
