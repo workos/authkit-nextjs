@@ -2,6 +2,7 @@ packages:
   - '.'
   - 'examples/next/'
   - 'examples/vinext/'
+  - 'e2e/'
 
 approveBuilds: esbuild
 

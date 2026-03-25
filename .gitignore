@@ -15,3 +15,4 @@ examples/vinext/.dev.vars
 examples/vinext/.wrangler
 examples/vinext/worker
 examples/vinext/dist
+test-results/

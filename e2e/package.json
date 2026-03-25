@@ -1,0 +1,16 @@
+{
+  "name": "e2e-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "E2E_APPS=next,vinext playwright test",
+    "test:next": "E2E_APPS=next playwright test",
+    "test:vinext": "E2E_APPS=vinext playwright test",
+    "test:headed": "E2E_APPS=next playwright test --headed",
+    "test:ui": "E2E_APPS=next playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "workos": "link:../../cli/main"
+  }
+}
