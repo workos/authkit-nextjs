@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { Text, Heading, TextField, Flex, Box } from "@radix-ui/themes";
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
+import { Text, Heading, TextField, Flex, Box } from '@radix-ui/themes';
 
 export default function AccountPage() {
   const { user, loading } = useAuth();
@@ -15,10 +15,10 @@ export default function AccountPage() {
   }
 
   const userFields = [
-    ["First name", user?.firstName],
-    ["Last name", user?.lastName],
-    ["Email", user?.email],
-    ["Id", user?.id],
+    ['First name', user?.firstName],
+    ['Last name', user?.lastName],
+    ['Email', user?.email],
+    ['Id', user?.id],
   ].filter(([, value]) => value);
 
   return (
@@ -41,7 +41,7 @@ export default function AccountPage() {
               </Text>
 
               <Box flexGrow="1">
-                <TextField.Root value={String(value) || ""} readOnly />
+                <TextField.Root value={String(value) || ''} readOnly />
               </Box>
             </label>
           </Flex>

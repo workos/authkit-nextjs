@@ -32,12 +32,12 @@ This example demonstrates how to use [`@workos-inc/authkit-nextjs`](https://gith
 
    Required variables:
 
-   | Variable | Description |
-   |----------|-------------|
-   | `WORKOS_CLIENT_ID` | Your WorkOS Client ID |
-   | `WORKOS_API_KEY` | Your WorkOS API Key (secret) |
-   | `WORKOS_COOKIE_PASSWORD` | A random string of at least 32 characters for session encryption |
-   | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | OAuth callback URL (default: `http://localhost:3000/callback`) |
+   | Variable                          | Description                                                      |
+   | --------------------------------- | ---------------------------------------------------------------- |
+   | `WORKOS_CLIENT_ID`                | Your WorkOS Client ID                                            |
+   | `WORKOS_API_KEY`                  | Your WorkOS API Key (secret)                                     |
+   | `WORKOS_COOKIE_PASSWORD`          | A random string of at least 32 characters for session encryption |
+   | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | OAuth callback URL (default: `http://localhost:3000/callback`)   |
 
 3. In your WorkOS Dashboard, add `http://localhost:3000/callback` as a redirect URI.
 

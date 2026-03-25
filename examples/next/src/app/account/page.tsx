@@ -1,16 +1,16 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
-import { Text, Heading, TextField, Flex, Box } from "@radix-ui/themes";
+import { withAuth } from '@workos-inc/authkit-nextjs';
+import { Text, Heading, TextField, Flex, Box } from '@radix-ui/themes';
 
 export default async function AccountPage() {
   const { user, role, permissions } = await withAuth({ ensureSignedIn: true });
 
   const userFields = [
-    ["First name", user?.firstName],
-    ["Last name", user?.lastName],
-    ["Email", user?.email],
-    role ? ["Role", role] : [],
-    permissions ? ["Permissions", permissions] : [],
-    ["Id", user?.id],
+    ['First name', user?.firstName],
+    ['Last name', user?.lastName],
+    ['Email', user?.email],
+    role ? ['Role', role] : [],
+    permissions ? ['Permissions', permissions] : [],
+    ['Id', user?.id],
   ].filter((arr) => arr.length > 0);
 
   return (
@@ -34,7 +34,7 @@ export default async function AccountPage() {
                 </Text>
 
                 <Box flexGrow="1">
-                  <TextField.Root value={String(value) || ""} readOnly />
+                  <TextField.Root value={String(value) || ''} readOnly />
                 </Box>
               </label>
             </Flex>

@@ -31,10 +31,10 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
       data-workos-impersonation-root=""
       style={
         {
-          'position': 'fixed',
-          'inset': 0,
-          'pointerEvents': 'none',
-          'zIndex': 9999,
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 9999,
 
           // short properties with defaults for authoring convenience
           '--wi-minimized': '0',
@@ -53,14 +53,14 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
           {
             '--wi-frame-size':
               'calc(var(--wi-s) * (1 - var(--wi-minimized)) + var(--wi-minimized) * var(--wi-bw) * -1)',
-            'position': 'absolute',
-            'inset': 'calc(var(--wi-frame-size) * -1)',
-            'borderRadius': 'calc(var(--wi-frame-size) * 3)',
-            'boxShadow': `
+            position: 'absolute',
+            inset: 'calc(var(--wi-frame-size) * -1)',
+            borderRadius: 'calc(var(--wi-frame-size) * 3)',
+            boxShadow: `
 						inset 0 0 0 calc(var(--wi-frame-size) * 2) var(--wi-bgc),
 						inset 0 0 0 calc(var(--wi-frame-size) * 2 + var(--wi-bw)) var(--wi-bc)
 					`,
-            'transition': 'all 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'all 500ms cubic-bezier(0.16, 1, 0.3, 1)',
           } as React.CSSProperties
         }
       />

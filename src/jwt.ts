@@ -2,16 +2,16 @@
  * JWT (JSON Web Token) Interface Definitions
  */
 export interface JWTHeader {
-  'alg': string;
-  'typ'?: string | undefined;
-  'cty'?: string | undefined;
-  'crit'?: Array<string | Exclude<keyof JWTHeader, 'crit'>> | undefined;
-  'kid'?: string | undefined;
-  'jku'?: string | undefined;
-  'x5u'?: string | string[] | undefined;
+  alg: string;
+  typ?: string | undefined;
+  cty?: string | undefined;
+  crit?: Array<string | Exclude<keyof JWTHeader, 'crit'>> | undefined;
+  kid?: string | undefined;
+  jku?: string | undefined;
+  x5u?: string | string[] | undefined;
   'x5t#S256'?: string | undefined;
-  'x5t'?: string | undefined;
-  'x5c'?: string | string[] | undefined;
+  x5t?: string | undefined;
+  x5c?: string | string[] | undefined;
 }
 /**
  * JWT Payload Interface
