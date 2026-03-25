@@ -51,7 +51,7 @@ needsAuth.describe('organization switching', () => {
     await createMembership(userId, orgId);
   });
 
-  needsAuth('switch to organization completes without error', async ({ page, baseURL, signIn }) => {
+  needsAuth('switch to organization returns session with org context', async ({ page, baseURL, signIn }) => {
     await signIn();
 
     const orgId = await getOrgId();
@@ -61,6 +61,7 @@ needsAuth.describe('organization switching', () => {
     const body = await page.evaluate(() => document.body.textContent);
     const json = JSON.parse(body!);
     expect(json.switched).toBe(true);
+    expect(json.organizationId).toBe(orgId);
     expect(json.user.email).toBe('test@example.com');
   });
 
