@@ -17,6 +17,20 @@ export default async function globalSetup() {
           last_name: 'User',
           password: 'password',
           email_verified: true,
+          impersonator: { email: 'admin@example.com', reason: 'E2E testing' },
+        },
+        {
+          email: 'other@example.com',
+          first_name: 'Other',
+          last_name: 'Person',
+          password: 'password',
+          email_verified: true,
+        },
+      ],
+      organizations: [
+        {
+          name: 'Test Organization',
+          domains: [{ domain: 'example.com', state: 'verified' as const }],
         },
       ],
     },

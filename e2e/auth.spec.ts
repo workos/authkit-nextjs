@@ -49,9 +49,9 @@ test.describe('authentication flows', () => {
     await expect(page.getByText('Welcome back')).toBeVisible();
 
     // Click the sign out button in the main content area.
-    // signOut() deletes the session cookie then redirects to the WorkOS logout URL.
-    // The emulator doesn't implement the logout redirect endpoint, so we navigate
-    // back to the app afterward and verify the session was cleared.
+    // signOut() deletes the session cookie then redirects to the emulator's
+    // logout endpoint which revokes the session. Without a returnTo param,
+    // the emulator returns JSON, so we navigate back to verify session cleared.
     await page.getByRole('main').getByRole('button', { name: /sign out/i }).click();
     await page.waitForTimeout(1000);
     await page.goto(baseURL!);
