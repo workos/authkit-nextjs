@@ -33,7 +33,10 @@ describe('getStateFromPKCECookieValue', () => {
   });
 
   it('should throw when nonce is missing', async () => {
-    const sealed = await sealData({ codeVerifier: 'verifier-abc', returnPathname: '/dashboard' }, { password: PASSWORD });
+    const sealed = await sealData(
+      { codeVerifier: 'verifier-abc', returnPathname: '/dashboard' },
+      { password: PASSWORD },
+    );
 
     await expect(getStateFromPKCECookieValue(sealed)).rejects.toThrow();
   });
@@ -43,7 +46,10 @@ describe('getStateFromPKCECookieValue', () => {
   });
 
   it('should throw when sealed with a different password', async () => {
-    const sealed = await sealData({ nonce: 'test-nonce', codeVerifier: 'verifier-abc' }, { password: 'a-different-password-that-is-32-chars!' });
+    const sealed = await sealData(
+      { nonce: 'test-nonce', codeVerifier: 'verifier-abc' },
+      { password: 'a-different-password-that-is-32-chars!' },
+    );
 
     await expect(getStateFromPKCECookieValue(sealed)).rejects.toThrow();
   });

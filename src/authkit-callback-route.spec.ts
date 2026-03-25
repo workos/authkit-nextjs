@@ -181,7 +181,11 @@ describe('authkit-callback-route', () => {
     it('should handle state parameter with returnPathname', async () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier', returnPathname: '/custom-path' });
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/custom-path',
+      });
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', sealedState);
 
@@ -369,7 +373,11 @@ describe('authkit-callback-route', () => {
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // State with only returnPathname
-      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier', returnPathname: '/profile' });
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/profile',
+      });
 
       request.nextUrl.searchParams.set('code', 'test-code');
       request.nextUrl.searchParams.set('state', sealedState);
@@ -436,7 +444,10 @@ describe('authkit-callback-route', () => {
       });
 
       it('should reject when state is present but no cookie exists', async () => {
-        const sealedState = await sealData({ nonce: 'foo', codeVerifier: 'test-verifier' }, { password: process.env.WORKOS_COOKIE_PASSWORD! });
+        const sealedState = await sealData(
+          { nonce: 'foo', codeVerifier: 'test-verifier' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
         request.nextUrl.searchParams.set('code', 'test-code');
         request.nextUrl.searchParams.set('state', sealedState);
 
