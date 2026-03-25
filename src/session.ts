@@ -27,8 +27,9 @@ import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
 
 function appendPKCESetCookieHeader(headers: Headers, sealedState: string, requestUrl: string): void {
-  // Force SameSite=Lax: the PKCE cookie must survive the cross-site redirect back from WorkOS
-  const options = getCookieOptions(requestUrl, true).replace(/SameSite=\w+/, 'SameSite=Lax');
+  // 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
+  // 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
+  const options = getCookieOptions(requestUrl, true).replace(/SameSite=Strict/i, 'SameSite=Lax');
   headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${sealedState}; ${options}`);
 }
 

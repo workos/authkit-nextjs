@@ -27,8 +27,8 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     // Always delete the PKCE cookie after handling the callback, regardless of success or error
     // to avoid stale cookies affecting future auth attempts & prevent replays
-    // Force SameSite=Lax to match the PKCE cookie's forced SameSite=Lax (must match to delete)
-    const deleteCookie = `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true).replace(/SameSite=\w+/, 'SameSite=Lax')}`;
+    // Match the PKCE cookie's SameSite override: downgrade 'strict' to 'lax', preserve 'none'.
+    const deleteCookie = `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true).replace(/SameSite=Strict/i, 'SameSite=Lax')}`;
 
     // We want to catch any & all errors and respond the same way
     // Firstly, by destroying the 1-use PKCE cookie to prevent replay attacks

@@ -14,13 +14,14 @@ const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
  */
 export async function setPKCECookie(sealedState: string): Promise<void> {
   const nextCookies = await cookies();
-  const { domain, path, secure } = getCookieOptions();
+  const { domain, path, sameSite, secure } = getCookieOptions();
 
   nextCookies.set(PKCE_COOKIE_NAME, sealedState, {
     domain,
     path,
-    // Must be 'lax' — 'strict' blocks the cookie on the cross-site redirect back from WorkOS
-    sameSite: 'lax',
+    // 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
+    // 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
+    sameSite: sameSite === 'strict' ? 'lax' : sameSite,
     secure,
     httpOnly: true,
     maxAge: PKCE_COOKIE_MAX_AGE,
