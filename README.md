@@ -695,16 +695,18 @@ import { useAccessToken } from '@workos-inc/authkit-nextjs/components';
 function MyComponent() {
   const { getAccessToken } = useAccessToken();
 
-  // Token is available immediately on initial page load
-  const token = getAccessToken();
+  async function handleClick() {
+    // Token is available immediately on initial page load
+    const token = await getAccessToken();
 
-  // Use with third-party services that need immediate token access
-  if (token) {
-    // Initialize your third-party client with the token
-    thirdPartyClient.authenticate(token);
+    // Use with third-party services that need immediate token access
+    if (token) {
+      // Initialize your third-party client with the token
+      thirdPartyClient.authenticate(token);
+    }
   }
 
-  return <div>...</div>;
+  return <button onClick={handleClick}>Authenticate</button>;
 }
 ```
 
