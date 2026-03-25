@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getCookieOptions } from './cookie.js';
+import { getPKCECookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getStateFromPKCECookieValue } from './pkce.js';
@@ -27,7 +27,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     // Always delete the PKCE cookie after handling the callback, regardless of success or error
     // to avoid stale cookies affecting future auth attempts & prevent replays
-    const deleteCookie = `${PKCE_COOKIE_NAME}=; ${getCookieOptions(request.url, true, true)}`;
+    const deleteCookie = `${PKCE_COOKIE_NAME}=; ${getPKCECookieOptions(request.url, true, true)}`;
 
     // We want to catch any & all errors and respond the same way
     // Firstly, by destroying the 1-use PKCE cookie to prevent replay attacks

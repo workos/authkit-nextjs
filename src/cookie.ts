@@ -92,6 +92,35 @@ export function getCookieOptions(
   };
 }
 
+/**
+ * Cookie options for the PKCE verifier cookie.
+ * 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
+ * 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
+ */
+export function getPKCECookieOptions(): CookieOptions;
+export function getPKCECookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
+export function getPKCECookieOptions(
+  redirectUri?: string | null,
+  asString?: boolean,
+  expired?: boolean,
+): CookieOptions | string;
+export function getPKCECookieOptions(
+  redirectUri?: string | null,
+  asString: boolean = false,
+  expired: boolean = false,
+): CookieOptions | string {
+  if (asString) {
+    const options = getCookieOptions(redirectUri, true, expired);
+    return options.replace(/SameSite=Strict/i, 'SameSite=Lax');
+  }
+
+  const options = getCookieOptions(redirectUri);
+  return {
+    ...options,
+    sameSite: options.sameSite.toLowerCase() === 'strict' ? 'lax' : options.sameSite,
+  };
+}
+
 export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: string | null, expired?: boolean): string {
   const cookie = `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`;
 

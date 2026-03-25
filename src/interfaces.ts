@@ -66,7 +66,7 @@ export const StateSchema = v.object({
   nonce: v.string(),
   customState: v.optional(v.string()),
   returnPathname: v.optional(v.string()),
-  codeVerifier: v.optional(v.string()),
+  codeVerifier: v.string(),
 });
 
 export type State = v.InferOutput<typeof StateSchema>;
