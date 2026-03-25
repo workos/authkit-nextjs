@@ -15,6 +15,10 @@ const sharedEnv: Record<string, string> = {
   WORKOS_COOKIE_PASSWORD: 'a-sufficiently-long-password-for-iron-session!!',
 };
 
+// Move .env.local aside so test env vars aren't overridden by developer credentials.
+// Restored by global-teardown.ts after tests complete.
+const moveEnvAside = 'if [ -f .env.local ]; then mv .env.local .env.local.bak; fi';
+
 interface AppConfig {
   name: string;
   port: number;
@@ -27,15 +31,15 @@ const appConfigs: Record<string, AppConfig> = {
   next: {
     name: 'next',
     port: NEXT_PORT,
-    buildCommand: 'pnpm run build',
+    buildCommand: `${moveEnvAside} && pnpm run build`,
     startCommand: `pnpm exec next start -p ${NEXT_PORT}`,
     cwd: '../examples/next',
   },
   vinext: {
     name: 'vinext',
     port: VINEXT_PORT,
-    buildCommand: 'pnpm run build',
-    startCommand: `pnpm exec vinext start --port ${VINEXT_PORT}`,
+    buildCommand: moveEnvAside,
+    startCommand: `pnpm exec vinext dev -p ${VINEXT_PORT}`,
     cwd: '../examples/vinext',
   },
 };

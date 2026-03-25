@@ -1,5 +1,20 @@
 import { test, expect } from './fixtures.js';
 
+// vinext's redirect() shim doesn't propagate Set-Cookie headers from cookies().set(),
+// so the PKCE cookie is lost during the sign-in redirect chain. Tests that require
+// authentication are skipped for vinext until this is resolved upstream.
+const needsAuth = test.extend<{ requiresAuth: void }>({
+  requiresAuth: [
+    async ({}, use, testInfo) => {
+      if (testInfo.project.name === 'vinext') {
+        testInfo.skip(true, 'vinext does not propagate cookies on redirect');
+      }
+      await use();
+    },
+    { auto: true },
+  ],
+});
+
 test.describe('authentication flows', () => {
   test('unauthenticated home page shows sign-in prompt', async ({ page, baseURL }) => {
     await page.goto(baseURL!);
@@ -8,13 +23,13 @@ test.describe('authentication flows', () => {
     await expect(page.getByText('Welcome back')).not.toBeVisible();
   });
 
-  test('sign-in flow authenticates and shows welcome message', async ({ page, signIn }) => {
+  needsAuth('sign-in flow authenticates and shows welcome message', async ({ page, signIn }) => {
     await signIn();
     await expect(page.getByText('Welcome back')).toBeVisible();
     await expect(page.getByText('Test')).toBeVisible();
   });
 
-  test('authenticated user can view account page', async ({ page, baseURL, signIn }) => {
+  needsAuth('authenticated user can view account page', async ({ page, baseURL, signIn }) => {
     await signIn();
     await page.goto(`${baseURL}/account`);
     await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible();
@@ -29,7 +44,7 @@ test.describe('authentication flows', () => {
     await expect(page.getByRole('heading', { name: 'Account details' })).not.toBeVisible();
   });
 
-  test('sign-out clears session', async ({ page, baseURL, signIn }) => {
+  needsAuth('sign-out clears session', async ({ page, baseURL, signIn }) => {
     await signIn();
     await expect(page.getByText('Welcome back')).toBeVisible();
 
