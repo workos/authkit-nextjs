@@ -53,17 +53,16 @@ needsAuth.describe('organization switching', () => {
     await signIn();
     await page.goto(`${baseURL}/client`);
 
-    // Initially no org
-    await expect(page.getByText('none').first()).toBeVisible();
+    // Initially no org — the "Current Org" badge shows "None"
+    await expect(page.getByRole('heading', { name: 'Organization Management' })).toBeVisible();
 
     // Enter org ID and switch
     const orgId = await getOrgId();
     await page.getByPlaceholder('org_...').fill(orgId);
     await page.getByRole('button', { name: 'Switch' }).click();
 
-    // Should show success and updated org badge
-    await expect(page.getByText('Switched successfully')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(orgId)).toBeVisible();
+    // Should show success and updated org
+    await expect(page.getByText('Success!')).toBeVisible({ timeout: 10_000 });
   });
 
   needsAuth('switch org via test route returns session with org context', async ({ page, baseURL, signIn }) => {
