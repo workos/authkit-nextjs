@@ -3,6 +3,61 @@ import { getStateFromPKCECookieValue } from './pkce.js';
 
 const PASSWORD = process.env.WORKOS_COOKIE_PASSWORD!;
 
+describe('setPKCECookie SameSite override', () => {
+  const mockSet = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    vi.doMock('next/headers', () => ({
+      cookies: async () => ({ set: mockSet, get: vi.fn(), getAll: vi.fn(), delete: vi.fn() }),
+      headers: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }),
+    }));
+    vi.doMock('./env-variables', async (importOriginal) => {
+      return { ...(await importOriginal<typeof import('./env-variables')>()) };
+    });
+  });
+
+  it('should downgrade strict to lax', async () => {
+    const envVars = await import('./env-variables');
+    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
+
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state');
+
+    expect(mockSet).toHaveBeenCalledWith(
+      'wos-auth-verifier',
+      'sealed-state',
+      expect.objectContaining({ sameSite: 'lax' }),
+    );
+  });
+
+  it('should preserve none for iframe/cross-origin flows', async () => {
+    const envVars = await import('./env-variables');
+    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
+
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state');
+
+    expect(mockSet).toHaveBeenCalledWith(
+      'wos-auth-verifier',
+      'sealed-state',
+      expect.objectContaining({ sameSite: 'none' }),
+    );
+  });
+
+  it('should default to lax when no SameSite configured', async () => {
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state');
+
+    expect(mockSet).toHaveBeenCalledWith(
+      'wos-auth-verifier',
+      'sealed-state',
+      expect.objectContaining({ sameSite: 'lax' }),
+    );
+  });
+});
+
 describe('getStateFromPKCECookieValue', () => {
   it('should unseal and validate a valid state', async () => {
     const sealed = await sealData(
