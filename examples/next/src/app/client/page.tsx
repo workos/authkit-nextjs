@@ -38,12 +38,16 @@ export default function ClientPage() {
 
   const [orgIdInput, setOrgIdInput] = useState("");
   const [switchOrgResult, setSwitchOrgResult] = useState<string | null>(null);
+  const [refreshResult, setRefreshResult] = useState<string | null>(null);
 
   const handleRefreshToken = async () => {
+    setRefreshResult(null);
     try {
       await refresh();
+      setRefreshResult("Token refreshed successfully");
     } catch (err) {
-      console.error("Token refresh failed:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      setRefreshResult(`Error: ${message}`);
     }
   };
 
@@ -275,6 +279,13 @@ export default function ClientPage() {
               Refresh Token
             </Button>
           </Flex>
+          {refreshResult && (
+            <Callout.Root
+              color={refreshResult.startsWith("Error") ? "red" : "green"}
+            >
+              <Callout.Text>{refreshResult}</Callout.Text>
+            </Callout.Root>
+          )}
         </Flex>
       </Flex>
 

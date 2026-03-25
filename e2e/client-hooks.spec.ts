@@ -43,11 +43,11 @@ test.describe('client-side hooks', () => {
     await signIn();
     await page.goto(`${baseURL}/client`);
 
-    // Token should be available before refresh
     await expect(page.getByText('Available')).toBeVisible();
     await page.getByRole('button', { name: 'Refresh Token' }).click();
-    // Token should still be available after refresh
-    await expect(page.getByText('Available')).toBeVisible();
+
+    // Should show success message, not an error
+    await expect(page.getByText('Token refreshed successfully')).toBeVisible({ timeout: 5000 });
   });
 
   needsAuth('useAuth updates after sign-out', async ({ page, baseURL, signIn }) => {
