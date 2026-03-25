@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.0.0](https://github.com/workos/authkit-nextjs/compare/v2.17.0...v3.0.0) (2026-03-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* add OAuth state verification on callback to prevent CSRF attacks ([#388](https://github.com/workos/authkit-nextjs/issues/388))
+
+### Features
+
+* add OAuth state verification on callback to prevent CSRF attacks ([#388](https://github.com/workos/authkit-nextjs/issues/388)) ([ebef6e7](https://github.com/workos/authkit-nextjs/commit/ebef6e7b51556bf08b1714e2d3f5765a59d9c7f0))
+* **middleware:** add authkitProxy and handleAuthkitProxy aliases for proxy.ts ([#384](https://github.com/workos/authkit-nextjs/issues/384)) ([4c3f27b](https://github.com/workos/authkit-nextjs/commit/4c3f27b40c9a4ea295ef002dd0a2c32b9740f1ae))
+
+
+### Bug Fixes
+
+* **actions:** catch TokenRefreshError in refreshAccessTokenAction to prevent 500s ([#383](https://github.com/workos/authkit-nextjs/issues/383)) ([5c46c39](https://github.com/workos/authkit-nextjs/commit/5c46c394fe00b9552665b51ca42b23d00416c704))
+* **auth:** return signInUrl from server actions to avoid CORS errors ([#386](https://github.com/workos/authkit-nextjs/issues/386)) ([7d52400](https://github.com/workos/authkit-nextjs/commit/7d52400b8e62bc9d1a4f40b3400ae7586e511098))
+* harden PKCE/CSRF for v3.0.0 release ([#398](https://github.com/workos/authkit-nextjs/issues/398)) ([8054829](https://github.com/workos/authkit-nextjs/commit/80548297ac45f15f0774b84e5981b80009412b8b))
+
 ## [2.17.0](https://github.com/workos/authkit-nextjs/compare/v2.16.1...v2.17.0) (2026-03-13)
 
 
