@@ -7,6 +7,7 @@ export const config = {
   matcher: [
     '/',
     '/account/:path*',
+    '/client/:path*',
     '/api/:path*',
     '/test-session-error/:path*',
     '/test-refresh/:path*',

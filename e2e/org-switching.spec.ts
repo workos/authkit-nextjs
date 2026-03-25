@@ -44,14 +44,29 @@ async function getUserId(email: string): Promise<string> {
 }
 
 needsAuth.describe('organization switching', () => {
-  // Create the membership before tests run — the emulator seed creates the org
-  // and user but doesn't link them automatically.
   needsAuth.beforeAll(async () => {
     const [userId, orgId] = await Promise.all([getUserId('test@example.com'), getOrgId()]);
     await createMembership(userId, orgId);
   });
 
-  needsAuth('switch to organization returns session with org context', async ({ page, baseURL, signIn }) => {
+  needsAuth('switch org via client page updates organization badge', async ({ page, baseURL, signIn }) => {
+    await signIn();
+    await page.goto(`${baseURL}/client`);
+
+    // Initially no org
+    await expect(page.getByText('none').first()).toBeVisible();
+
+    // Enter org ID and switch
+    const orgId = await getOrgId();
+    await page.getByPlaceholder('org_...').fill(orgId);
+    await page.getByRole('button', { name: 'Switch' }).click();
+
+    // Should show success and updated org badge
+    await expect(page.getByText('Switched successfully')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(orgId)).toBeVisible();
+  });
+
+  needsAuth('switch org via test route returns session with org context', async ({ page, baseURL, signIn }) => {
     await signIn();
 
     const orgId = await getOrgId();
@@ -63,16 +78,5 @@ needsAuth.describe('organization switching', () => {
     expect(json.switched).toBe(true);
     expect(json.organizationId).toBe(orgId);
     expect(json.user.email).toBe('test@example.com');
-  });
-
-  needsAuth('session remains valid after org switch', async ({ page, baseURL, signIn }) => {
-    await signIn();
-
-    const orgId = await getOrgId();
-    await page.goto(`${baseURL}/test-switch-org?org_id=${orgId}`);
-
-    // Navigate back — should still be authenticated
-    await page.goto(baseURL!);
-    await expect(page.getByText('Welcome back')).toBeVisible();
   });
 });

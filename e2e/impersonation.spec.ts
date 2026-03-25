@@ -41,7 +41,8 @@ needsAuth.describe('impersonation', () => {
     const banner = page.locator('[data-workos-impersonation-root]');
     await expect(banner).toBeVisible();
 
-    // Click "Stop" to end impersonation (triggers sign-out)
+    // Click "Stop" to end impersonation — the Impersonation component's sign-out
+    // doesn't pass returnTo, so the emulator returns JSON. Navigate back manually.
     await banner.getByRole('button', { name: 'Stop' }).click();
     await page.waitForTimeout(1000);
     await page.goto(baseURL!);

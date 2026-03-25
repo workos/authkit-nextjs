@@ -50,7 +50,7 @@ test.describe('authentication flows', () => {
 
     // Click the sign out button in the main content area.
     // signOut() deletes the session cookie then redirects to the emulator's
-    // logout endpoint which revokes the session. Without a returnTo param,
+    // logout endpoint which revokes the session. Without a full returnTo URL,
     // the emulator returns JSON, so we navigate back to verify session cleared.
     await page.getByRole('main').getByRole('button', { name: /sign out/i }).click();
     await page.waitForTimeout(1000);

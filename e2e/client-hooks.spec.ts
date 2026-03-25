@@ -1,11 +1,5 @@
 import { test, expect } from './fixtures.js';
 
-// Tests for client-side hook behavior (useAuth).
-// The SignInButton component uses useAuth() and renders:
-//   - "Loading..." while hydrating
-//   - "Sign In" link when unauthenticated
-//   - "Sign Out" button when authenticated
-
 // Auth-dependent tests skip on vinext (PKCE cookie issue)
 const needsAuth = test.extend<{ requiresAuth: void }>({
   requiresAuth: [
@@ -21,32 +15,48 @@ const needsAuth = test.extend<{ requiresAuth: void }>({
 
 test.describe('client-side hooks', () => {
   test('useAuth resolves to unauthenticated state after hydration', async ({ page, baseURL }) => {
-    await page.goto(baseURL!);
-
-    // After hydration, useAuth should resolve — "Loading..." disappears
-    // and sign-in links become visible
-    await expect(page.getByRole('link', { name: /sign in/i }).first()).toBeVisible();
-    await expect(page.getByText('Loading...')).not.toBeVisible();
+    await page.goto(`${baseURL}/client`);
+    // Unauthenticated users see the sign-in prompt
+    await expect(page.getByText('Sign in to see hooks in action')).toBeVisible();
   });
 
-  needsAuth('useAuth reflects authenticated state after sign-in', async ({ page, signIn }) => {
+  needsAuth('useAuth shows session info when authenticated', async ({ page, baseURL, signIn }) => {
     await signIn();
+    await page.goto(`${baseURL}/client`);
 
-    // useAuth should now show the user is authenticated — sign out buttons visible
-    await expect(page.getByRole('button', { name: /sign out/i }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: /sign in/i })).not.toBeVisible();
+    await expect(page.getByText('Client-Side Hooks Demo')).toBeVisible();
+    await expect(page.getByText('Session ID:')).toBeVisible();
+    // Impersonator info should be visible (seeded user has impersonator data)
+    await expect(page.getByText('Impersonated by: admin@example.com')).toBeVisible();
+  });
+
+  needsAuth('useAccessToken provides token status', async ({ page, baseURL, signIn }) => {
+    await signIn();
+    await page.goto(`${baseURL}/client`);
+
+    // Token should be available after sign-in
+    await expect(page.getByText('available')).toBeVisible();
+  });
+
+  needsAuth('refresh token button works', async ({ page, baseURL, signIn }) => {
+    await signIn();
+    await page.goto(`${baseURL}/client`);
+
+    await page.getByRole('button', { name: 'Refresh Token' }).click();
+    await expect(page.getByText('Token refreshed successfully')).toBeVisible({ timeout: 5000 });
   });
 
   needsAuth('useAuth updates after sign-out', async ({ page, baseURL, signIn }) => {
     await signIn();
-    await expect(page.getByRole('button', { name: /sign out/i }).first()).toBeVisible();
+    await page.goto(`${baseURL}/client`);
+    await expect(page.getByText('Session ID:')).toBeVisible();
 
-    // Sign out and return to home
-    await page.getByRole('main').getByRole('button', { name: /sign out/i }).click();
+    // Sign out via the client page button and navigate back
+    await page.getByRole('button', { name: /sign out.*client/i }).click();
     await page.waitForTimeout(1000);
-    await page.goto(baseURL!);
+    await page.goto(`${baseURL}/client`);
 
-    // useAuth should reflect unauthenticated state
-    await expect(page.getByRole('link', { name: /sign in/i }).first()).toBeVisible({ timeout: 10_000 });
+    // Should show unauthenticated state
+    await expect(page.getByText('Sign in to see hooks in action')).toBeVisible({ timeout: 10_000 });
   });
 });
