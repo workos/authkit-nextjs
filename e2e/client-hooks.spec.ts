@@ -44,10 +44,15 @@ test.describe('client-side hooks', () => {
     await page.goto(`${baseURL}/client`);
     await expect(page.getByText('Session ID:')).toBeVisible();
 
-    await page.getByRole('main').getByRole('button', { name: /sign out/i }).click();
+    await page
+      .getByRole('main')
+      .getByRole('button', { name: /sign out/i })
+      .click();
     await page.waitForTimeout(1000);
     await page.goto(`${baseURL}/client`);
 
-    await expect(page.getByText('Please sign in to see the client-side hooks in action.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Please sign in to see the client-side hooks in action.')).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

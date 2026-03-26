@@ -17,7 +17,9 @@ needsAuth.describe('multi-user support', () => {
   needsAuth('login_hint selects a specific user', async ({ page, baseURL }) => {
     // Sign in as the second seeded user via login_hint
     await page.goto(`${baseURL}/login?login_hint=other@example.com`);
-    await page.waitForURL((url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'));
+    await page.waitForURL(
+      (url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'),
+    );
 
     await expect(page.getByText('Welcome back')).toBeVisible({ timeout: 10_000 });
     // Should see "Other" (the second user's first name), not "Test"
@@ -27,7 +29,9 @@ needsAuth.describe('multi-user support', () => {
   needsAuth('different users see different account details', async ({ page, baseURL }) => {
     // Sign in as the second user
     await page.goto(`${baseURL}/login?login_hint=other@example.com`);
-    await page.waitForURL((url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'));
+    await page.waitForURL(
+      (url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'),
+    );
     await expect(page.getByText('Welcome back')).toBeVisible({ timeout: 10_000 });
 
     // Account page should show the second user's details
@@ -42,14 +46,18 @@ needsAuth.describe('multi-user support', () => {
     const contextA = await browser.newContext();
     const pageA = await contextA.newPage();
     await pageA.goto(`${baseURL}/login`);
-    await pageA.waitForURL((url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'));
+    await pageA.waitForURL(
+      (url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'),
+    );
     await expect(pageA.getByText('Welcome back')).toBeVisible({ timeout: 10_000 });
 
     // Sign in as second user in context B
     const contextB = await browser.newContext();
     const pageB = await contextB.newPage();
     await pageB.goto(`${baseURL}/login?login_hint=other@example.com`);
-    await pageB.waitForURL((url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'));
+    await pageB.waitForURL(
+      (url) => !url.pathname.includes('/callback') && !url.href.includes('/user_management/authorize'),
+    );
     await expect(pageB.getByText('Welcome back')).toBeVisible({ timeout: 10_000 });
 
     // Verify they see different users

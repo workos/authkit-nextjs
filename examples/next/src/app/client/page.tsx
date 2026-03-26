@@ -1,42 +1,15 @@
-"use client";
+'use client';
 
-import {
-  Badge,
-  Box,
-  Button,
-  Callout,
-  Code,
-  Flex,
-  Heading,
-  Text,
-  TextField,
-} from "@radix-ui/themes";
-import {
-  useAuth,
-  useAccessToken,
-} from "@workos-inc/authkit-nextjs/components";
-import { useState } from "react";
+import { Badge, Box, Button, Callout, Code, Flex, Heading, Text, TextField } from '@radix-ui/themes';
+import { useAuth, useAccessToken } from '@workos-inc/authkit-nextjs/components';
+import { useState } from 'react';
 
 export default function ClientPage() {
-  const {
-    user,
-    loading,
-    sessionId,
-    organizationId,
-    role,
-    permissions,
-    impersonator,
-    signOut,
-    switchToOrganization,
-  } = useAuth();
-  const {
-    accessToken,
-    loading: tokenLoading,
-    error: tokenError,
-    refresh,
-  } = useAccessToken();
+  const { user, loading, sessionId, organizationId, role, permissions, impersonator, signOut, switchToOrganization } =
+    useAuth();
+  const { accessToken, loading: tokenLoading, error: tokenError, refresh } = useAccessToken();
 
-  const [orgIdInput, setOrgIdInput] = useState("");
+  const [orgIdInput, setOrgIdInput] = useState('');
   const [switchOrgResult, setSwitchOrgResult] = useState<string | null>(null);
   const [refreshResult, setRefreshResult] = useState<string | null>(null);
 
@@ -44,7 +17,7 @@ export default function ClientPage() {
     setRefreshResult(null);
     try {
       await refresh();
-      setRefreshResult("Token refreshed successfully");
+      setRefreshResult('Token refreshed successfully');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setRefreshResult(`Error: ${message}`);
@@ -53,24 +26,24 @@ export default function ClientPage() {
 
   const handleClientSignOut = async () => {
     try {
-      await signOut({ returnTo: "/" });
+      await signOut({ returnTo: '/' });
     } catch (err) {
-      console.error("signOut() failed:", err);
+      console.error('signOut() failed:', err);
     }
   };
 
   const handleSwitchOrg = async () => {
     if (!orgIdInput.trim()) {
-      setSwitchOrgResult("Please enter an organization ID");
+      setSwitchOrgResult('Please enter an organization ID');
       return;
     }
     setSwitchOrgResult(null);
     try {
       const result = await switchToOrganization(orgIdInput.trim());
-      if (result && "error" in result) {
+      if (result && 'error' in result) {
         setSwitchOrgResult(`Error: ${result.error}`);
       } else {
-        setSwitchOrgResult("Success! Check updated claims above.");
+        setSwitchOrgResult('Success! Check updated claims above.');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -93,13 +66,10 @@ export default function ClientPage() {
           Client-Side Hooks Demo
         </Heading>
         <Text size="5" align="center" color="gray">
-          This page demonstrates the client-side hooks from{" "}
-          <Code>@workos-inc/authkit-nextjs/components</Code>
+          This page demonstrates the client-side hooks from <Code>@workos-inc/authkit-nextjs/components</Code>
         </Text>
         <Callout.Root>
-          <Callout.Text>
-            Please sign in to see the client-side hooks in action.
-          </Callout.Text>
+          <Callout.Text>Please sign in to see the client-side hooks in action.</Callout.Text>
         </Callout.Root>
       </Flex>
     );
@@ -118,9 +88,8 @@ export default function ClientPage() {
 
       <Callout.Root>
         <Callout.Text>
-          This page uses client-side React hooks to access authentication data.
-          Unlike server components, these hooks work in client components and
-          automatically update when auth state changes.
+          This page uses client-side React hooks to access authentication data. Unlike server components, these hooks
+          work in client components and automatically update when auth state changes.
         </Callout.Text>
       </Callout.Root>
 
@@ -132,62 +101,38 @@ export default function ClientPage() {
             <Text weight="bold" style={{ width: 150 }}>
               User ID:
             </Text>
-            <TextField.Root
-              value={user.id}
-              readOnly
-              style={{ flexGrow: 1 }}
-            />
+            <TextField.Root value={user.id} readOnly style={{ flexGrow: 1 }} />
           </Flex>
           <Flex align="center" gap="2">
             <Text weight="bold" style={{ width: 150 }}>
               Email:
             </Text>
-            <TextField.Root
-              value={user.email}
-              readOnly
-              style={{ flexGrow: 1 }}
-            />
+            <TextField.Root value={user.email} readOnly style={{ flexGrow: 1 }} />
           </Flex>
           <Flex align="center" gap="2">
             <Text weight="bold" style={{ width: 150 }}>
               First Name:
             </Text>
-            <TextField.Root
-              value={user.firstName || ""}
-              readOnly
-              style={{ flexGrow: 1 }}
-            />
+            <TextField.Root value={user.firstName || ''} readOnly style={{ flexGrow: 1 }} />
           </Flex>
           <Flex align="center" gap="2">
             <Text weight="bold" style={{ width: 150 }}>
               Last Name:
             </Text>
-            <TextField.Root
-              value={user.lastName || ""}
-              readOnly
-              style={{ flexGrow: 1 }}
-            />
+            <TextField.Root value={user.lastName || ''} readOnly style={{ flexGrow: 1 }} />
           </Flex>
           <Flex align="center" gap="2">
             <Text weight="bold" style={{ width: 150 }}>
               Session ID:
             </Text>
-            <TextField.Root
-              value={sessionId || ""}
-              readOnly
-              style={{ flexGrow: 1 }}
-            />
+            <TextField.Root value={sessionId || ''} readOnly style={{ flexGrow: 1 }} />
           </Flex>
           {organizationId && (
             <Flex align="center" gap="2">
               <Text weight="bold" style={{ width: 150 }}>
                 Organization ID:
               </Text>
-              <TextField.Root
-                value={organizationId}
-                readOnly
-                style={{ flexGrow: 1 }}
-              />
+              <TextField.Root value={organizationId} readOnly style={{ flexGrow: 1 }} />
             </Flex>
           )}
           {role && (
@@ -195,11 +140,7 @@ export default function ClientPage() {
               <Text weight="bold" style={{ width: 150 }}>
                 Role:
               </Text>
-              <TextField.Root
-                value={role}
-                readOnly
-                style={{ flexGrow: 1 }}
-              />
+              <TextField.Root value={role} readOnly style={{ flexGrow: 1 }} />
             </Flex>
           )}
           {permissions && permissions.length > 0 && (
@@ -221,11 +162,7 @@ export default function ClientPage() {
               <Text weight="bold" style={{ width: 150 }}>
                 Impersonator:
               </Text>
-              <TextField.Root
-                value={impersonator.email}
-                readOnly
-                style={{ flexGrow: 1 }}
-              />
+              <TextField.Root value={impersonator.email} readOnly style={{ flexGrow: 1 }} />
             </Flex>
           )}
         </Flex>
@@ -239,10 +176,8 @@ export default function ClientPage() {
             <Text weight="bold" style={{ width: 150 }}>
               Token Status:
             </Text>
-            <Badge
-              color={tokenLoading ? "yellow" : accessToken ? "green" : "gray"}
-            >
-              {tokenLoading ? "Loading" : accessToken ? "Available" : "None"}
+            <Badge color={tokenLoading ? 'yellow' : accessToken ? 'green' : 'gray'}>
+              {tokenLoading ? 'Loading' : accessToken ? 'Available' : 'None'}
             </Badge>
           </Flex>
           {tokenError && (
@@ -261,14 +196,11 @@ export default function ClientPage() {
               <Box
                 style={{
                   flexGrow: 1,
-                  maxWidth: "100%",
-                  overflow: "hidden",
+                  maxWidth: '100%',
+                  overflow: 'hidden',
                 }}
               >
-                <Code
-                  size="2"
-                  style={{ wordBreak: "break-all", display: "block" }}
-                >
+                <Code size="2" style={{ wordBreak: 'break-all', display: 'block' }}>
                   ...{accessToken.slice(-20)}
                 </Code>
               </Box>
@@ -280,9 +212,7 @@ export default function ClientPage() {
             </Button>
           </Flex>
           {refreshResult && (
-            <Callout.Root
-              color={refreshResult.startsWith("Error") ? "red" : "green"}
-            >
+            <Callout.Root color={refreshResult.startsWith('Error') ? 'red' : 'green'}>
               <Callout.Text>{refreshResult}</Callout.Text>
             </Callout.Root>
           )}
@@ -293,16 +223,15 @@ export default function ClientPage() {
       <Flex direction="column" gap="3">
         <Heading size="5">Organization Management</Heading>
         <Text size="2" color="gray">
-          Switch to a different organization. Requires multi-organization setup
-          in WorkOS.
+          Switch to a different organization. Requires multi-organization setup in WorkOS.
         </Text>
         <Flex direction="column" gap="2">
           <Flex align="center" gap="2">
             <Text weight="bold" style={{ width: 150 }}>
               Current Org:
             </Text>
-            <Badge color={organizationId ? "green" : "gray"} size="2">
-              {organizationId || "None"}
+            <Badge color={organizationId ? 'green' : 'gray'} size="2">
+              {organizationId || 'None'}
             </Badge>
           </Flex>
           <Flex align="center" gap="2">
@@ -320,9 +249,7 @@ export default function ClientPage() {
             </Button>
           </Flex>
           {switchOrgResult && (
-            <Callout.Root
-              color={switchOrgResult.startsWith("Success") ? "green" : "red"}
-            >
+            <Callout.Root color={switchOrgResult.startsWith('Success') ? 'green' : 'red'}>
               <Callout.Text>{switchOrgResult}</Callout.Text>
             </Callout.Root>
           )}
