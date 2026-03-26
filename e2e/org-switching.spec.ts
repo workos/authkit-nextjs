@@ -6,7 +6,7 @@ const API_KEY = 'sk_test_default';
 // Org switching tests require authentication — skip on vinext
 const needsAuth = test.extend<{ requiresAuth: void }>({
   requiresAuth: [
-    async ({}, use, testInfo) => {
+    async (_fixtures, use, testInfo) => {
       if (testInfo.project.name === 'vinext') {
         testInfo.skip(true, 'vinext does not propagate cookies on redirect');
       }
