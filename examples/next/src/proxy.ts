@@ -4,5 +4,5 @@ export default authkitProxy();
 
 // Match against the pages
 export const config = {
-  matcher: ['/', '/account/:path*', '/api/:path*', '/test-session-error/:path*'],
+  matcher: ['/', '/account/:path*', '/client/:path*', '/api/:path*', '/test-session-error/:path*'],
 };

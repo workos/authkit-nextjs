@@ -15,3 +15,10 @@ examples/vinext/.dev.vars
 examples/vinext/.wrangler
 examples/vinext/worker
 examples/vinext/dist
+test-results/
+
+# E2E build artifacts
+e2e/*.js
+e2e/*.js.map
+e2e/*.d.ts
+e2e/test-results/

@@ -20,7 +20,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
-          include: ['**/*.spec.ts'],
+          include: ['src/**/*.spec.ts'],
         },
       },
       {
@@ -28,7 +28,7 @@ export default defineConfig({
         test: {
           name: 'jsdom',
           environment: 'jsdom',
-          include: ['**/*.spec.tsx'],
+          include: ['src/**/*.spec.tsx'],
         },
       },
     ],

@@ -6,5 +6,5 @@
     "declarationDir": "./dist/esm/types",
     "types": ["node"]
   },
-  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "vitest.config.ts", "vitest.setup.ts", "/dist/**/*", "examples"]
+  "exclude": ["**/*.spec.ts", "**/*.spec.tsx", "vitest.config.ts", "vitest.setup.ts", "/dist/**/*", "examples", "e2e"]
 }
