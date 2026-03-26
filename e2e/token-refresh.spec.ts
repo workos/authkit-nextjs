@@ -14,24 +14,23 @@ const needsAuth = test.extend<{ requiresAuth: void }>({
 });
 
 needsAuth.describe('token refresh', () => {
-  needsAuth('refresh endpoint returns updated session', async ({ page, baseURL, signIn }) => {
+  needsAuth('refresh token via client page succeeds', async ({ page, baseURL, signIn }) => {
     await signIn();
+    await page.goto(`${baseURL}/client`);
 
-    // Hit the test-refresh route which calls refreshSession()
-    const response = await page.goto(`${baseURL}/test-refresh`);
-    expect(response?.status()).toBe(200);
+    await expect(page.getByText('Available')).toBeVisible();
+    await page.getByRole('button', { name: 'Refresh Token' }).click();
 
-    const body = await page.evaluate(() => document.body.textContent);
-    const json = JSON.parse(body!);
-    expect(json.refreshed).toBe(true);
-    expect(json.user.email).toBe('test@example.com');
+    await expect(page.getByText('Token refreshed successfully')).toBeVisible({ timeout: 5000 });
   });
 
   needsAuth('session remains valid after refresh', async ({ page, baseURL, signIn }) => {
     await signIn();
+    await page.goto(`${baseURL}/client`);
 
-    // Force a refresh
-    await page.goto(`${baseURL}/test-refresh`);
+    // Refresh the token
+    await page.getByRole('button', { name: 'Refresh Token' }).click();
+    await expect(page.getByText('Token refreshed successfully')).toBeVisible({ timeout: 5000 });
 
     // Navigate back to home — should still be authenticated
     await page.goto(baseURL!);

@@ -49,33 +49,43 @@ needsAuth.describe('organization switching', () => {
     await createMembership(userId, orgId);
   });
 
-  needsAuth('switch org via client page updates organization badge', async ({ page, baseURL, signIn }) => {
+  needsAuth('switch org via client page shows success', async ({ page, baseURL, signIn }) => {
     await signIn();
     await page.goto(`${baseURL}/client`);
 
-    // Initially no org — the "Current Org" badge shows "None"
     await expect(page.getByRole('heading', { name: 'Organization Management' })).toBeVisible();
 
-    // Enter org ID and switch
     const orgId = await getOrgId();
     await page.getByPlaceholder('org_...').fill(orgId);
     await page.getByRole('button', { name: 'Switch' }).click();
 
-    // Should show success and updated org
     await expect(page.getByText('Success!')).toBeVisible({ timeout: 10_000 });
   });
 
-  needsAuth('switch org via test route returns session with org context', async ({ page, baseURL, signIn }) => {
+  needsAuth('org badge updates after switching', async ({ page, baseURL, signIn }) => {
     await signIn();
+    await page.goto(`${baseURL}/client`);
 
     const orgId = await getOrgId();
-    const response = await page.goto(`${baseURL}/test-switch-org?org_id=${orgId}`);
-    expect(response?.status()).toBe(200);
+    await page.getByPlaceholder('org_...').fill(orgId);
+    await page.getByRole('button', { name: 'Switch' }).click();
+    await expect(page.getByText('Success!')).toBeVisible({ timeout: 10_000 });
 
-    const body = await page.evaluate(() => document.body.textContent);
-    const json = JSON.parse(body!);
-    expect(json.switched).toBe(true);
-    expect(json.organizationId).toBe(orgId);
-    expect(json.user.email).toBe('test@example.com');
+    // The Organization ID field should now show the org ID
+    await expect(page.getByText(orgId)).toBeVisible();
+  });
+
+  needsAuth('session remains valid after org switch', async ({ page, baseURL, signIn }) => {
+    await signIn();
+    await page.goto(`${baseURL}/client`);
+
+    const orgId = await getOrgId();
+    await page.getByPlaceholder('org_...').fill(orgId);
+    await page.getByRole('button', { name: 'Switch' }).click();
+    await expect(page.getByText('Success!')).toBeVisible({ timeout: 10_000 });
+
+    // Navigate back — should still be authenticated
+    await page.goto(baseURL!);
+    await expect(page.getByText('Welcome back')).toBeVisible();
   });
 });
