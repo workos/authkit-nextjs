@@ -25,5 +25,5 @@
     "builtin": true
   },
   "globals": {},
-  "ignorePatterns": ["tests/fixtures/**"]
+  "ignorePatterns": ["tests/fixtures/**", "e2e/**"]
 }
