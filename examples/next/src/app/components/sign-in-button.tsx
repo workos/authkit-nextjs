@@ -28,8 +28,13 @@ export function SignInButton({ large }: { large?: boolean }) {
   }
 
   return (
-    <Button asChild size={large ? '3' : '2'}>
-      <a href="/login">Sign In {large && 'with AuthKit'}</a>
-    </Button>
+    <Flex gap="3" align="center">
+      <Button asChild size={large ? '3' : '2'}>
+        <a href="/login">Sign In {large && 'with AuthKit'}</a>
+      </Button>
+      <Button asChild size={large ? '3' : '2'} variant="outline">
+        <a href="/auth/google">Sign In with Google</a>
+      </Button>
+    </Flex>
   );
 }
