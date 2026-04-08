@@ -41,26 +41,37 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       const state = requestUrl.searchParams.get('state');
       const pkceCookie = request.cookies.get(PKCE_COOKIE_NAME)?.value;
 
-      if (!code || !state) {
-        throw new Error('Missing required auth parameter');
+      if (!code) {
+        throw new Error('Missing authorization code');
       }
 
-      // CSRF verification: both channels (cookie + URL state) must be present and match
-      if (!pkceCookie) {
-        throw new Error(
-          'Auth cookie missing — cannot verify OAuth state. Ensure Set-Cookie headers are propagated on redirects.',
-        );
-      }
+      // Dashboard impersonation: WorkOS sends only `code` (no state parameter)
+      // because the flow is initiated from the WorkOS dashboard, not from the application.
+      // A stale PKCE cookie may exist from a prior auth flow — its presence is irrelevant here.
+      // The impersonator check after code exchange guards against misuse of this path.
+      const isDashboardImpersonation = state === null;
 
-      if (state !== pkceCookie) {
-        throw new Error('OAuth state mismatch');
-      }
+      let codeVerifier: string | undefined;
+      let customState: string | undefined;
+      let returnPathnameState: string | undefined;
 
-      const {
-        codeVerifier,
-        customState,
-        returnPathname: returnPathnameState,
-      } = await getStateFromPKCECookieValue(pkceCookie);
+      if (!isDashboardImpersonation) {
+        // CSRF verification: both channels (cookie + URL state) must be present and match
+        if (!pkceCookie) {
+          throw new Error(
+            'Auth cookie missing — cannot verify OAuth state. Ensure Set-Cookie headers are propagated on redirects.',
+          );
+        }
+
+        if (state !== pkceCookie) {
+          throw new Error('OAuth state mismatch');
+        }
+
+        const stateData = await getStateFromPKCECookieValue(pkceCookie);
+        codeVerifier = stateData.codeVerifier;
+        customState = stateData.customState;
+        returnPathnameState = stateData.returnPathname;
+      }
 
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
@@ -72,6 +83,12 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       if (!accessToken || !refreshToken) {
         throw new Error('response is missing tokens');
+      }
+
+      // If we skipped PKCE/CSRF verification, the response must indicate impersonation.
+      // This prevents an intercepted authorization code from being exchanged without PKCE.
+      if (isDashboardImpersonation && !impersonator) {
+        throw new Error('PKCE/state verification was bypassed but response is not an impersonation session');
       }
 
       // If baseURL is provided, use it instead of request.nextUrl

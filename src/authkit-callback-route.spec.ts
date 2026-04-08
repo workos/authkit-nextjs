@@ -472,14 +472,29 @@ describe('authkit-callback-route', () => {
         expect(response.status).not.toBe(500);
       });
 
-      it('should return 500 when neither state nor cookie exist', async () => {
+      it('should still reject when state is present but cookie is missing', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
         request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', 'some-state');
 
         const handler = handleAuth();
         const response = await handler(request);
 
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
+      });
+
+      it('should not treat empty state string as impersonation', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', '');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        // Empty state is not null — should enter normal PKCE flow and fail (no matching cookie)
         expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
         expect(response.status).toBe(500);
       });
@@ -594,6 +609,114 @@ describe('authkit-callback-route', () => {
         const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-auth-verifier='));
         expect(pkceDeletionCookie).toBeDefined();
         expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
+    });
+
+    describe('dashboard impersonation', () => {
+      const mockImpersonationResponse = {
+        ...mockAuthResponse,
+        impersonator: {
+          email: 'admin@example.com',
+          reason: 'Debugging user issue',
+        },
+      };
+
+      it('should succeed when code is present but state and cookie are both absent', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockImpersonationResponse);
+
+        request.nextUrl.searchParams.set('code', 'impersonation-code');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith({
+          clientId: process.env.WORKOS_CLIENT_ID,
+          code: 'impersonation-code',
+          codeVerifier: undefined,
+        });
+        expect(response.status).toBe(307);
+      });
+
+      it('should redirect to the default returnPathname', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockImpersonationResponse);
+
+        request.nextUrl.searchParams.set('code', 'impersonation-code');
+
+        const handler = handleAuth({ returnPathname: '/dashboard' });
+        const response = await handler(request);
+
+        expect(response.headers.get('Location')).toContain('/dashboard');
+      });
+
+      it('should save session with impersonator data', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockImpersonationResponse);
+
+        request.nextUrl.searchParams.set('code', 'impersonation-code');
+
+        const handler = handleAuth();
+        await handler(request);
+
+        const session = await getSessionFromCookie();
+        expect(session?.impersonator).toEqual({
+          email: 'admin@example.com',
+          reason: 'Debugging user issue',
+        });
+      });
+
+      it('should call onSuccess with impersonator data', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockImpersonationResponse);
+
+        request.nextUrl.searchParams.set('code', 'impersonation-code');
+
+        const onSuccess = vi.fn();
+        const handler = handleAuth({ onSuccess });
+        await handler(request);
+
+        expect(onSuccess).toHaveBeenCalledWith(
+          expect.objectContaining({
+            impersonator: { email: 'admin@example.com', reason: 'Debugging user issue' },
+            state: undefined,
+          }),
+        );
+      });
+
+      it('should reject when PKCE was bypassed but response has no impersonator', async () => {
+        // Simulates an intercepted authorization code sent without state/cookie
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'intercepted-code');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+      });
+
+      it('should succeed even when a stale PKCE cookie exists from a prior flow', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockImpersonationResponse);
+
+        // Stale cookie from a previous sign-in attempt — middleware sets this on unauthenticated requests
+        await setAuthCookie(request, { nonce: 'stale-nonce', codeVerifier: 'stale-verifier' });
+        request.nextUrl.searchParams.set('code', 'impersonation-code');
+        // No state param — this is the scenario from issue #400
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith({
+          clientId: process.env.WORKOS_CLIENT_ID,
+          code: 'impersonation-code',
+          codeVerifier: undefined,
+        });
+        expect(response.status).toBe(307);
+      });
+
+      it('should still fail when only code is missing', async () => {
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
       });
     });
   });
