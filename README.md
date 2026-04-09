@@ -142,6 +142,26 @@ The `onSuccess` callback receives the following data:
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
+### Sign-in endpoint
+
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **Sign-in endpoint** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
+
+```ts
+// app/sign-in/route.ts (or app/login/route.ts)
+import { getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
+
+export const GET = async () => {
+  const signInUrl = await getSignInUrl();
+  return redirect(signInUrl);
+};
+```
+
+In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and set the **Sign-in endpoint** to match this route (e.g., `http://localhost:3000/sign-in`).
+
+> [!IMPORTANT]
+> The sign-in endpoint is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
+
 ### Proxy / Middleware
 
 This library relies on Next.js proxy (called "middleware" in Next.js ≤15) to provide session management for routes.
@@ -746,6 +766,9 @@ await signOut({ returnTo: 'https://your-app.com/signed-out' });
 Render the `Impersonation` component in your app so that it is clear when someone is [impersonating a user](https://workos.com/docs/user-management/impersonation).
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
+> [!IMPORTANT]
+> Impersonation requires a configured **Sign-in endpoint** in your WorkOS dashboard. See the [sign-in endpoint](#sign-in-endpoint) setup instructions. Without it, impersonation from the WorkOS dashboard will fail with a `Missing required auth parameter` error.
+
 ```jsx
 import { Impersonation, AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
 
@@ -938,6 +961,12 @@ If the cookie is missing or doesn't match, authentication will fail with one of:
 > **Upgrading to v3:** Previous versions would silently fall back to verifying only the URL `state` parameter when the cookie was missing. This fallback has been removed because it disabled CSRF protection. If you see `Auth cookie missing` errors after upgrading, ensure that `Set-Cookie` headers are propagated on redirects between your application and the user's browser.
 
 ### Troubleshooting
+
+#### `Missing required auth parameter` when impersonating from the WorkOS dashboard
+
+This error occurs when WorkOS-initiated flows (like dashboard impersonation) redirect directly to your callback URL without going through your application's sign-in flow. Because this library enforces PKCE/CSRF verification on every callback, the request is rejected when the required `state` parameter is missing.
+
+**Fix:** Configure a [sign-in endpoint](#sign-in-endpoint) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
 
 #### NEXT_REDIRECT error when using try/catch blocks
 
