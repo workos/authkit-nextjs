@@ -1,3 +1,4 @@
+import fnv1a from '@sindresorhus/fnv1a';
 import { unsealData } from 'iron-session';
 import { cookies } from 'next/headers';
 import * as v from 'valibot';
@@ -9,6 +10,27 @@ export const PKCE_COOKIE_NAME = 'wos-auth-verifier';
 const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
 
 /**
+ * Short, deterministic hex fingerprint of an arbitrary string.
+ * Used to give each PKCE flow its own cookie name without depending
+ * on the internal format of the sealed state value
+ */
+function shortHash(input: string): string {
+  // fnv1a returns a BigInt — use 32-bit variant so it fits safely in a Number
+  const hash = Number(fnv1a(input, { size: 32 }));
+
+  // Hex-encode and pad to a fixed 8-char width
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
+ * Derive a flow-specific cookie name so concurrent auth flows don't overwrite
+ * each other's PKCE cookies. Uses an FNV-1a hash of the full sealed state
+ */
+export function getPKCECookieNameForState(state: string): string {
+  return `${PKCE_COOKIE_NAME}-${shortHash(state)}`;
+}
+
+/**
  * Set the PKCE verifier cookie in server action context.
  * In middleware context, callers must set the cookie via Set-Cookie headers instead.
  */
@@ -16,7 +38,7 @@ export async function setPKCECookie(sealedState: string): Promise<void> {
   const nextCookies = await cookies();
   const { domain, path, sameSite, secure } = getPKCECookieOptions();
 
-  nextCookies.set(PKCE_COOKIE_NAME, sealedState, {
+  nextCookies.set(getPKCECookieNameForState(sealedState), sealedState, {
     domain,
     path,
     sameSite,

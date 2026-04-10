@@ -18,7 +18,7 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
-import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
+import { getPKCECookieNameForState, setPKCECookie } from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
@@ -26,8 +26,21 @@ import { parse, tokensToRegexp } from 'path-to-regexp';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
 
-function appendPKCESetCookieHeader(headers: Headers, sealedState: string, requestUrl: string): void {
-  headers.append('Set-Cookie', `${PKCE_COOKIE_NAME}=${sealedState}; ${getPKCECookieOptions(requestUrl, true)}`);
+// Only set the PKCE cookie for initial document navigations — fetch/XHR/RSC/prefetch
+// requests never follow cross-origin redirects so they'll never complete the OAuth
+// flow and therefore don't need the cookie set.
+// This prevents cookie bloat (HTTP 431) when multiple requests fire concurrently
+// now that we are generating unique cookie names per flow, they add up quickly if
+// we don't limit to just the initial navigation request
+function appendPKCESetCookieHeader(request: NextRequest, headers: Headers, sealedState: string): void {
+  if (!isInitialDocumentRequest(request)) {
+    return;
+  }
+
+  headers.append(
+    'Set-Cookie',
+    `${getPKCECookieNameForState(sealedState)}=${sealedState}; ${getPKCECookieOptions(request.url, true)}`,
+  );
 }
 
 const sessionHeaderName = 'x-workos-session';
@@ -213,7 +226,7 @@ async function updateSession(
       screenHint: options.screenHint,
     });
 
-    appendPKCESetCookieHeader(newRequestHeaders, sealedState, request.url);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
 
     return {
       session: { user: null },
@@ -354,7 +367,7 @@ async function updateSession(
       redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
     });
 
-    appendPKCESetCookieHeader(newRequestHeaders, sealedState, request.url);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
 
     return {
       session: { user: null },
