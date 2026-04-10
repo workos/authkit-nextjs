@@ -7,7 +7,6 @@ import { WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { State, StateSchema } from './interfaces.js';
 
 export const PKCE_COOKIE_NAME = 'wos-auth-verifier';
-const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
 
 /**
  * Short, deterministic hex fingerprint of an arbitrary string.
@@ -36,15 +35,11 @@ export function getPKCECookieNameForState(state: string): string {
  */
 export async function setPKCECookie(sealedState: string): Promise<void> {
   const nextCookies = await cookies();
-  const { domain, path, sameSite, secure } = getPKCECookieOptions();
+  const options = getPKCECookieOptions();
 
   nextCookies.set(getPKCECookieNameForState(sealedState), sealedState, {
-    domain,
-    path,
-    sameSite,
-    secure,
+    ...options,
     httpOnly: true,
-    maxAge: PKCE_COOKIE_MAX_AGE,
   });
 }
 
