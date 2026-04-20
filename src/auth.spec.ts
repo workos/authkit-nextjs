@@ -274,6 +274,25 @@ describe('auth.ts', () => {
       expect(sessionCookie).toBeUndefined();
     });
 
+    it('should clear lingering PKCE verifier cookies (legacy and per-flow)', async () => {
+      const nextCookies = await cookies();
+      const nextHeaders = await headers();
+
+      nextHeaders.set('x-workos-middleware', 'true');
+      nextCookies.set('wos-session', 'foo');
+      nextCookies.set('wos-auth-verifier', 'legacy-state');
+      nextCookies.set('wos-auth-verifier-a1b2c3d4', 'flow-a-state');
+      nextCookies.set('wos-auth-verifier-deadbeef', 'flow-b-state');
+      nextCookies.set('unrelated-cookie', 'keep-me');
+
+      await signOut();
+
+      expect(nextCookies.get('wos-auth-verifier')).toBeUndefined();
+      expect(nextCookies.get('wos-auth-verifier-a1b2c3d4')).toBeUndefined();
+      expect(nextCookies.get('wos-auth-verifier-deadbeef')).toBeUndefined();
+      expect(nextCookies.get('unrelated-cookie')?.value).toBe('keep-me');
+    });
+
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
         vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(

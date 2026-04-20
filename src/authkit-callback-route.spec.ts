@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest';
 import { getWorkOS } from './workos.js';
 import { handleAuth } from './authkit-callback-route.js';
+import { getPKCECookieNameForState } from './pkce.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
 import { sealData } from 'iron-session';
@@ -56,7 +57,7 @@ describe('authkit-callback-route', () => {
 
   async function setAuthCookie(req: NextRequest, state: State): Promise<string> {
     const sealedState = await sealData(state, { password: process.env.WORKOS_COOKIE_PASSWORD! });
-    req.cookies.set('wos-auth-verifier', sealedState);
+    req.cookies.set(getPKCECookieNameForState(sealedState), sealedState);
     return sealedState;
   }
 
@@ -548,10 +549,11 @@ describe('authkit-callback-route', () => {
       it('should return an error response when PKCE cookie is corrupted', async () => {
         vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-        // Set a corrupted cookie
-        request.cookies.set('wos-auth-verifier', 'not-a-valid-sealed-value');
+        // Set a corrupted cookie using the flow-specific name
+        const corruptedState = 'not-a-valid-sealed-value';
+        request.cookies.set(getPKCECookieNameForState(corruptedState), corruptedState);
         request.nextUrl.searchParams.set('code', 'test-code');
-        request.nextUrl.searchParams.set('state', 'not-a-valid-sealed-value');
+        request.nextUrl.searchParams.set('state', corruptedState);
 
         const handler = handleAuth();
         const response = await handler(request);
@@ -570,11 +572,12 @@ describe('authkit-callback-route', () => {
         const handler = handleAuth();
         const response = await handler(request);
 
-        // The response should be a redirect (success) and have a Set-Cookie header to delete the PKCE cookie
+        // The response should be a redirect (success) and have a Set-Cookie header to delete the flow-specific PKCE cookie
         expect(response.status).toBe(307);
 
+        const flowCookieName = getPKCECookieNameForState(sealedState);
         const setCookieHeaders = response.headers.getSetCookie();
-        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-auth-verifier='));
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith(`${flowCookieName}=`));
         expect(pkceDeletionCookie).toBeDefined();
         expect(pkceDeletionCookie).toContain('Max-Age=0');
       });
@@ -590,10 +593,69 @@ describe('authkit-callback-route', () => {
         const response = await handler(request);
 
         expect(response.status).toBe(500);
+        const flowCookieName = getPKCECookieNameForState(sealedState);
         const setCookieHeaders = response.headers.getSetCookie();
-        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith('wos-auth-verifier='));
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith(`${flowCookieName}=`));
         expect(pkceDeletionCookie).toBeDefined();
         expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
+
+      it('should isolate concurrent auth flows using per-flow cookie names', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Simulate two concurrent auth flows with different sealed states
+        const sealedStateA = await sealData(
+          { nonce: 'nonce-a', codeVerifier: 'verifier-a' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+        const sealedStateB = await sealData(
+          { nonce: 'nonce-b', codeVerifier: 'verifier-b' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Both cookies exist on the request (set by different middleware redirects)
+        request.cookies.set(getPKCECookieNameForState(sealedStateA), sealedStateA);
+        request.cookies.set(getPKCECookieNameForState(sealedStateB), sealedStateB);
+
+        // Callback for flow A — should find its own cookie
+        request.nextUrl.searchParams.set('code', 'code-a');
+        request.nextUrl.searchParams.set('state', sealedStateA);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(307);
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({ codeVerifier: 'verifier-a' }),
+        );
+
+        // Flow B's cookie should NOT have been deleted
+        const setCookieHeaders = response.headers.getSetCookie();
+        const flowBCookieName = getPKCECookieNameForState(sealedStateB);
+        const flowBDeletion = setCookieHeaders.find((c: string) => c.startsWith(`${flowBCookieName}=`));
+        expect(flowBDeletion).toBeUndefined();
+      });
+
+      it('should fall back to the legacy shared PKCE cookie for v3.0.x in-flight flows', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await sealData(
+          { nonce: 'legacy', codeVerifier: 'legacy-verifier' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Simulate a user mid-OAuth on v3.0.x: only the legacy cookie name exists
+        request.cookies.set('wos-auth-verifier', sealedState);
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(307);
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({ codeVerifier: 'legacy-verifier' }),
+        );
       });
     });
   });

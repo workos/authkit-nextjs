@@ -37,6 +37,7 @@
     "typecheck": "tsc --project tsconfig.app.json --noEmit && tsc --project tsconfig.test.json --noEmit"
   },
   "dependencies": {
+    "@sindresorhus/fnv1a": "^3.1.0",
     "@workos-inc/node": "^8.9.0",
     "iron-session": "^8.0.4",
     "jose": "^5.10.0",

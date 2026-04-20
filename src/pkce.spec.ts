@@ -1,7 +1,28 @@
 import { sealData } from 'iron-session';
-import { getStateFromPKCECookieValue } from './pkce.js';
+import { getStateFromPKCECookieValue, getPKCECookieNameForState } from './pkce.js';
 
 const PASSWORD = process.env.WORKOS_COOKIE_PASSWORD!;
+
+describe('getPKCECookieNameForState', () => {
+  it('should derive a cookie name prefixed with the base name', () => {
+    const state = 'any-string-at-all';
+
+    expect(getPKCECookieNameForState(state)).toMatch(/^wos-auth-verifier-[0-9a-f]{8}$/);
+  });
+
+  it('should produce different names for different states', () => {
+    const stateA = 'first-sealed-state-value';
+    const stateB = 'second-sealed-state-value';
+
+    expect(getPKCECookieNameForState(stateA)).not.toBe(getPKCECookieNameForState(stateB));
+  });
+
+  it('should be deterministic for the same input', () => {
+    const state = 'some-sealed-state';
+
+    expect(getPKCECookieNameForState(state)).toBe(getPKCECookieNameForState(state));
+  });
+});
 
 describe('setPKCECookie SameSite override', () => {
   const mockSet = vi.fn();
@@ -26,7 +47,7 @@ describe('setPKCECookie SameSite override', () => {
     await setPKCECookie('sealed-state');
 
     expect(mockSet).toHaveBeenCalledWith(
-      'wos-auth-verifier',
+      getPKCECookieNameForState('sealed-state'),
       'sealed-state',
       expect.objectContaining({ sameSite: 'lax' }),
     );
@@ -40,7 +61,7 @@ describe('setPKCECookie SameSite override', () => {
     await setPKCECookie('sealed-state');
 
     expect(mockSet).toHaveBeenCalledWith(
-      'wos-auth-verifier',
+      getPKCECookieNameForState('sealed-state'),
       'sealed-state',
       expect.objectContaining({ sameSite: 'none' }),
     );
@@ -54,7 +75,7 @@ describe('setPKCECookie SameSite override', () => {
     await setPKCECookie('sealed-state');
 
     expect(mockSet).toHaveBeenCalledWith(
-      'wos-auth-verifier',
+      getPKCECookieNameForState('sealed-state'),
       'sealed-state',
       expect.objectContaining({ sameSite: 'lax' }),
     );
@@ -65,7 +86,7 @@ describe('setPKCECookie SameSite override', () => {
     await setPKCECookie('sealed-state');
 
     expect(mockSet).toHaveBeenCalledWith(
-      'wos-auth-verifier',
+      getPKCECookieNameForState('sealed-state'),
       'sealed-state',
       expect.objectContaining({ sameSite: 'lax' }),
     );
