@@ -8,12 +8,12 @@ import {
   getAccessTokenAction,
   refreshAccessTokenAction,
 } from '../src/actions.js';
-import { signOut, switchToOrganization } from './auth.js';
+import { getSignInUrl, signOut, switchToOrganization } from './auth.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
-import { getAuthorizationUrl } from '../src/get-authorization-url.js';
 
 vi.mock('../src/auth.js', () => ({
+  getSignInUrl: vi.fn().mockResolvedValue('https://api.workos.com/authorize?...'),
   signOut: vi.fn().mockResolvedValue(true),
   switchToOrganization: vi.fn().mockResolvedValue({ organizationId: 'org_123' }),
 }));
@@ -32,10 +32,6 @@ vi.mock('../src/workos.js', () => ({
 vi.mock('../src/session.js', () => ({
   withAuth: vi.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
   refreshSession: vi.fn().mockResolvedValue({ user: 'testUser', accessToken: 'refreshed_token' }),
-}));
-
-vi.mock('../src/get-authorization-url.js', () => ({
-  getAuthorizationUrl: vi.fn().mockResolvedValue('https://api.workos.com/authorize?...'),
 }));
 
 describe('actions', () => {
@@ -94,13 +90,13 @@ describe('actions', () => {
     it('should return signInUrl when ensureSignedIn is true and no user', async () => {
       vi.mocked(withAuth).mockResolvedValueOnce({ user: null });
       const result = await getAuthAction({ ensureSignedIn: true });
-      expect(getAuthorizationUrl).toHaveBeenCalledWith({ screenHint: 'sign-in' });
+      expect(getSignInUrl).toHaveBeenCalled();
       expect(result).toEqual({ user: null, signInUrl: 'https://api.workos.com/authorize?...' });
     });
 
     it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
       const result = await getAuthAction({ ensureSignedIn: true });
-      expect(getAuthorizationUrl).not.toHaveBeenCalled();
+      expect(getSignInUrl).not.toHaveBeenCalled();
       expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });
@@ -121,13 +117,13 @@ describe('actions', () => {
     it('should return signInUrl when ensureSignedIn is true and no user', async () => {
       vi.mocked(refreshSession).mockResolvedValueOnce({ user: null });
       const result = await refreshAuthAction({ ensureSignedIn: true });
-      expect(getAuthorizationUrl).toHaveBeenCalledWith({ screenHint: 'sign-in' });
+      expect(getSignInUrl).toHaveBeenCalled();
       expect(result).toEqual({ user: null, signInUrl: 'https://api.workos.com/authorize?...' });
     });
 
     it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
       const result = await refreshAuthAction({ ensureSignedIn: true });
-      expect(getAuthorizationUrl).not.toHaveBeenCalled();
+      expect(getSignInUrl).not.toHaveBeenCalled();
       expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });

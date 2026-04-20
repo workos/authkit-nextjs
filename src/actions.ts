@@ -1,9 +1,8 @@
 'use server';
 
-import { signOut, switchToOrganization } from './auth.js';
+import { getSignInUrl, signOut, switchToOrganization } from './auth.js';
 import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
-import { getAuthorizationUrl } from './get-authorization-url.js';
 import { getWorkOS } from './workos.js';
 
 export interface RefreshAccessTokenActionResult {
@@ -49,7 +48,7 @@ export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
   const sanitized = sanitize(auth);
 
   if (options?.ensureSignedIn && !auth.user) {
-    const signInUrl = await getAuthorizationUrl({ screenHint: 'sign-in' });
+    const signInUrl = await getSignInUrl();
     return { ...sanitized, signInUrl };
   }
 
@@ -69,7 +68,7 @@ export const refreshAuthAction = async ({
   const sanitized = sanitize(auth);
 
   if (ensureSignedIn && !auth.user) {
-    const signInUrl = await getAuthorizationUrl({ screenHint: 'sign-in' });
+    const signInUrl = await getSignInUrl();
     return { ...sanitized, signInUrl };
   }
 
