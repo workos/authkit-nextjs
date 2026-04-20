@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/workos/authkit-nextjs/compare/v3.0.0...v3.0.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* isolate concurrent PKCE flows to prevent cookie clobbering ([#403](https://github.com/workos/authkit-nextjs/issues/403)) ([3740a83](https://github.com/workos/authkit-nextjs/commit/3740a835df8b51027e8d5bf5011a3877c8648cec))
+* set PKCE cookie in ensureSignedIn server action flow ([#406](https://github.com/workos/authkit-nextjs/issues/406)) ([a55bb64](https://github.com/workos/authkit-nextjs/commit/a55bb6467942042325d3015ea735ebd4fa7912d5))
+
 ## [3.0.0](https://github.com/workos/authkit-nextjs/compare/v2.17.0...v3.0.0) (2026-03-25)
 
 

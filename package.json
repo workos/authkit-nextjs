@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/authkit-nextjs",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Authentication and session helpers for using WorkOS & AuthKit with Next.js",
   "packageManager": "pnpm@10.28.0",
   "sideEffects": false,
