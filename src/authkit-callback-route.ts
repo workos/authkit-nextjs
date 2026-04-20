@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getPKCECookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
+import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
 import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
@@ -42,8 +42,11 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // Derive the flow-specific cookie name from the state param so each
       // concurrent auth flow reads/deletes its own cookie, not a shared one.
+      // Fall back to the legacy shared cookie name so in-flight OAuth flows
+      // started on v3.0.x don't fail on the first callback after upgrade.
+      // Safe to remove once v3.0.x is unsupported.
       const pkceCookieName = getPKCECookieNameForState(state);
-      const pkceCookie = request.cookies.get(pkceCookieName)?.value;
+      const pkceCookie = request.cookies.get(pkceCookieName)?.value ?? request.cookies.get(PKCE_COOKIE_NAME)?.value;
 
       // CSRF verification: both channels (cookie + URL state) must be present and match
       if (!pkceCookie) {
@@ -98,10 +101,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // Always delete the PKCE cookie after handling the callback, regardless of success or error
       // to avoid stale cookies affecting future auth attempts & prevent replays
-      response.headers.append(
-        'Set-Cookie',
-        `${pkceCookieName}=; ${getPKCECookieOptions(request.url, true, true)}`,
-      );
+      response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(request.url, true, true)}`);
 
       await saveSession({ accessToken, refreshToken, user, impersonator }, request);
 

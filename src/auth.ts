@@ -5,10 +5,10 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
-import { getCookieOptions } from './cookie.js';
+import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { AccessToken, GetAuthURLOptions, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
-import { setPKCECookie } from './pkce.js';
+import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
 import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -78,6 +78,24 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
     } catch {
       // Some environments (e.g., vinext) only accept a string cookie name
       nextCookies.delete(cookieName);
+    }
+
+    // Clear any lingering PKCE verifier cookies so orphans from abandoned
+    // flows don't accumulate toward HTTP 431 or confuse future sign-ins.
+    const pkceOptions = getPKCECookieOptions();
+    for (const { name } of nextCookies.getAll()) {
+      if (!name.startsWith(PKCE_COOKIE_NAME)) continue;
+      try {
+        nextCookies.delete({
+          name,
+          domain: pkceOptions.domain,
+          path: pkceOptions.path,
+          sameSite: pkceOptions.sameSite,
+          secure: pkceOptions.secure,
+        });
+      } catch {
+        nextCookies.delete(name);
+      }
     }
 
     if (sessionId) {

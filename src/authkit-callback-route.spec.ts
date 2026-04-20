@@ -635,6 +635,28 @@ describe('authkit-callback-route', () => {
         const flowBDeletion = setCookieHeaders.find((c: string) => c.startsWith(`${flowBCookieName}=`));
         expect(flowBDeletion).toBeUndefined();
       });
+
+      it('should fall back to the legacy shared PKCE cookie for v3.0.x in-flight flows', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await sealData(
+          { nonce: 'legacy', codeVerifier: 'legacy-verifier' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Simulate a user mid-OAuth on v3.0.x: only the legacy cookie name exists
+        request.cookies.set('wos-auth-verifier', sealedState);
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(307);
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({ codeVerifier: 'legacy-verifier' }),
+        );
+      });
     });
   });
 });

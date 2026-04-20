@@ -26,7 +26,7 @@ vi.mock('next/headers', () => {
         cookieStore.delete(cookieName);
       }),
       get: vi.fn((name: string) => cookieStore.get(name)),
-      getAll: vi.fn(() => Array.from(cookieStore.entries())),
+      getAll: vi.fn(() => Array.from(cookieStore.values())),
       set: vi.fn((name: string, value: string | { [key: string]: string | number | boolean }) =>
         cookieStore.set(name, {
           name,
