@@ -144,7 +144,7 @@ The `onSuccess` callback receives the following data:
 
 ### Sign-in endpoint
 
-Create a route that initiates the AuthKit sign-in flow. This route is used as the **Sign-in endpoint** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Sign-in endpoint](https://workos.com/docs/authkit/nextjs/2-configure-your-project/configure-a-redirect-uri#sign-in-endpoint)** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
 
 ```ts
 // app/sign-in/route.ts (or app/login/route.ts)
