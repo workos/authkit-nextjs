@@ -16,7 +16,7 @@ describe('validate-api-key.ts', () => {
     nextHeaders._reset();
   });
 
-  describe('validateApiKey', () => {
+  describe('createValidation', () => {
     it('should return valid API key when Bearer token is present and valid', async () => {
       const mockApiKeyResponse = {
         apiKey: {
@@ -32,14 +32,14 @@ describe('validate-api-key.ts', () => {
         },
       };
 
-      vi.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockApiKeyResponse);
+      vi.spyOn(workos.apiKeys, 'createValidation').mockResolvedValue(mockApiKeyResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer sk_test_1234567890');
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).toHaveBeenCalledWith({
+      expect(workos.apiKeys.createValidation).toHaveBeenCalledWith({
         value: 'sk_test_1234567890',
       });
       expect(result).toEqual(mockApiKeyResponse);
@@ -49,7 +49,7 @@ describe('validate-api-key.ts', () => {
       // Don't set any authorization header
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -59,7 +59,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -69,7 +69,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -79,7 +79,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -89,20 +89,20 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
     it('should return { apiKey: null } when WorkOS validation fails', async () => {
       const mockResponse = { apiKey: null };
-      vi.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockResponse);
+      vi.spyOn(workos.apiKeys, 'createValidation').mockResolvedValue(mockResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer invalid_key');
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).toHaveBeenCalledWith({
+      expect(workos.apiKeys.createValidation).toHaveBeenCalledWith({
         value: 'invalid_key',
       });
       expect(result).toEqual({ apiKey: null });
