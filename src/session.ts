@@ -291,7 +291,7 @@ async function updateSession(
 
     const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-    const { accessToken, refreshToken, user, impersonator } =
+    const { accessToken, refreshToken, user, impersonator, authenticationMethod } =
       await getWorkOS().userManagement.authenticateWithRefreshToken({
         clientId: WORKOS_CLIENT_ID,
         refreshToken: session.refreshToken,
@@ -307,6 +307,7 @@ async function updateSession(
       refreshToken,
       user,
       impersonator,
+      authenticationMethod,
     });
 
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);

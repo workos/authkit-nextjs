@@ -321,6 +321,23 @@ describe('authkit-callback-route', () => {
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
 
+    it('should persist authenticationMethod in the sealed session', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue({
+        ...mockAuthResponse,
+        authenticationMethod: 'SSO',
+      });
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      const handler = handleAuth();
+      await handler(request);
+
+      const session = await getSessionFromCookie();
+      expect(session?.authenticationMethod).toBe('SSO');
+    });
+
     it('should allow onSuccess to update session', async () => {
       const newAccessToken = 'new-access-token';
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);

@@ -103,7 +103,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       // to avoid stale cookies affecting future auth attempts & prevent replays
       response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(request.url, true, true)}`);
 
-      await saveSession({ accessToken, refreshToken, user, impersonator }, request);
+      await saveSession({ accessToken, refreshToken, user, impersonator, authenticationMethod }, request);
 
       if (onSuccess) {
         await onSuccess({
