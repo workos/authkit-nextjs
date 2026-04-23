@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1](https://github.com/workos/authkit-nextjs/compare/v4.0.0...v4.0.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* persist authenticationMethod in sealed session cookie ([#410](https://github.com/workos/authkit-nextjs/issues/410)) ([a8f7def](https://github.com/workos/authkit-nextjs/commit/a8f7def7cf3cbbb38dd1805e8da82a4b10bdf1d9))
+
 ## [4.0.0](https://github.com/workos/authkit-nextjs/compare/v3.0.1...v4.0.0) (2026-04-23)
 
 
