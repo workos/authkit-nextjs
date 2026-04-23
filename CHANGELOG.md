@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.0.0](https://github.com/workos/authkit-nextjs/compare/v3.0.1...v4.0.0) (2026-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Upgrade @workos-inc/node to v9 ([#407](https://github.com/workos/authkit-nextjs/issues/407))
+* set minimum Node.js version to 22.11.0 ([#408](https://github.com/workos/authkit-nextjs/issues/408))
+
+### Miscellaneous Chores
+
+* set minimum Node.js version to 22.11.0 ([#408](https://github.com/workos/authkit-nextjs/issues/408)) ([c394669](https://github.com/workos/authkit-nextjs/commit/c3946698b6a7f369becce8ac9bba83fe7540300b))
+* Upgrade @workos-inc/node to v9 ([#407](https://github.com/workos/authkit-nextjs/issues/407)) ([0183951](https://github.com/workos/authkit-nextjs/commit/0183951e281146e973fd4a9884162b008a3dd38d))
+
 ## [3.0.1](https://github.com/workos/authkit-nextjs/compare/v3.0.0...v3.0.1) (2026-04-20)
 
 
