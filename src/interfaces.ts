@@ -25,6 +25,7 @@ export interface Session {
   refreshToken: string;
   user: User;
   impersonator?: Impersonator;
+  authenticationMethod?: AuthenticationResponse['authenticationMethod'];
 }
 
 export interface UserInfo {
