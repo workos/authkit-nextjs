@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@sindresorhus/fnv1a": "^3.1.0",
-    "@workos-inc/node": "^8.9.0",
+    "@workos-inc/node": "^9.0.0",
     "iron-session": "^8.0.4",
     "jose": "^5.10.0",
     "path-to-regexp": "^6.3.0",
