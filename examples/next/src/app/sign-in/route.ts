@@ -1,3 +1,4 @@
+import { getSignInUrl } from '@workos-inc/authkit-nextjs';
 import { redirect } from 'next/navigation';
 import { sanitizeReturnTo } from '@/lib/auth-context';
 
@@ -7,5 +8,7 @@ interface RequestWithNextUrl extends Request {
 
 export const GET = async (request: RequestWithNextUrl) => {
   const returnTo = sanitizeReturnTo(request.nextUrl?.searchParams.get('returnTo'));
-  return redirect(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`);
+  const signInUrl = await getSignInUrl({ returnTo });
+
+  return redirect(signInUrl);
 };

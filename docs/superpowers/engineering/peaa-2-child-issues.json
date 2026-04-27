@@ -1,0 +1,66 @@
+{
+  "parentIssue": "PEAA-2",
+  "generatedAt": "2026-04-27",
+  "childIssues": [
+    {
+      "title": "PEAA-2.1: Integrate PEAA-2 SQL suite into app migration runner",
+      "ownerRole": "Staff Engineer",
+      "priority": "high",
+      "scope": [
+        "Integrate PEAA-2 SQL artifacts into target app migration tooling",
+        "Enforce migration order in deploy pipeline",
+        "Document one-command local DB bootstrap"
+      ],
+      "inputs": [
+        "docs/superpowers/engineering/sql/0001_init_schema.sql",
+        "docs/superpowers/engineering/sql/0002_indexes.sql",
+        "docs/superpowers/engineering/sql/0003_seed_v1.sql",
+        "docs/superpowers/engineering/scripts/run_peaa2_sql_suite.sh"
+      ],
+      "acceptanceCriteria": [
+        "Migrations apply in required order through app migration runner",
+        "Developer setup can bootstrap DB with one documented command",
+        "No drift between migration runner artifacts and source SQL files"
+      ]
+    },
+    {
+      "title": "PEAA-2.2: Add PEAA-2 DB verification gate in CI",
+      "ownerRole": "QA Engineer",
+      "priority": "high",
+      "scope": [
+        "Run PEAA-2 SQL suite in ephemeral CI Postgres",
+        "Make assertion script blocking",
+        "Publish verification output as CI artifact"
+      ],
+      "inputs": [
+        "docs/superpowers/engineering/sql/verify_v1_read_paths.sql",
+        "docs/superpowers/engineering/sql/verify_v1_assertions.sql",
+        "docs/superpowers/engineering/scripts/run_peaa2_sql_suite.sh"
+      ],
+      "acceptanceCriteria": [
+        "CI executes PEAA-2 SQL suite on relevant pull requests",
+        "Build fails on assertion failure",
+        "CI artifact contains row-count and assertion outputs"
+      ]
+    },
+    {
+      "title": "PEAA-2.3: Create DB rollout runbook for staging/prod",
+      "ownerRole": "Release Engineer",
+      "priority": "medium",
+      "scope": [
+        "Define DB backup + apply checklist for staging and production",
+        "Define forward-fix policy for failed migrations",
+        "Require staging dry-run prior to production"
+      ],
+      "inputs": [
+        "docs/superpowers/engineering/sql/README.md",
+        "docs/superpowers/engineering/peaa-2-handoff-report.md"
+      ],
+      "acceptanceCriteria": [
+        "Release checklist records backup, apply order, and owner",
+        "Staging dry-run is mandatory and logged",
+        "Production migration command and owner are explicit per release"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "issueId": "PEAA-2",
+  "statusRecommendation": "close",
+  "preCloseCheck": {
+    "command": "./docs/superpowers/engineering/scripts/validate_peaa2_artifacts.sh",
+    "expectedOutputContains": "PEAA-2 artifact validation passed."
+  },
+  "closeCommentTemplatePath": "docs/superpowers/engineering/peaa-2-close-comment-template.md",
+  "artifactIndexPath": "docs/superpowers/engineering/peaa-2-artifact-index.md",
+  "followUpChildIssuesPath": "docs/superpowers/engineering/peaa-2-child-issues.json",
+  "postCloseActions": [
+    "Create child issues from peaa-2-child-issues.json",
+    "Assign PEAA-2.1 to Staff Engineer",
+    "Assign PEAA-2.2 to QA Engineer",
+    "Assign PEAA-2.3 to Release Engineer"
+  ]
+}

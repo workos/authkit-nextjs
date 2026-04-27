@@ -1,17 +1,15 @@
-import { withAuth } from '@workos-inc/authkit-nextjs';
 import { Text, Heading, TextField, Flex, Box } from '@radix-ui/themes';
+import { requireMemberContext } from '@/lib/auth-context';
 
 export default async function AccountPage() {
-  const { user, role, permissions } = await withAuth({ ensureSignedIn: true });
+  const memberContext = await requireMemberContext();
 
   const userFields = [
-    ['First name', user?.firstName],
-    ['Last name', user?.lastName],
-    ['Email', user?.email],
-    role ? ['Role', role] : [],
-    permissions ? ['Permissions', permissions] : [],
-    ['Id', user?.id],
-  ].filter((arr) => arr.length > 0);
+    ['Member ID', memberContext.memberId],
+    ['Organization ID', memberContext.organizationId],
+    ['Role', memberContext.role],
+    ['WorkOS User ID', memberContext.workosUserId],
+  ];
 
   return (
     <>

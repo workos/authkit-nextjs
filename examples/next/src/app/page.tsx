@@ -17,6 +17,12 @@ export default async function HomePage() {
             <Button asChild size="3" variant="soft">
               <NextLink href="/account">View account</NextLink>
             </Button>
+            <Button asChild size="3" variant="soft">
+              <NextLink href="/customers">Open customers</NextLink>
+            </Button>
+            <Button asChild size="3" variant="soft">
+              <NextLink href="/today">Open today</NextLink>
+            </Button>
             <SignInButton large />
           </Flex>
         </>

@@ -1,0 +1,359 @@
+From 7577baeac8f01ce889ae519e7720e0e0f4e92b00 Mon Sep 17 00:00:00 2001
+From: Komala Chenna <komala@peazylabs.com>
+Date: Sun, 26 Apr 2026 18:58:23 -0700
+Subject: [PATCH] test(sql): record PEAA-10 verification harness evidence
+
+---
+ .../peaa-13-sql-verification-evidence.md      |  22 ++
+ .../peaa10_verification_20260426_185729.log   |  93 ++++++++
+ .../sql/verify_peaa10_customer_person.sql     | 209 ++++++++++++++++++
+ 3 files changed, 324 insertions(+)
+ create mode 100644 docs/superpowers/engineering/peaa-13-sql-verification-evidence.md
+ create mode 100644 docs/superpowers/engineering/sql/artifacts/peaa10_verification_20260426_185729.log
+ create mode 100644 docs/superpowers/engineering/sql/verify_peaa10_customer_person.sql
+
+diff --git a/docs/superpowers/engineering/peaa-13-sql-verification-evidence.md b/docs/superpowers/engineering/peaa-13-sql-verification-evidence.md
+new file mode 100644
+index 0000000..450a07d
+--- /dev/null
++++ b/docs/superpowers/engineering/peaa-13-sql-verification-evidence.md
+@@ -0,0 +1,22 @@
++# PEAA-13 SQL Verification Evidence
++
++Date: 2026-04-26 (America/Los_Angeles)
++Issue: PEAA-13 (`PEAA-1.3a.i: Execute PEAA-10 SQL Verification Harness`)
++
++## Command
++
++```bash
++DATABASE_URL=postgres://$(whoami)@localhost:5432/postgres ./docs/superpowers/engineering/sql/run_peaa10_verification.sh
++```
++
++## Result
++
++PASS
++
++Key terminal lines:
++- `[PEAA-10] Verification harness passed (all assertions succeeded, transaction rolled back)`
++- `PEAA-10 SQL verification completed successfully`
++
++## Raw Console Output Artifact
++
++`docs/superpowers/engineering/sql/artifacts/peaa10_verification_20260426_185729.log`
+diff --git a/docs/superpowers/engineering/sql/artifacts/peaa10_verification_20260426_185729.log b/docs/superpowers/engineering/sql/artifacts/peaa10_verification_20260426_185729.log
+new file mode 100644
+index 0000000..c18cfb1
+--- /dev/null
++++ b/docs/superpowers/engineering/sql/artifacts/peaa10_verification_20260426_185729.log
+@@ -0,0 +1,93 @@
++CREATE EXTENSION
++DO
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE TABLE
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++DROP TRIGGER
++CREATE TRIGGER
++DROP TRIGGER
++CREATE TRIGGER
++DROP TRIGGER
++CREATE TRIGGER
++DROP TRIGGER
++CREATE TRIGGER
++DROP TRIGGER
++CREATE TRIGGER
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++CREATE INDEX
++BEGIN
++DELETE 10
++DELETE 32
++DELETE 32
++DELETE 16
++DELETE 32
++DELETE 24
++DELETE 4
++DELETE 8
++DELETE 4
++INSERT 0 4
++INSERT 0 8
++INSERT 0 24
++INSERT 0 32
++INSERT 0 16
++INSERT 0 32
++INSERT 0 32
++INSERT 0 4
++INSERT 0 10
++COMMIT
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++CREATE FUNCTION
++[PEAA-10] Starting customer/person verification harness
++BEGIN
++INSERT 0 2
++DO
++DO
++DO
++DO
++DO
++DO
++ROLLBACK
++[PEAA-10] Verification harness passed (all assertions succeeded, transaction rolled back)
++PEAA-10 SQL verification completed successfully
+diff --git a/docs/superpowers/engineering/sql/verify_peaa10_customer_person.sql b/docs/superpowers/engineering/sql/verify_peaa10_customer_person.sql
+new file mode 100644
+index 0000000..b5fd422
+--- /dev/null
++++ b/docs/superpowers/engineering/sql/verify_peaa10_customer_person.sql
+@@ -0,0 +1,209 @@
++-- PEAA-10 executable verification harness
++-- Usage:
++--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/superpowers/engineering/sql/verify_peaa10_customer_person.sql
++
++\echo '[PEAA-10] Starting customer/person verification harness'
++
++BEGIN;
++
++-- Stable IDs for deterministic verification.
++-- Separate organization used for cross-org negative checks.
++INSERT INTO members (id, organization_id, workos_user_id, email, name, role)
++VALUES
++  ('90000000-0000-4000-8000-000000000001', 'org_verify_peaa10', 'user_verify_admin', 'verify.admin@peazy.test', 'Verify Admin', 'admin'),
++  ('90000000-0000-4000-8000-000000000002', 'org_verify_peaa10_other', 'user_verify_other', 'verify.other@peazy.test', 'Verify Other', 'admin')
++ON CONFLICT DO NOTHING;
++
++-- Positive: create customer with same-org owner.
++DO $$
++DECLARE
++  v_customer customers;
++BEGIN
++  v_customer := create_customer_record(
++    'org_verify_peaa10',
++    'Verification Customer',
++    '90000000-0000-4000-8000-000000000001'::uuid,
++    'https://verify.example',
++    'active',
++    'active',
++    'Created by verification harness'
++  );
++
++  IF v_customer.organization_id <> 'org_verify_peaa10' THEN
++    RAISE EXCEPTION 'customer org mismatch';
++  END IF;
++END;
++$$;
++
++-- Negative: reject cross-org owner.
++DO $$
++BEGIN
++  PERFORM create_customer_record(
++    'org_verify_peaa10',
++    'Should Fail Owner Scope',
++    '90000000-0000-4000-8000-000000000002'::uuid,
++    NULL,
++    'active',
++    'active',
++    NULL
++  );
++
++  RAISE EXCEPTION 'expected cross-org owner rejection did not occur';
++EXCEPTION
++  WHEN OTHERS THEN
++    IF POSITION('same organization' IN SQLERRM) = 0 THEN
++      RAISE;
++    END IF;
++END;
++$$;
++
++-- Positive: create person linked to valid customer.
++DO $$
++DECLARE
++  v_customer_id uuid;
++  v_person people;
++BEGIN
++  SELECT id
++  INTO v_customer_id
++  FROM customers
++  WHERE organization_id = 'org_verify_peaa10'
++    AND name = 'Verification Customer'
++  ORDER BY created_at DESC
++  LIMIT 1;
++
++  IF v_customer_id IS NULL THEN
++    RAISE EXCEPTION 'verification customer not found';
++  END IF;
++
++  v_person := create_person_record(
++    'org_verify_peaa10',
++    v_customer_id,
++    'Pat',
++    'Verifier',
++    'pat.verifier@peazy.test',
++    NULL,
++    'CS Lead',
++    'champion',
++    'strong',
++    'PEAA-10 verification person'
++  );
++
++  IF v_person.organization_id <> 'org_verify_peaa10' THEN
++    RAISE EXCEPTION 'person org mismatch';
++  END IF;
++END;
++$$;
++
++-- Negative: reject person creation against foreign org customer.
++DO $$
++DECLARE
++  v_other_customer_id uuid;
++BEGIN
++  INSERT INTO customers (id, organization_id, name, lifecycle_stage, status)
++  VALUES (
++    '90000000-0000-4000-8000-000000000101',
++    'org_verify_peaa10_other',
++    'Other Org Customer',
++    'active',
++    'active'
++  )
++  ON CONFLICT DO NOTHING;
++
++  v_other_customer_id := '90000000-0000-4000-8000-000000000101'::uuid;
++
++  PERFORM create_person_record(
++    'org_verify_peaa10',
++    v_other_customer_id,
++    'Cross',
++    'Org',
++    NULL,
++    NULL,
++    NULL,
++    'unknown',
++    'unknown',
++    NULL
++  );
++
++  RAISE EXCEPTION 'expected foreign-org customer rejection did not occur';
++EXCEPTION
++  WHEN OTHERS THEN
++    IF POSITION('customer not found for organization' IN SQLERRM) = 0 THEN
++      RAISE;
++    END IF;
++END;
++$$;
++
++-- Negative: notes require linked_object_type and linked_object_id together.
++DO $$
++DECLARE
++  v_customer_id uuid;
++BEGIN
++  SELECT id INTO v_customer_id
++  FROM customers
++  WHERE organization_id = 'org_verify_peaa10'
++    AND name = 'Verification Customer'
++  ORDER BY created_at DESC
++  LIMIT 1;
++
++  INSERT INTO notes (
++    organization_id,
++    customer_id,
++    title,
++    body,
++    linked_object_type,
++    linked_object_id
++  )
++  VALUES (
++    'org_verify_peaa10',
++    v_customer_id,
++    'Invalid note pair',
++    'Should fail',
++    'customer',
++    NULL
++  );
++
++  RAISE EXCEPTION 'expected note link pair check rejection did not occur';
++EXCEPTION
++  WHEN OTHERS THEN
++    IF POSITION('notes_link_pair_check' IN SQLERRM) = 0
++      AND POSITION('note linked object must exist in same organization and customer scope' IN SQLERRM) = 0 THEN
++      RAISE;
++    END IF;
++END;
++$$;
++
++-- Positive: list/detail read primitives return data.
++DO $$
++DECLARE
++  v_customer_id uuid;
++  v_list_count integer;
++  v_people_count integer;
++BEGIN
++  SELECT id INTO v_customer_id
++  FROM customers
++  WHERE organization_id = 'org_verify_peaa10'
++    AND name = 'Verification Customer'
++  ORDER BY created_at DESC
++  LIMIT 1;
++
++  SELECT COUNT(*)
++  INTO v_list_count
++  FROM get_customers_with_metrics('org_verify_peaa10', NULL, 50, 0);
++
++  SELECT COUNT(*)
++  INTO v_people_count
++  FROM get_customer_people('org_verify_peaa10', v_customer_id);
++
++  IF v_list_count < 1 THEN
++    RAISE EXCEPTION 'expected at least one customer row in metrics view';
++  END IF;
++
++  IF v_people_count < 1 THEN
++    RAISE EXCEPTION 'expected at least one person row in customer people view';
++  END IF;
++END;
++$$;
++
++ROLLBACK;
++
++\echo '[PEAA-10] Verification harness passed (all assertions succeeded, transaction rolled back)'
+-- 
+2.50.1 (Apple Git-155)
+

@@ -35,6 +35,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                             <Button asChild variant="soft">
                               <NextLink href="/account">Account</NextLink>
                             </Button>
+
+                            <Button asChild variant="soft">
+                              <NextLink href="/customers">Customers</NextLink>
+                            </Button>
+
+                            <Button asChild variant="soft">
+                              <NextLink href="/people">People</NextLink>
+                            </Button>
                           </Flex>
 
                           <SignInButton />
