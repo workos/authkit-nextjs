@@ -39,3 +39,4 @@ Notes:
 - Escalation (2026-04-27T02:32:01Z): opened upstream issue for disposition guidance: https://github.com/workos/authkit-nextjs/issues/414
 - Disposition signal (2026-04-27T02:34:18Z): escalation issue #414 was closed by @nicknisi at 2026-04-27T02:33:46Z without alternate landing instructions; treat as intentionally declined for upstream integration unless maintainers reopen with a target.
 - Closeout recommendation (2026-04-27T02:35:32Z): PEAA-13 can be closed as complete for verification execution; upstream landing declined by maintainer disposition (#412/#413/#414).
+- Archive reference (2026-04-27T02:38:52Z): posted durable recovery pointer on closed issue #414: https://github.com/workos/authkit-nextjs/issues/414#issuecomment-4323808678
