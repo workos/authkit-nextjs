@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "distinct_id: ${{ github.event.inputs.distinct_id }}"
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install Socket CLI
         run: npm install -g socket
       - name: Run Tier 1 reachability scan
