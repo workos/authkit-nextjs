@@ -14,9 +14,6 @@ importers:
       '@sindresorhus/fnv1a':
         specifier: ^3.1.0
         version: 3.1.0
-      '@workos-inc/node':
-        specifier: ^9.0.0
-        version: 9.1.0
       iron-session:
         specifier: ^8.0.4
         version: 8.0.4
@@ -54,6 +51,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4(@types/node@20.19.37)(jsdom@26.1.0)(terser@5.46.0))
+      '@workos-inc/node':
+        specifier: ^9.0.0
+        version: 9.1.0
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
@@ -1946,6 +1946,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@unpic/core@1.0.3':
     resolution: {integrity: sha512-aum9YNVUGso7MjGLD0Rp/08kywCGLqZ03/q6VQBFFakDBOXWEc8D4kPGcZ8v5wEnGRex3lE+++bOuucBp3KJ/w==}
