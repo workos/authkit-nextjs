@@ -316,7 +316,10 @@ async function updateSession(
       authenticationMethod,
     });
 
-    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encodeURIComponent(encryptedSession)}; ${getCookieOptions(request.url, true)}`);
+    newRequestHeaders.append(
+      'Set-Cookie',
+      `${cookieName}=${encodeURIComponent(encryptedSession)}; ${getCookieOptions(request.url, true)}`,
+    );
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
