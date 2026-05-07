@@ -3,9 +3,7 @@
   "extends": ["github>workos/renovate-config"],
   "enabledManagers": ["github-actions"],
   "dependencyDashboard": false,
-  "schedule": [
-    "on the 15th day of the month before 12pm"
-  ],
+  "schedule": ["on the 15th day of the month before 12pm"],
   "timezone": "UTC",
-  "rebaseWhen": "conflicted",
+  "rebaseWhen": "conflicted"
 }
