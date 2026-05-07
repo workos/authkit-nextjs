@@ -1,6 +1,6 @@
 'use server';
 
-import { sealData, unsealData } from 'iron-session';
+import { unsealData } from 'iron-session';
 import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -108,11 +108,17 @@ function isInitialDocumentRequest(request: NextRequest): boolean {
   return isDocumentRequest && !isRSCRequest && !isPrefetch;
 }
 
+const IRON_SEAL_PREFIX = 'Fe26.';
+
 async function encryptSession(session: Session) {
-  return sealData(session, {
-    password: WORKOS_COOKIE_PASSWORD,
-    ttl: 0,
-  });
+  return JSON.stringify(session);
+}
+
+async function decryptSession<T>(data: string): Promise<T> {
+  if (data.startsWith(IRON_SEAL_PREFIX)) {
+    return unsealData<T>(data, { password: WORKOS_COOKIE_PASSWORD });
+  }
+  return JSON.parse(data) as T;
 }
 
 async function updateSessionMiddleware(
@@ -553,9 +559,11 @@ export async function getSessionFromCookie(request?: NextRequest) {
   }
 
   if (cookie) {
-    return unsealData<Session>(cookie.value, {
-      password: WORKOS_COOKIE_PASSWORD,
-    });
+    try {
+      return await decryptSession<Session>(cookie.value);
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -573,7 +581,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   const authHeader = headersList.get(sessionHeaderName);
   if (!authHeader) return;
 
-  return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
+  return decryptSession<Session>(authHeader);
 }
 
 function getReturnPathname(url: string): string {

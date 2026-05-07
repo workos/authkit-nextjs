@@ -1170,4 +1170,129 @@ describe('session.ts', () => {
       });
     });
   });
+
+  describe('session sealing migration', () => {
+    it('should write session cookies as plain JSON, not iron-sealed', async () => {
+      const { saveSession } = await import('./session.js');
+
+      const sessionData = {
+        accessToken: await generateTestToken(),
+        refreshToken: 'test-refresh-token',
+        user: mockSession.user,
+      };
+
+      await saveSession(sessionData, 'https://example.com/callback');
+
+      const nextCookies = await cookies();
+      const cookie = nextCookies.get('wos-session');
+      expect(cookie).toBeDefined();
+
+      // Should be valid JSON, not an iron-sealed blob
+      expect(cookie!.value).not.toMatch(/^Fe26\./);
+      const parsed = JSON.parse(cookie!.value);
+      expect(parsed.accessToken).toBe(sessionData.accessToken);
+      expect(parsed.refreshToken).toBe(sessionData.refreshToken);
+      expect(parsed.user).toEqual(sessionData.user);
+    });
+
+    it('should read legacy iron-sealed session cookies', async () => {
+      mockSession.accessToken = await generateTestToken();
+
+      (jwtVerify as Mock).mockImplementation(() => true);
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSession(request);
+
+      expect(result.session).toBeDefined();
+      expect(result.session.user).toEqual(mockSession.user);
+    });
+
+    it('should read plain JSON session cookies', async () => {
+      mockSession.accessToken = await generateTestToken();
+
+      (jwtVerify as Mock).mockImplementation(() => true);
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set('wos-session', JSON.stringify(mockSession));
+
+      const result = await updateSession(request);
+
+      expect(result.session).toBeDefined();
+      expect(result.session.user).toEqual(mockSession.user);
+    });
+
+    it('should read legacy iron-sealed session from header', async () => {
+      mockSession.accessToken = await generateTestToken();
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+      expect(result.user).toEqual(mockSession.user);
+    });
+
+    it('should read plain JSON session from header', async () => {
+      mockSession.accessToken = await generateTestToken();
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-workos-session', JSON.stringify(mockSession));
+
+      const result = await withAuth();
+      expect(result.user).toEqual(mockSession.user);
+    });
+
+    it('should rewrite iron-sealed session as plain JSON on refresh', async () => {
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      (jwtVerify as Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const newAccessToken = await generateTestToken();
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: newAccessToken,
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      const request = new NextRequest(new URL('http://example.com'));
+
+      // Plant an iron-sealed cookie (legacy format)
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSession(request);
+
+      // After refresh, the Set-Cookie should contain plain JSON, not iron-sealed
+      const setCookieHeader = result.headers.get('Set-Cookie');
+      expect(setCookieHeader).toBeDefined();
+
+      const cookieValue = setCookieHeader!.split('wos-session=')[1].split(';')[0];
+      expect(cookieValue).not.toMatch(/^Fe26\./);
+      const parsed = JSON.parse(decodeURIComponent(cookieValue));
+      expect(parsed.accessToken).toBe(newAccessToken);
+    });
+
+    it('should gracefully handle malformed cookie values', async () => {
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set('wos-session', 'not-json-and-not-iron');
+
+      const result = await updateSession(request, {
+        debug: true,
+      });
+
+      expect(result.session.user).toBeNull();
+      expect(console.log).toHaveBeenCalledWith('No session found from cookie');
+    });
+  });
 });
