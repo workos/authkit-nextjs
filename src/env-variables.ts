@@ -17,8 +17,14 @@ const WORKOS_CLAIM_TOKEN = getEnvVariable('WORKOS_CLAIM_TOKEN');
 // Required env variables
 const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY') ?? '';
 const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID') ?? '';
-const WORKOS_COOKIE_PASSWORD = getEnvVariable('WORKOS_COOKIE_PASSWORD') ?? '';
+const WORKOS_COOKIE_PASSWORD =
+  getEnvVariable('WORKOS_COOKIE_PASSWORD') || deriveCookiePassword(WORKOS_API_KEY, WORKOS_CLIENT_ID);
 const WORKOS_REDIRECT_URI = process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI ?? '';
+
+function deriveCookiePassword(apiKey: string, clientId: string): string {
+  if (!apiKey || !clientId) return '';
+  return `wos-ck:${apiKey}:${clientId}`;
+}
 
 export {
   WORKOS_API_HOSTNAME,

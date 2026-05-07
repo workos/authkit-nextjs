@@ -202,7 +202,7 @@ describe('session.ts', () => {
           [],
         );
       }).rejects.toThrow(
-        'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+        'Cookie password must be at least 32 characters. Either set WORKOS_COOKIE_PASSWORD or ensure WORKOS_API_KEY and WORKOS_CLIENT_ID are configured.',
       );
 
       setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
@@ -225,7 +225,7 @@ describe('session.ts', () => {
           [],
         );
       }).rejects.toThrow(
-        'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+        'Cookie password must be at least 32 characters. Either set WORKOS_COOKIE_PASSWORD or ensure WORKOS_API_KEY and WORKOS_CLIENT_ID are configured.',
       );
 
       setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);

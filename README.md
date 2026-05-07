@@ -31,11 +31,16 @@ Make sure the following values are present in your `.env.local` environment vari
 ```sh
 WORKOS_CLIENT_ID="client_..." # retrieved from the WorkOS dashboard
 WORKOS_API_KEY="sk_test_..." # retrieved from the WorkOS dashboard
-WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
 NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
 ```
 
-`WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the session cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
+`WORKOS_COOKIE_PASSWORD` is optional. When not set, a password is automatically derived from your `WORKOS_API_KEY` and `WORKOS_CLIENT_ID`. You can set it explicitly if you need cookie continuity across API key rotations or want to share sessions across apps/domains:
+
+```sh
+WORKOS_COOKIE_PASSWORD="<your password>" # optional, must be at least 32 characters
+```
+
+You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
 
 ```
 openssl rand -base64 24
@@ -68,7 +73,7 @@ WORKOS_COOKIE_NAME='my-auth-cookie'
 > [!WARNING]
 > Setting `WORKOS_COOKIE_SAMESITE='none'` allows cookies to be sent in cross-origin contexts (like iframes), but reduces protection against CSRF attacks. This setting forces cookies to be secure (HTTPS only) and should only be used when absolutely necessary for your application architecture.
 
-> [!TIP] >`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains. Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains. Not needed for most use cases.
+> [!TIP] >`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains. When sharing sessions, set `WORKOS_COOKIE_PASSWORD` explicitly to the same value across apps. Not needed for most use cases.
 
 ## Setup
 
