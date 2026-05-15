@@ -452,13 +452,51 @@ export default function MyComponent() {
 }
 ```
 
-### Get the enabled flags for the logged in user
+### Evaluate feature flags
 
-For situations where you need access to the authenticated user's currently active feature flags, use `withAuth` to retrieve the flags from the WorkOS session.
+There are two ways to evaluate feature flags with AuthKit Next.js:
+
+- Use the `feature_flags` access token claim when you want a simple session-scoped list of enabled flags for the signed-in user.
+- Use the Feature Flags runtime client when you want server-side evaluation without storing every active flag in the user's session cookie.
+
+#### Option 1: Use the `feature_flags` claim
+
+For situations where you need access to the authenticated user's currently active feature flags and your environment includes the `feature_flags` access token claim, use `withAuth` to retrieve the flags from the WorkOS session.
 
 ```jsx
 const { featureFlags } = await withAuth();
 ```
+
+This is convenient for small flag sets because the flags are available with the user's session. Flag changes appear the next time the user logs in or the session is refreshed.
+
+#### Option 2: Use the runtime client
+
+Use the runtime client when your application has many feature flags, when the `feature_flags` claim makes the access token too large, or when you need server-side flag evaluation that stays in sync independently of the user's session. The runtime client keeps flag configuration in memory and syncs changes in the background, so create one shared instance per server process rather than one client per request.
+
+```tsx
+import { getFeatureFlagsRuntimeClient, withAuth } from '@workos-inc/authkit-nextjs';
+
+const featureFlags = getFeatureFlagsRuntimeClient();
+
+export default async function DashboardPage() {
+  const { user, organizationId } = await withAuth({ ensureSignedIn: true });
+
+  try {
+    await featureFlags.waitUntilReady({ timeoutMs: 5000 });
+  } catch (error) {
+    console.error('Feature flags client failed to initialize:', error);
+  }
+
+  const enabled = featureFlags.isEnabled('advanced-analytics', {
+    userId: user.id,
+    organizationId,
+  });
+
+  return enabled ? <AdvancedAnalytics /> : <BasicAnalytics />;
+}
+```
+
+The `getFeatureFlagsRuntimeClient` helper returns the same runtime client for every call in the current server process. Options passed to `getFeatureFlagsRuntimeClient(options)` are only used when the client is created for the first time.
 
 ### Requiring auth
 
