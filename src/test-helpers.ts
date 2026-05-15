@@ -54,7 +54,43 @@ export async function generateSession(overrides: Partial<User> = {}) {
     org_id: 'org_123',
   });
 
-  // Create and set a session cookie
+  const sessionData = JSON.stringify({
+    accessToken,
+    refreshToken: 'refresh_token_123',
+    user: mockUser,
+  });
+
+  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  const nextCookies = await cookies();
+  nextCookies.set(cookieName, sessionData);
+}
+
+/**
+ * Create a legacy iron-sealed session cookie for backward compatibility tests.
+ */
+export async function generateSealedSession(overrides: Partial<User> = {}) {
+  const mockUser = {
+    id: 'user_123',
+    email: 'test@example.com',
+    emailVerified: true,
+    profilePictureUrl: null,
+    firstName: 'Test',
+    lastName: 'User',
+    object: 'user',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    lastSignInAt: '2024-01-01T00:00:00Z',
+    externalId: null,
+    metadata: {},
+    locale: null,
+    ...overrides,
+  } satisfies User;
+
+  const accessToken = await generateTestToken({
+    sid: 'session_123',
+    org_id: 'org_123',
+  });
+
   const encryptedSession = await sealData(
     {
       accessToken,
