@@ -1,7 +1,6 @@
 import type { FeatureFlagsRuntimeClient, RuntimeClientOptions } from '@workos-inc/node';
+import { lazy } from './utils.js';
 import { getWorkOS } from './workos.js';
-
-let featureFlagsRuntimeClient: FeatureFlagsRuntimeClient | undefined;
 
 /**
  * Returns a shared WorkOS Feature Flags runtime client.
@@ -10,8 +9,7 @@ let featureFlagsRuntimeClient: FeatureFlagsRuntimeClient | undefined;
  * should be created once per server process instead of once per request.
  * Options are only used when the client is created for the first time.
  */
-export function getFeatureFlagsRuntimeClient(options?: RuntimeClientOptions): FeatureFlagsRuntimeClient {
-  featureFlagsRuntimeClient ??= getWorkOS().featureFlags.createRuntimeClient(options);
-
-  return featureFlagsRuntimeClient;
-}
+export const getFeatureFlagsRuntimeClient = lazy(
+  (options?: RuntimeClientOptions): FeatureFlagsRuntimeClient =>
+    getWorkOS().featureFlags.createRuntimeClient(options),
+);

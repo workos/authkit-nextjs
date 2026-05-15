@@ -3,6 +3,7 @@ import { getWorkOS } from './workos.js';
 describe('feature flags', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.resetModules();
   });
 
   it('memoizes the feature flags runtime client', async () => {
