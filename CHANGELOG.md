@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.0](https://github.com/workos/authkit-nextjs/compare/v4.0.1...v4.1.0) (2026-05-15)
+
+
+### Features
+
+* Add feature flags runtime client helper ([#428](https://github.com/workos/authkit-nextjs/issues/428)) ([be6b932](https://github.com/workos/authkit-nextjs/commit/be6b9328dd75327211dcfc5be89c77b48bd18bd3))
+
 ## [4.0.1](https://github.com/workos/authkit-nextjs/compare/v4.0.0...v4.0.1) (2026-04-23)
 
 
