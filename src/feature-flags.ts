@@ -10,6 +10,5 @@ import { getWorkOS } from './workos.js';
  * Options are only used when the client is created for the first time.
  */
 export const getFeatureFlagsRuntimeClient = lazy(
-  (options?: RuntimeClientOptions): FeatureFlagsRuntimeClient =>
-    getWorkOS().featureFlags.createRuntimeClient(options),
+  (options?: RuntimeClientOptions): FeatureFlagsRuntimeClient => getWorkOS().featureFlags.createRuntimeClient(options),
 );

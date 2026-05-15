@@ -481,7 +481,11 @@ const featureFlags = getFeatureFlagsRuntimeClient();
 export default async function DashboardPage() {
   const { user, organizationId } = await withAuth({ ensureSignedIn: true });
 
-  await featureFlags.waitUntilReady({ timeoutMs: 5000 });
+  try {
+    await featureFlags.waitUntilReady({ timeoutMs: 5000 });
+  } catch (error) {
+    console.error('Feature flags client failed to initialize:', error);
+  }
 
   const enabled = featureFlags.isEnabled('advanced-analytics', {
     userId: user.id,
