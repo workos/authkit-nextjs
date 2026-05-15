@@ -16,6 +16,7 @@ export {
 } from './middleware-helpers.js';
 import { getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
 import { validateApiKey } from './validate-api-key.js';
+import { getFeatureFlagsRuntimeClient } from './feature-flags.js';
 import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
@@ -28,6 +29,7 @@ export {
   authkitProxy,
   getSignInUrl,
   getSignUpUrl,
+  getFeatureFlagsRuntimeClient,
   getTokenClaims,
   getWorkOS,
   handleAuth,
