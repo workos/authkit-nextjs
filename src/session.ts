@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
-import { getCookieOptions, getJwtCookie, getPKCECookieOptions } from './cookie.js';
+import { getCookieOptions, getJwtCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
 import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
@@ -18,30 +18,13 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
-import { getPKCECookieNameForState, setPKCECookie } from './pkce.js';
+import { appendPKCESetCookieHeader, setPKCECookie, setPendingPKCERedirectHeaders } from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
 import { lazy, setCachePreventionHeaders } from './utils.js';
-
-// Only set the PKCE cookie for initial document navigations — fetch/XHR/RSC/prefetch
-// requests never follow cross-origin redirects so they'll never complete the OAuth
-// flow and therefore don't need the cookie set.
-// This prevents cookie bloat (HTTP 431) when multiple requests fire concurrently
-// now that we are generating unique cookie names per flow, they add up quickly if
-// we don't limit to just the initial navigation request
-function appendPKCESetCookieHeader(request: NextRequest, headers: Headers, sealedState: string): void {
-  if (!isInitialDocumentRequest(request)) {
-    return;
-  }
-
-  headers.append(
-    'Set-Cookie',
-    `${getPKCECookieNameForState(sealedState)}=${sealedState}; ${getPKCECookieOptions(request.url, true)}`,
-  );
-}
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -226,6 +209,7 @@ async function updateSession(
       screenHint: options.screenHint,
     });
 
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
     appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
 
     return {
@@ -368,6 +352,7 @@ async function updateSession(
       redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
     });
 
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
     appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
 
     return {
