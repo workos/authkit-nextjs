@@ -18,7 +18,12 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
-import { appendPKCESetCookieHeader, isInitialDocumentRequest, setPKCECookie, setPendingPKCERedirectHeaders } from './pkce.js';
+import {
+  appendPKCESetCookieHeader,
+  isInitialDocumentRequest,
+  setPKCECookie,
+  setPendingPKCERedirectHeaders,
+} from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
@@ -75,7 +80,6 @@ function applyCacheSecurityHeaders(
 
   setCachePreventionHeaders(headers);
 }
-
 
 async function encryptSession(session: Session) {
   return sealData(session, {
