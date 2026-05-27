@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.1](https://github.com/workos/authkit-nextjs/compare/v4.1.0...v4.1.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* defer PKCE cookie write until AuthKit redirect ([#432](https://github.com/workos/authkit-nextjs/issues/432)) ([4f63d2f](https://github.com/workos/authkit-nextjs/commit/4f63d2f35f0ef1a07888a34e8872278881d0405a))
+
 ## [4.1.0](https://github.com/workos/authkit-nextjs/compare/v4.0.1...v4.1.0) (2026-05-15)
 
 
