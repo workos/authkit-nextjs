@@ -18,7 +18,7 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
-import { appendPKCESetCookieHeader, setPKCECookie, setPendingPKCERedirectHeaders } from './pkce.js';
+import { appendPKCESetCookieHeader, isInitialDocumentRequest, setPKCECookie, setPendingPKCERedirectHeaders } from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
@@ -76,20 +76,6 @@ function applyCacheSecurityHeaders(
   setCachePreventionHeaders(headers);
 }
 
-/**
- * Determines if a request is for an initial document load (not API/RSC/prefetch)
- */
-function isInitialDocumentRequest(request: NextRequest): boolean {
-  const accept = request.headers.get('accept') || '';
-  const isDocumentRequest = accept.includes('text/html');
-  const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
-  const isPrefetch =
-    request.headers.get('Purpose') === 'prefetch' ||
-    request.headers.get('Sec-Purpose') === 'prefetch' ||
-    request.headers.has('Next-Router-Prefetch');
-
-  return isDocumentRequest && !isRSCRequest && !isPrefetch;
-}
 
 async function encryptSession(session: Session) {
   return sealData(session, {

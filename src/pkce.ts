@@ -102,7 +102,7 @@ export function stripPKCESetCookieHeaders(headers: Headers): void {
   }
 }
 
-function isInitialDocumentRequest(request: NextRequest): boolean {
+export function isInitialDocumentRequest(request: NextRequest): boolean {
   const accept = request.headers.get('accept') || '';
   const isDocumentRequest = accept.includes('text/html');
   const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
