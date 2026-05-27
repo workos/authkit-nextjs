@@ -16,6 +16,7 @@ function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 import { getStateFromPKCECookieValue } from './pkce.js';
+import { handleAuthkitHeaders } from './middleware-helpers.js';
 
 vi.mock('jose', async () => {
   const actual = await vi.importActual<typeof import('jose')>('jose');
@@ -615,7 +616,10 @@ describe('session.ts', () => {
 
   describe('updateSession', () => {
     it('should return an authorization url if the session is invalid', async () => {
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+      const request = new NextRequest(new URL('http://example.com/protected'), {
+        headers: { accept: 'text/html' },
+      });
+      const result = await updateSession(request, {
         debug: true,
         screenHint: 'sign-up',
       });
@@ -623,6 +627,12 @@ describe('session.ts', () => {
       expect(result.authorizationUrl).toBeDefined();
       expect(result.authorizationUrl).toContain('screen_hint=sign-up');
       expect(result.session.user).toBeNull();
+      expect(result.headers.getSetCookie().some((c) => c.includes('wos-auth-verifier'))).toBe(true);
+      expect(
+        handleAuthkitHeaders(request, result.headers)
+          .headers.getSetCookie()
+          .some((c) => c.includes('wos-auth-verifier')),
+      ).toBe(false);
       expect(console.log).toHaveBeenCalledWith('No session found from cookie');
     });
 
@@ -696,6 +706,134 @@ describe('session.ts', () => {
       expect(response.session.user).toBeNull();
       expect(response.authorizationUrl).toBeDefined();
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
+    });
+
+    describe('PKCE cookie cleanup', () => {
+      function documentRequest(url = 'http://example.com/protected'): NextRequest {
+        return new NextRequest(new URL(url), {
+          headers: { accept: 'text/html' },
+        });
+      }
+
+      function getRedirectSetCookieHeaders(
+        request: NextRequest,
+        result: Awaited<ReturnType<typeof updateSession>>,
+      ): string[] {
+        return handleAuthkitHeaders(request, result.headers, {
+          redirect: result.authorizationUrl,
+        }).headers.getSetCookie();
+      }
+
+      function addStalePKCECookies(request: NextRequest, count: number): void {
+        for (let i = 0; i < count; i++) {
+          request.cookies.set(`wos-auth-verifier-${i.toString(16).padStart(8, '0')}`, `stale-state-${i}`);
+        }
+      }
+
+      it('should not expire PKCE cookies when below the threshold (concurrent flows preserved)', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier-aaaaaaaa', 'stale-sealed-state-a');
+        request.cookies.set('wos-auth-verifier-bbbbbbbb', 'stale-sealed-state-b');
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-aaaaaaaa=;'))).toBe(false);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-bbbbbbbb=;'))).toBe(false);
+        // The new PKCE cookie should still be set
+        expect(
+          setCookies.some(
+            (c) =>
+              c.match(/^wos-auth-verifier-[0-9a-f]{8}=.+/) &&
+              !c.startsWith('wos-auth-verifier-aaaaaaaa') &&
+              !c.startsWith('wos-auth-verifier-bbbbbbbb'),
+          ),
+        ).toBe(true);
+      });
+
+      it('should expire all PKCE cookies when at or above the threshold', async () => {
+        const request = documentRequest();
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        for (let i = 0; i < 5; i++) {
+          const name = `wos-auth-verifier-${i.toString(16).padStart(8, '0')}`;
+          expect(setCookies.some((c) => c.startsWith(`${name}=;`))).toBe(true);
+        }
+        // The new PKCE cookie should also be present
+        expect(setCookies.some((c) => c.match(/^wos-auth-verifier-[0-9a-f]{8}=.+/) && !c.includes('=;'))).toBe(true);
+      });
+
+      it('should expire stale PKCE cookies when refresh fails and threshold exceeded', async () => {
+        mockSession.accessToken = await generateTestToken({}, true);
+
+        (jwtVerify as Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+
+        const request = documentRequest();
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-00000000=;'))).toBe(true);
+      });
+
+      it('should not expire PKCE cookies for non-document requests', async () => {
+        const request = new NextRequest(new URL('http://example.com/protected'), {
+          headers: { RSC: '1' },
+        });
+        addStalePKCECookies(request, 10);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.includes('wos-auth-verifier'))).toBe(false);
+      });
+
+      it('should not expire non-PKCE cookies', async () => {
+        const request = documentRequest();
+        request.cookies.set('some-other-cookie', 'value');
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('some-other-cookie=;'))).toBe(false);
+      });
+
+      it('should not expire legacy wos-auth-verifier cookie when below threshold', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier', 'legacy-sealed-state');
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier=;'))).toBe(false);
+      });
+
+      it('should expire legacy wos-auth-verifier cookie when threshold exceeded', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier', 'legacy-sealed-state');
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier=;'))).toBe(true);
+      });
     });
 
     it('should call onSessionRefreshSuccess when refresh succeeds', async () => {

@@ -7,6 +7,7 @@ import {
   isAuthkitRequestHeader,
   AUTHKIT_REQUEST_HEADERS,
 } from './middleware-helpers.js';
+import { appendPKCESetCookieHeader, setPendingPKCERedirectHeaders } from './pkce.js';
 
 describe('middleware-helpers', () => {
   function createMockRequest(url = 'https://example.com/test', method = 'GET'): NextRequest {
@@ -210,6 +211,42 @@ describe('middleware-helpers', () => {
 
       expect(handleAuthkitHeaders(request, headers, { redirect: '' }).status).toBe(200);
       expect(handleAuthkitHeaders(request, headers, { redirect: undefined }).status).toBe(200);
+    });
+
+    it('should set pending PKCE cookie when redirecting to the generated authorization URL', () => {
+      const request = new NextRequest('https://example.com/app', {
+        headers: { accept: 'text/html' },
+      });
+      const authorizationUrl = 'https://api.workos.com/user_management/authorize?client_id=client_123&state=abc';
+      const headers = new Headers();
+      setPendingPKCERedirectHeaders(headers, authorizationUrl, 'sealed-state');
+      appendPKCESetCookieHeader(request, headers, 'sealed-state');
+
+      const response = handleAuthkitHeaders(request, headers, { redirect: authorizationUrl });
+      const setCookies = response.headers.getSetCookie();
+
+      expect(setCookies.filter((c) => /^wos-auth-verifier-[0-9a-f]{8}=sealed-state;/.test(c))).toHaveLength(1);
+      expect(response.headers.get('x-workos-pkce-state')).toBeNull();
+      expect(response.headers.get('x-workos-authorization-url')).toBeNull();
+    });
+
+    it('should not set pending PKCE cookie without a matching AuthKit redirect', () => {
+      const request = new NextRequest('https://example.com/app', {
+        headers: { accept: 'text/html' },
+      });
+      const authorizationUrl = 'https://api.workos.com/user_management/authorize?client_id=client_123&state=abc';
+      const headers = new Headers();
+      setPendingPKCERedirectHeaders(headers, authorizationUrl, 'sealed-state');
+      appendPKCESetCookieHeader(request, headers, 'sealed-state');
+      headers.append('Set-Cookie', 'other=value; Path=/; HttpOnly');
+
+      const nextResponse = handleAuthkitHeaders(request, headers);
+      const customRedirectResponse = handleAuthkitHeaders(request, headers, { redirect: '/new-path' });
+
+      expect(nextResponse.headers.getSetCookie().some((c) => c.includes('wos-auth-verifier'))).toBe(false);
+      expect(customRedirectResponse.headers.getSetCookie().some((c) => c.includes('wos-auth-verifier'))).toBe(false);
+      expect(nextResponse.headers.getSetCookie().some((c) => c.startsWith('other=value;'))).toBe(true);
+      expect(customRedirectResponse.headers.getSetCookie().some((c) => c.startsWith('other=value;'))).toBe(true);
     });
   });
 
