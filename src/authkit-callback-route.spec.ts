@@ -243,6 +243,7 @@ describe('authkit-callback-route', () => {
       const appOrigin = 'http://example.com';
       const hostileReturnPathnames = [
         'javascript:alert(document.domain)',
+        'data:text/html,<script>alert(1)</script>',
         'https://evil.com/phishing',
         '//evil.com/phishing',
         '/\\evil.com/phishing',
