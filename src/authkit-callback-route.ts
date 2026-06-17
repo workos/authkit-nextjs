@@ -50,9 +50,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // CSRF verification: both channels (cookie + URL state) must be present and match
       if (!pkceCookie) {
-        throw new Error(
-          'Sign-in session could not be verified. Please try signing in again.',
-        );
+        throw new Error('Sign-in session could not be verified. Please try signing in again.');
       }
 
       if (state !== pkceCookie) {
