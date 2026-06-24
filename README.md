@@ -992,11 +992,11 @@ The `wos-auth-verifier` cookie must survive the round-trip from sign-in initiati
 
 If the cookie is missing or doesn't match, authentication will fail with one of:
 
-- `Auth cookie missing` — the cookie was not sent back with the callback request. This typically happens when a reverse proxy or CDN strips `Set-Cookie` headers on redirects.
+- `Sign-in session could not be verified` — the cookie was not sent back with the callback request. This typically happens when the session has expired or a reverse proxy or CDN strips `Set-Cookie` headers on redirects.
 - `OAuth state mismatch` — the cookie and URL `state` parameter don't match, indicating a possible CSRF attack or cookie corruption.
 
 > [!IMPORTANT]
-> **Upgrading to v3:** Previous versions would silently fall back to verifying only the URL `state` parameter when the cookie was missing. This fallback has been removed because it disabled CSRF protection. If you see `Auth cookie missing` errors after upgrading, ensure that `Set-Cookie` headers are propagated on redirects between your application and the user's browser.
+> **Upgrading to v3:** Previous versions would silently fall back to verifying only the URL `state` parameter when the cookie was missing. This fallback has been removed because it disabled CSRF protection. If you see `Sign-in session could not be verified` errors after upgrading, ensure that `Set-Cookie` headers are propagated on redirects between your application and the user's browser.
 
 ### Troubleshooting
 
