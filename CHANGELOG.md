@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.2](https://github.com/workos/authkit-nextjs/compare/v4.1.1...v4.1.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* Improve auth cookie missing error message ([#440](https://github.com/workos/authkit-nextjs/issues/440)) ([39af2bb](https://github.com/workos/authkit-nextjs/commit/39af2bb2cbe1af4e3c0d542c62ac3c00c61ecc88))
+
 ## [4.1.1](https://github.com/workos/authkit-nextjs/compare/v4.1.0...v4.1.1) (2026-05-27)
 
 
