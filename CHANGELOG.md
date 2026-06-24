@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.3](https://github.com/workos/authkit-nextjs/compare/v4.1.2...v4.1.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* prevent cross-organization disclosure in getOrganizationAction ([#443](https://github.com/workos/authkit-nextjs/issues/443)) ([6b2ea66](https://github.com/workos/authkit-nextjs/commit/6b2ea661e0ba61f872330d8a61633ca532ac0d3f))
+
 ## [4.1.2](https://github.com/workos/authkit-nextjs/compare/v4.1.1...v4.1.2) (2026-06-24)
 
 
