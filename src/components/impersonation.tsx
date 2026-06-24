@@ -4,7 +4,6 @@ import * as React from 'react';
 import { Button } from './button.js';
 import { MinMaxButton } from './min-max-button.js';
 import { getOrganizationAction, handleSignOutAction } from '../actions.js';
-import type { Organization } from '@workos-inc/node';
 import { useAuth } from './authkit-provider.js';
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
@@ -15,7 +14,7 @@ interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
 export function Impersonation({ side = 'bottom', returnTo, ...props }: ImpersonationProps) {
   const { user, impersonator, organizationId } = useAuth();
 
-  const [organization, setOrganization] = React.useState<Organization | null>(null);
+  const [organization, setOrganization] = React.useState<{ id: string; name: string } | null>(null);
 
   React.useEffect(() => {
     if (!organizationId || !impersonator || !user) return;

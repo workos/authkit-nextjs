@@ -36,7 +36,19 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
 };
 
 export const getOrganizationAction = async (organizationId: string) => {
-  return await getWorkOS().organizations.getOrganization(organizationId);
+  // Authorization: only resolve the organization the caller is currently
+  // authenticated within. The WorkOS client uses the app's API key, which can
+  // read any organization in the environment, so without this check any caller
+  // could fetch arbitrary organizations by ID (authorization bypass / IDOR).
+  const { user, organizationId: sessionOrganizationId } = await withAuth();
+  if (!user || sessionOrganizationId !== organizationId) {
+    return null;
+  }
+
+  // Return only the fields the client needs. Avoids disclosing the full
+  // organization object (metadata, externalId, stripeCustomerId, domains).
+  const { id, name } = await getWorkOS().organizations.getOrganization(organizationId);
+  return { id, name };
 };
 
 export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
