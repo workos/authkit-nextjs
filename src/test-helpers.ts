@@ -37,6 +37,7 @@ export async function generateSession(overrides: Partial<User> = {}) {
     email: 'test@example.com',
     emailVerified: true,
     profilePictureUrl: null,
+    name: null,
     firstName: 'Test',
     lastName: 'User',
     object: 'user',

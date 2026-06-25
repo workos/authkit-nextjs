@@ -6,16 +6,16 @@ The AuthKit library for Next.js provides convenient helpers for authentication a
 
 ## Installation
 
-Install the package with:
+Install the package alongside the WorkOS Node SDK (a peer dependency):
 
 ```
-pnpm i @workos-inc/authkit-nextjs
+pnpm i @workos-inc/authkit-nextjs @workos-inc/node
 ```
 
 or
 
 ```
-yarn add @workos-inc/authkit-nextjs
+yarn add @workos-inc/authkit-nextjs @workos-inc/node
 ```
 
 ## Video tutorial
