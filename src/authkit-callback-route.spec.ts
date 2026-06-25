@@ -37,6 +37,7 @@ describe('authkit-callback-route', () => {
       email: 'test@example.com',
       emailVerified: true,
       profilePictureUrl: 'https://example.com/photo.jpg',
+      name: null,
       firstName: 'Test',
       lastName: 'User',
       object: 'user' as const,
