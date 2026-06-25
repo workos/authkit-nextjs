@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.4](https://github.com/workos/authkit-nextjs/compare/v4.1.3...v4.1.4) (2026-06-25)
+
+
+### Bug Fixes
+
+* **deps:** move @workos-inc/node to peerDependencies ([#423](https://github.com/workos/authkit-nextjs/issues/423)) ([18163d7](https://github.com/workos/authkit-nextjs/commit/18163d794db3efc1c7ff59339a1b00485e4b2056))
+
 ## [4.1.3](https://github.com/workos/authkit-nextjs/compare/v4.1.2...v4.1.3) (2026-06-24)
 
 
