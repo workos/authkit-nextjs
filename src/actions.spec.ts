@@ -67,10 +67,60 @@ describe('actions', () => {
   });
 
   describe('getOrganizationAction', () => {
-    it('should return organization details', async () => {
-      const organizationId = 'org_123';
-      const result = await getOrganizationAction(organizationId);
-      expect(workos.organizations.getOrganization).toHaveBeenCalledWith(organizationId);
+    it('should return organization details for the current session organization', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      const result = await getOrganizationAction('org_123');
+      expect(workos.organizations.getOrganization).toHaveBeenCalledWith('org_123');
+      expect(result).toEqual({ id: 'org_123', name: 'Test Org' });
+    });
+
+    it('denies fetching an organization the user is not authenticated within', async () => {
+      // Session is scoped to org_123; the caller requests a different org.
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      const result = await getOrganizationAction('org_456');
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
+    it('returns null when there is no authenticated user', async () => {
+      vi.mocked(withAuth).mockResolvedValue({ user: null } as never);
+      const result = await getOrganizationAction('org_123');
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
+    it('returns only id and name, never the full organization object', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      vi.mocked(workos.organizations.getOrganization).mockResolvedValueOnce({
+        object: 'organization',
+        id: 'org_123',
+        name: 'Test Org',
+        allowProfilesOutsideOrganization: false,
+        domains: [],
+        stripeCustomerId: 'cus_should_not_leak',
+        externalId: 'ext_should_not_leak',
+        metadata: { secret: 'should_not_leak' },
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      } as never);
+
+      const result = await getOrganizationAction('org_123');
+
       expect(result).toEqual({ id: 'org_123', name: 'Test Org' });
     });
   });

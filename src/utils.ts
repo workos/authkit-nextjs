@@ -38,12 +38,12 @@ export function errorResponseWithFallback(errorBody: { error: { message: string;
  * @param fn - The function to be called once.
  * @returns A function that can only be called once.
  */
-export function lazy<T>(fn: () => T): () => T {
+export function lazy<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult): (...args: TArgs) => TResult {
   let called = false;
-  let result: T;
-  return () => {
+  let result: TResult;
+  return (...args: TArgs) => {
     if (!called) {
-      result = fn();
+      result = fn(...args);
       called = true;
     }
     return result;

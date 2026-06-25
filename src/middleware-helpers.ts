@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  PKCE_AUTHORIZATION_URL_HEADER,
+  PKCE_STATE_HEADER,
+  appendPKCESetCookieHeader,
+  stripPKCESetCookieHeaders,
+} from './pkce.js';
 
 /** Internal AuthKit headers - forwarded to downstream requests but never sent to browser. */
 export const AUTHKIT_REQUEST_HEADERS = [
@@ -112,16 +118,31 @@ export function handleAuthkitProxy(
   authkitHeaders: Headers,
   options: HandleAuthkitHeadersOptions = {},
 ): NextResponse {
-  const { requestHeaders, responseHeaders } = partitionAuthkitHeaders(request, authkitHeaders);
   const { redirect, redirectStatus } = options;
+  const headers = new Headers(authkitHeaders);
+  let redirectUrl: URL | undefined;
+
+  const pkceAuthorizationUrl = headers.get(PKCE_AUTHORIZATION_URL_HEADER);
+  const sealedState = headers.get(PKCE_STATE_HEADER);
+  if (pkceAuthorizationUrl && sealedState) {
+    stripPKCESetCookieHeaders(headers);
+  }
 
   if (redirect != null && redirect !== '') {
-    let redirectUrl: URL;
     try {
       redirectUrl = redirect instanceof URL ? redirect : new URL(redirect, request.url);
     } catch {
       throw new Error(`Invalid redirect URL: "${redirect}". Must be a valid absolute or relative URL.`);
     }
+
+    if (pkceAuthorizationUrl && sealedState && redirectUrl.toString() === new URL(pkceAuthorizationUrl).toString()) {
+      appendPKCESetCookieHeader(request, headers, sealedState);
+    }
+  }
+
+  const { requestHeaders, responseHeaders } = partitionAuthkitHeaders(request, headers);
+
+  if (redirectUrl) {
     const method = request.method.toUpperCase();
     const status = redirectStatus ?? (method === 'GET' || method === 'HEAD' ? 307 : 303);
     return applyResponseHeaders(NextResponse.redirect(redirectUrl, status), responseHeaders);

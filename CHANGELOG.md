@@ -1,5 +1,33 @@
 # Changelog
 
+## [4.1.3](https://github.com/workos/authkit-nextjs/compare/v4.1.2...v4.1.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* prevent cross-organization disclosure in getOrganizationAction ([#443](https://github.com/workos/authkit-nextjs/issues/443)) ([6b2ea66](https://github.com/workos/authkit-nextjs/commit/6b2ea661e0ba61f872330d8a61633ca532ac0d3f))
+
+## [4.1.2](https://github.com/workos/authkit-nextjs/compare/v4.1.1...v4.1.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* Improve auth cookie missing error message ([#440](https://github.com/workos/authkit-nextjs/issues/440)) ([39af2bb](https://github.com/workos/authkit-nextjs/commit/39af2bb2cbe1af4e3c0d542c62ac3c00c61ecc88))
+
+## [4.1.1](https://github.com/workos/authkit-nextjs/compare/v4.1.0...v4.1.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* defer PKCE cookie write until AuthKit redirect ([#432](https://github.com/workos/authkit-nextjs/issues/432)) ([4f63d2f](https://github.com/workos/authkit-nextjs/commit/4f63d2f35f0ef1a07888a34e8872278881d0405a))
+
+## [4.1.0](https://github.com/workos/authkit-nextjs/compare/v4.0.1...v4.1.0) (2026-05-15)
+
+
+### Features
+
+* Add feature flags runtime client helper ([#428](https://github.com/workos/authkit-nextjs/issues/428)) ([be6b932](https://github.com/workos/authkit-nextjs/commit/be6b9328dd75327211dcfc5be89c77b48bd18bd3))
+
 ## [4.0.1](https://github.com/workos/authkit-nextjs/compare/v4.0.0...v4.0.1) (2026-04-23)
 
 

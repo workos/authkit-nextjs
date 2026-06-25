@@ -233,6 +233,50 @@ describe('authkit-callback-route', () => {
       expect(location).not.toContain('https://example.com/invite');
     });
 
+    // Regression coverage for the open-redirect / javascript:-URI class reported
+    // against the `state` param. `returnPathname` is read only from the sealed
+    // (tamper-proof) PKCE cookie and the callback copies only the pathname +
+    // search onto the app's own origin, so a hostile value can never change the
+    // redirect's scheme or host. These tests pin that invariant so a refactor
+    // that started honoring the full URL would fail loudly.
+    describe('returnPathname is neutralized to the app origin', () => {
+      const appOrigin = 'http://example.com';
+      const hostileReturnPathnames = [
+        'javascript:alert(document.domain)',
+        'data:text/html,<script>alert(1)</script>',
+        'https://evil.com/phishing',
+        '//evil.com/phishing',
+        '/\\evil.com/phishing',
+        'https:/evil.com',
+      ];
+
+      it.each(hostileReturnPathnames)('keeps the redirect same-origin for %s', async (returnPathname) => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, {
+          nonce: 'foo',
+          codeVerifier: 'test-verifier',
+          returnPathname,
+        });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        const location = response.headers.get('Location');
+        expect(location).not.toBeNull();
+        const redirectUrl = new URL(location!);
+
+        // The scheme is never javascript:/data: and the host is never the
+        // attacker's — a hostile value can only ever become a path on our own
+        // origin (e.g. "https:/evil.com" lands at http://example.com/evil.com).
+        expect(redirectUrl.protocol).toBe('http:');
+        expect(redirectUrl.origin).toBe(appOrigin);
+        expect(redirectUrl.hostname).toBe('example.com');
+      });
+    });
+
     it('should use Response if NextResponse.redirect is not available', async () => {
       const originalRedirect = NextResponse.redirect;
       (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
