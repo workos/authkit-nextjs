@@ -66,6 +66,11 @@ export interface JWTPayload {
    * Permissions granted to the user associated with the JWT
    */
   permissions?: string[];
+
+  /**
+   * Time of user authentication, represented as epoch seconds
+   */
+  auth_time?: number;
 }
 
 export type TokenClaims<T> = Partial<JWTPayload & T>;

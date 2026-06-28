@@ -41,6 +41,7 @@ async function getAuthorizationUrl({
   prompt,
   state: customState,
   redirectUri,
+  maxAge,
 }: GetAuthURLOptions = {}): Promise<GetAuthURLResult> {
   const redirectUriToUse = await (async () => {
     if (redirectUri) {
@@ -75,6 +76,7 @@ async function getAuthorizationUrl({
     codeChallenge: pkce.codeChallenge,
     codeChallengeMethod: pkce.codeChallengeMethod,
     ...(claimNonce && { claimNonce }),
+    ...(maxAge !== undefined && { maxAge }),
   });
 
   return { url, sealedState };

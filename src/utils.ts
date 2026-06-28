@@ -31,6 +31,33 @@ export function errorResponseWithFallback(errorBody: { error: { message: string;
       });
 }
 
+type EvaluateRecentAuthParameters = {
+  authTime: unknown;
+  maxAgeSeconds: number;
+  nowSeconds: number;
+};
+
+/**
+ * Evaluate whether an authentication is recent enough.
+ *
+ * Fails closed: a missing or non-finite `authTime` is reported as stale. A
+ * future `authTime` (clock skew) is treated as recent rather than stale, and
+ * the `maxAge` boundary is inclusive.
+ */
+export function evaluateRecentAuth({ authTime, maxAgeSeconds, nowSeconds }: EvaluateRecentAuthParameters) {
+  if (typeof authTime !== 'number' || !Number.isFinite(authTime)) {
+    return {
+      authenticatedAt: null,
+      isStale: true,
+    } as const;
+  }
+
+  return {
+    authenticatedAt: new Date(authTime * 1000),
+    isStale: nowSeconds - authTime > maxAgeSeconds,
+  } as const;
+}
+
 /**
  * Returns a function that can only be called once.
  * Subsequent calls will return the result of the first call.

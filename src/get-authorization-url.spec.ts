@@ -70,6 +70,40 @@ describe('getAuthorizationUrl', () => {
     );
   });
 
+  it('forwards maxAge when provided', async () => {
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+    await getAuthorizationUrl({ maxAge: 300 });
+
+    expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxAge: 300,
+      }),
+    );
+  });
+
+  it('forwards maxAge of 0 (force reauth)', async () => {
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+    await getAuthorizationUrl({ maxAge: 0 });
+
+    expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxAge: 0,
+      }),
+    );
+  });
+
+  it('omits maxAge when not provided', async () => {
+    vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+    await getAuthorizationUrl({});
+
+    expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+      expect.not.objectContaining({ maxAge: expect.anything() }),
+    );
+  });
+
   describe('claim nonce', () => {
     afterEach(() => {
       delete process.env.WORKOS_CLAIM_TOKEN;

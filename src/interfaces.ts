@@ -1,6 +1,18 @@
-import type { AuthenticationResponse, OauthTokens, User } from '@workos-inc/node';
+import type { AuthenticationResponse, OauthTokens, User, WorkOS } from '@workos-inc/node';
 import { type NextRequest } from 'next/server';
 import * as v from 'valibot';
+
+/**
+ * The options object accepted by the installed SDK's `getAuthorizationUrl`.
+ *
+ * Derived from the method authkit already calls at runtime rather than from a
+ * named type import, so the version gate below never depends on whether a given
+ * `@workos-inc/node` release exports its options type by name — it only needs
+ * the method to exist, which it does across the entire peer range. `keyof` is
+ * read from the consumer's installed version at *their* compile time, so the
+ * surface tracks the peer.
+ */
+type SdkAuthorizationUrlOptions = Parameters<WorkOS['userManagement']['getAuthorizationUrl']>[0];
 
 export interface HandleAuthOptions {
   returnPathname?: string;
@@ -85,6 +97,13 @@ export interface GetAuthURLOptions {
   loginHint?: string;
   prompt?: 'consent';
   state?: string;
+  /**
+   * Maximum allowable elapsed time, in seconds, since the user last actively
+   * authenticated (OIDC `max_age`).
+   *
+   * Requires `@workos-inc/node` >= 10.7.0, where the param was added.
+   */
+  maxAge?: 'maxAge' extends keyof SdkAuthorizationUrlOptions ? number : never;
 }
 
 export interface AuthkitMiddlewareAuth {
