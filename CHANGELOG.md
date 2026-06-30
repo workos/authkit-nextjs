@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.2.0](https://github.com/workos/authkit-nextjs/compare/v4.1.4...v4.2.0) (2026-06-30)
+
+
+### Features
+
+* add recent-auth checking (checkRecentAuth + useRecentAuth) and maxAge step-up ([#446](https://github.com/workos/authkit-nextjs/issues/446)) ([34f92ac](https://github.com/workos/authkit-nextjs/commit/34f92acb281cf27510a7027d04c60e9f10083407))
+
 ## [4.1.4](https://github.com/workos/authkit-nextjs/compare/v4.1.3...v4.1.4) (2026-06-25)
 
 
