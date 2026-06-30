@@ -52,8 +52,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.6(@types/node@20.19.37)(jsdom@26.1.0)(terser@5.48.0))
       '@workos-inc/node':
-        specifier: ^10.0.0
-        version: 10.5.0
+        specifier: ^10.7.0
+        version: 10.7.0
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
@@ -2409,8 +2409,8 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@workos-inc/node@10.5.0':
-    resolution: {integrity: sha512-kTtDOXUDM56f0JReKDlIrTQZu4RbiR8ExwLbJE5QquvhduT/NHccbDZthILd4izT28jwtGVe0bX597w7+NMwqg==}
+  '@workos-inc/node@10.7.0':
+    resolution: {integrity: sha512-rffa9znZuIv4yo+9JRxGOLTTSxh0XhOT6jlsktgqEi9MuB9V0VFHRzLd3bTpkq+J9sgrPZNGpvX4aWNfMqt5cQ==}
     engines: {node: '>=22.11.0'}
 
   '@xtuc/ieee754@1.2.0':
@@ -5984,7 +5984,7 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@workos-inc/node@10.5.0': {}
+  '@workos-inc/node@10.7.0': {}
 
   '@xtuc/ieee754@1.2.0': {}
 

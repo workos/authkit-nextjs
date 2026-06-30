@@ -14,7 +14,7 @@ export {
   type AuthkitRequestHeader,
   type HandleAuthkitHeadersOptions,
 } from './middleware-helpers.js';
-import { getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
+import { checkRecentAuth, getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
 import { validateApiKey } from './validate-api-key.js';
 import { getFeatureFlagsRuntimeClient } from './feature-flags.js';
 import { getWorkOS } from './workos.js';
@@ -27,6 +27,7 @@ export {
   authkit,
   authkitMiddleware,
   authkitProxy,
+  checkRecentAuth,
   getSignInUrl,
   getSignUpUrl,
   getFeatureFlagsRuntimeClient,

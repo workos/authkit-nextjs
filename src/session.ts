@@ -29,7 +29,7 @@ import { getWorkOS } from './workos.js';
 import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
-import { lazy, setCachePreventionHeaders } from './utils.js';
+import { evaluateRecentAuth, lazy, setCachePreventionHeaders } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -469,6 +469,34 @@ export async function getTokenClaims<T = Record<string, unknown>>(
   }
 
   return decodeJwt<T>(token);
+}
+
+/**
+ * Check how recently the current user authenticated, using the `auth_time`
+ * claim on the access token. Returns data only — it never redirects — so it is
+ * safe to call as the enforcement step inside a sensitive server action or in a
+ * server component where you decide what to do.
+ *
+ * @example
+ * ```typescript
+ * // Guard a sensitive server action
+ * const { isStale } = await checkRecentAuth({ maxAge: 300 });
+ * if (isStale) {
+ *   return { status: 'reauth_required' };
+ * }
+ * ```
+ *
+ * @remarks
+ * To send the user through re-authentication, redirect to your sign-in route
+ * with `maxAge` (e.g. `getSignInUrl({ maxAge: 300 })`), which forwards OIDC
+ * `max_age` so the IdP forces a reauth when the most recent auth is older.
+ *
+ * Requires `@workos-inc/node` >= 10.7.0 for `maxAge` forwarding.
+ */
+export async function checkRecentAuth({ maxAge }: { maxAge: number }) {
+  const { user, accessToken } = await withAuth();
+  const authTime = user && accessToken ? (await getTokenClaims(accessToken)).auth_time : undefined;
+  return evaluateRecentAuth({ authTime, maxAgeSeconds: maxAge, nowSeconds: Math.floor(Date.now() / 1000) });
 }
 
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;

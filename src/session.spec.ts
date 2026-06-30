@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from './session.js';
+import {
+  withAuth,
+  updateSession,
+  refreshSession,
+  updateSessionMiddleware,
+  getTokenClaims,
+  checkRecentAuth,
+} from './session.js';
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
 
@@ -1096,6 +1103,44 @@ describe('session.ts', () => {
       const result = await getTokenClaims(token);
 
       expect(result).toMatchObject(tokenPayload);
+    });
+  });
+
+  describe('checkRecentAuth', () => {
+    async function authenticate(authTime?: number) {
+      mockSession.accessToken = await generateTestToken(authTime === undefined ? {} : { auth_time: authTime });
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+    }
+
+    it('reports recent auth as not stale', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await authenticate(now - 60);
+
+      const result = await checkRecentAuth({ maxAge: 300 });
+
+      expect(result.isStale).toBe(false);
+      expect(result.authenticatedAt).toEqual(new Date((now - 60) * 1000));
+    });
+
+    it('reports stale auth past maxAge', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await authenticate(now - 600);
+
+      expect((await checkRecentAuth({ maxAge: 300 })).isStale).toBe(true);
+    });
+
+    it('fails closed when auth_time claim is missing', async () => {
+      await authenticate(undefined);
+
+      expect(await checkRecentAuth({ maxAge: 300 })).toEqual({ authenticatedAt: null, isStale: true });
+    });
+
+    it('fails closed when there is no authenticated user', async () => {
+      expect(await checkRecentAuth({ maxAge: 300 })).toEqual({ authenticatedAt: null, isStale: true });
     });
   });
 

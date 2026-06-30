@@ -512,6 +512,51 @@ const { user, loading } = useAuth({ ensureSignedIn: true });
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
 
+### Re-authentication
+
+For sensitive actions you may want to require that the user authenticated _recently_, not just that they have a session. Use `checkRecentAuth` to read the access token's `auth_time` claim and decide whether to force a re-authentication.
+
+`checkRecentAuth` returns data only and never redirects, so it's safe to call as the enforcement step inside a server action or server component. It **fails closed**: a session with no usable `auth_time` (or no signed-in user) is reported as `isStale: true`.
+
+```ts
+'use server';
+
+import { checkRecentAuth, getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
+
+export async function deleteAccount() {
+  // Require that the user authenticated within the last 5 minutes
+  const { isStale } = await checkRecentAuth({ maxAge: 300 });
+
+  if (isStale) {
+    // Send the user through re-authentication. Passing `maxAge` forwards the OIDC
+    // `max_age` parameter, so AuthKit forces a fresh login when the most recent
+    // authentication is older than `maxAge` seconds.
+    redirect(await getSignInUrl({ maxAge: 300 }));
+  }
+
+  // ...perform the sensitive action
+}
+```
+
+For client components, use the `useRecentAuth` hook to reflect recency in the UI. This is **presentation only** — always enforce recency on the server with `checkRecentAuth`.
+
+```tsx
+'use client';
+
+import { useRecentAuth } from '@workos-inc/authkit-nextjs/components';
+
+function SensitiveActionButton() {
+  const { loading, isStale } = useRecentAuth({ maxAge: 300 });
+
+  if (loading) {
+    return <button disabled>Loading…</button>;
+  }
+
+  return <button>{isStale ? 'Re-authenticate to continue' : 'Delete account'}</button>;
+}
+```
+
 ### Refreshing the session
 
 Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
