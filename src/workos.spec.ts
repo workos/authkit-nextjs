@@ -63,5 +63,6 @@ describe('workos', () => {
 
       expect(customWorkos().options.port).toEqual(8080);
     });
+
   });
 });

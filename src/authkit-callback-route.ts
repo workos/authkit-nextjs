@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getPKCECookieOptions } from './cookie.js';
-import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { config } from './config.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
 import { saveSession } from './session.js';
@@ -66,7 +66,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
         await getWorkOS().userManagement.authenticateWithCode({
-          clientId: WORKOS_CLIENT_ID,
+          clientId: config.clientId,
           code,
           codeVerifier,
         });

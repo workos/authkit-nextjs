@@ -1,9 +1,4 @@
-import {
-  WORKOS_REDIRECT_URI,
-  WORKOS_COOKIE_MAX_AGE,
-  WORKOS_COOKIE_DOMAIN,
-  WORKOS_COOKIE_SAMESITE,
-} from './env-variables.js';
+import { config } from './config.js';
 import { CookieOptions } from './interfaces.js';
 
 type ValidSameSite = CookieOptions['sameSite'];
@@ -35,10 +30,10 @@ export function getCookieOptions(
   asString: boolean = false,
   expired: boolean = false,
 ): CookieOptions | string {
-  const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
+  const sameSite = config.cookieSameSite || 'lax';
   assertValidSamSite(sameSite);
 
-  const urlString = redirectUri || WORKOS_REDIRECT_URI;
+  const urlString = redirectUri || config.redirectUri;
   // Default to secure=true when no URL available (production default)
   // Developers should set WORKOS_REDIRECT_URI for proper local dev
   let secure: boolean;
@@ -59,9 +54,8 @@ export function getCookieOptions(
   let maxAge: number;
   if (expired) {
     maxAge = 0;
-  } else if (WORKOS_COOKIE_MAX_AGE) {
-    const parsed = parseInt(WORKOS_COOKIE_MAX_AGE, 10);
-    maxAge = Number.isFinite(parsed) ? parsed : 60 * 60 * 24 * 400;
+  } else if (config.cookieMaxAge !== undefined) {
+    maxAge = config.cookieMaxAge;
   } else {
     maxAge = 60 * 60 * 24 * 400;
   }
@@ -69,8 +63,8 @@ export function getCookieOptions(
   if (asString) {
     const capitalizedSameSite = sameSite.charAt(0).toUpperCase() + sameSite.slice(1).toLowerCase();
     const parts = ['Path=/', 'HttpOnly', `SameSite=${capitalizedSameSite}`, `Max-Age=${maxAge}`];
-    if (WORKOS_COOKIE_DOMAIN) {
-      parts.push(`Domain=${WORKOS_COOKIE_DOMAIN}`);
+    if (config.cookieDomain) {
+      parts.push(`Domain=${config.cookieDomain}`);
     }
     if (secure) {
       parts.push('Secure');
@@ -88,7 +82,7 @@ export function getCookieOptions(
     // It's fine to have a long cookie expiry date as the access/refresh tokens
     // act as the actual time-limited aspects of the session.
     maxAge,
-    domain: WORKOS_COOKIE_DOMAIN || '',
+    domain: config.cookieDomain || '',
   };
 }
 
@@ -144,7 +138,7 @@ export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: stri
       // If URL parsing fails, default to secure in production
       secure = isProduction;
       // If it's not a valid URL, fall back to WORKOS_REDIRECT_URI
-      const fallbackUrl = WORKOS_REDIRECT_URI;
+      const fallbackUrl = config.redirectUri;
       if (fallbackUrl) {
         try {
           const url = new URL(fallbackUrl);
@@ -154,10 +148,10 @@ export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: stri
         }
       }
     }
-  } else if (WORKOS_REDIRECT_URI) {
-    // No URL provided, check WORKOS_REDIRECT_URI
+  } else if (config.redirectUri) {
+    // No URL provided, check redirectUri config
     try {
-      const url = new URL(WORKOS_REDIRECT_URI);
+      const url = new URL(config.redirectUri);
       secure = url.protocol === 'https:';
     } catch {
       secure = false;

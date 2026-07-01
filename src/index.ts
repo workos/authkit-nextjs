@@ -18,6 +18,8 @@ import { checkRecentAuth, getTokenClaims, refreshSession, saveSession, withAuth 
 import { validateApiKey } from './validate-api-key.js';
 import { getFeatureFlagsRuntimeClient } from './feature-flags.js';
 import { getWorkOS } from './workos.js';
+import { initAuthKit } from './config.js';
+export type { AuthKitConfig } from './config.js';
 
 export * from './interfaces.js';
 
@@ -33,6 +35,7 @@ export {
   getFeatureFlagsRuntimeClient,
   getTokenClaims,
   getWorkOS,
+  initAuthKit,
   handleAuth,
   refreshSession,
   saveSession,
