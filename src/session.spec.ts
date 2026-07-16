@@ -14,7 +14,7 @@ import {
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
 
-import { jwtVerify } from 'jose';
+import { SignJWT, jwtVerify } from 'jose';
 
 // Helper to override env variable exports without triggering no-import-assign on the import binding
 function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
@@ -912,6 +912,167 @@ describe('session.ts', () => {
       expect(mockErrorCallback).toHaveBeenCalledWith({
         error: mockError,
         request,
+      });
+    });
+
+    describe('proactive refresh', () => {
+      // generateTestToken always signs with a 2h expiry, so build tokens with a
+      // controlled exp/iat here to place them inside or outside the refresh buffer.
+      async function generateTokenWithExpiry(secondsUntilExpiry: number, lifetimeSeconds = 3600) {
+        const now = Math.floor(Date.now() / 1000);
+        const secret = new TextEncoder().encode(process.env.WORKOS_COOKIE_PASSWORD as string);
+
+        return await new SignJWT({ sid: 'session_123', org_id: 'org_123' })
+          .setProtectedHeader({ alg: 'HS256' })
+          .setIssuedAt(now - (lifetimeSeconds - secondsUntilExpiry))
+          .setExpirationTime(now + secondsUntilExpiry)
+          .sign(secret);
+      }
+
+      async function requestWithSessionToken(accessToken: string) {
+        const request = new NextRequest(new URL('http://example.com/protected'));
+        request.cookies.set(
+          'wos-session',
+          await sealData({ ...mockSession, accessToken }, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        return request;
+      }
+
+      it('should refresh a valid session that is within the refresh buffer', async () => {
+        const newAccessToken = await generateTestToken();
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: newAccessToken,
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(30));
+        const response = await updateSession(request, { debug: true });
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+        expect(response.session.user).toBeDefined();
+        expect(response.session.accessToken).toBe(newAccessToken);
+        expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=') && c.length > 20)).toBe(true);
+        expect(console.log).toHaveBeenCalledWith(
+          expect.stringContaining('Session expiring soon. Proactively refreshing access token that ends in'),
+        );
+      });
+
+      it('should not refresh a valid session outside the refresh buffer', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+        const accessToken = await generateTokenWithExpiry(300);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request);
+
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect(response.session.accessToken).toBe(accessToken);
+      });
+
+      it('should use a 30 second buffer for tokens with a lifetime of 5 minutes or less', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 45 seconds left on a 5 minute token: outside the 30 second buffer
+        await updateSession(await requestWithSessionToken(await generateTokenWithExpiry(45, 300)));
+        expect(refreshSpy).not.toHaveBeenCalled();
+
+        // 20 seconds left on a 5 minute token: inside the 30 second buffer
+        await updateSession(await requestWithSessionToken(await generateTokenWithExpiry(20, 300)));
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should respect a custom refreshBufferSeconds', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 90 seconds left is outside the default 60 second buffer, but inside a 120 second one
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(90));
+        await updateSession(request, { refreshBufferSeconds: 120 });
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should disable proactive refresh when refreshBufferSeconds is 0', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+        const accessToken = await generateTokenWithExpiry(5);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request, { refreshBufferSeconds: 0 });
+
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect(response.session.accessToken).toBe(accessToken);
+      });
+
+      it('should serve the request with the still-valid token when a proactive refresh fails', async () => {
+        const mockErrorCallback = vi.fn();
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+
+        const accessToken = await generateTokenWithExpiry(30);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request, { debug: true, onSessionRefreshError: mockErrorCallback });
+
+        expect(response.session.user).toBeDefined();
+        expect(response.session.accessToken).toBe(accessToken);
+        expect(response.authorizationUrl).toBeUndefined();
+        // The session cookie must not be deleted while the access token is still valid
+        expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=;'))).toBe(false);
+        expect(mockErrorCallback).not.toHaveBeenCalled();
+        expect(console.log).toHaveBeenCalledWith(
+          'Proactive refresh failed. Serving request with the still-valid access token.',
+          expect.any(Error),
+        );
+      });
+
+      it('should call onSessionRefreshSuccess when a proactive refresh succeeds', async () => {
+        const mockSuccessCallback = vi.fn();
+        const newAccessToken = await generateTestToken();
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: newAccessToken,
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(30));
+        await updateSession(request, { onSessionRefreshSuccess: mockSuccessCallback });
+
+        expect(mockSuccessCallback).toHaveBeenCalledTimes(1);
+        expect(mockSuccessCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ accessToken: newAccessToken, user: mockSession.user }),
+        );
+      });
+
+      it('should thread refreshBufferSeconds through updateSessionMiddleware', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 90 seconds left is outside the default 60 second buffer, but inside a 120 second one
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(90));
+        const result = await updateSessionMiddleware(
+          request,
+          false,
+          {
+            enabled: false,
+            unauthenticatedPaths: [],
+          },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          [],
+          false,
+          120,
+        );
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe(200);
       });
     });
   });

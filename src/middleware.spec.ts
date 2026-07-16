@@ -12,6 +12,7 @@ describe('middleware', () => {
         debug: true,
         middlewareAuth: { enabled: true, unauthenticatedPaths: ['/public'] },
         signUpPaths: ['/sign-up'],
+        refreshBufferSeconds: 120,
       });
       expect(typeof middleware).toBe('function');
     });
