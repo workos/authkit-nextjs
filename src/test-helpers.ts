@@ -2,7 +2,7 @@
 
 import { sealData } from 'iron-session';
 import { SignJWT } from 'jose';
-import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
+import { config } from './config.js';
 import { cookies } from 'next/headers';
 import { User } from '@workos-inc/node';
 
@@ -19,7 +19,7 @@ export async function generateTestToken(payload = {}, expired = false) {
 
   const mergedPayload = { ...defaultPayload, ...payload };
 
-  const secret = new TextEncoder().encode(process.env.WORKOS_COOKIE_PASSWORD as string);
+  const secret = new TextEncoder().encode(config.cookiePassword);
 
   const token = await new SignJWT(mergedPayload)
     .setProtectedHeader({ alg: 'HS256' })
@@ -63,11 +63,11 @@ export async function generateSession(overrides: Partial<User> = {}) {
       user: mockUser,
     },
     {
-      password: WORKOS_COOKIE_PASSWORD as string,
+      password: config.cookiePassword,
     },
   );
 
-  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
+  const cookieName = config.cookieName || 'wos-session';
   const nextCookies = await cookies();
   nextCookies.set(cookieName, encryptedSession);
 }

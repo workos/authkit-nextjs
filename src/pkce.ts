@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import * as v from 'valibot';
 import { getPKCECookieOptions } from './cookie.js';
-import { WORKOS_COOKIE_PASSWORD } from './env-variables.js';
+import { config } from './config.js';
 import { State, StateSchema } from './interfaces.js';
 
 export const PKCE_COOKIE_NAME = 'wos-auth-verifier';
@@ -132,7 +132,7 @@ export async function getStateFromPKCECookieValue(cookieValue: string): Promise<
   // Also, this function is not in a critically-high-performance path, so runtime validation
   // is an acceptable tradeoff for increased security and type-safety
   const unsealed = await unsealData(cookieValue, {
-    password: WORKOS_COOKIE_PASSWORD,
+    password: config.cookiePassword,
   });
 
   return v.parse(StateSchema, unsealed);

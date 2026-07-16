@@ -1,6 +1,6 @@
 import { sealData } from 'iron-session';
 import { headers } from 'next/headers';
-import { WORKOS_CLAIM_TOKEN, WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { config } from './config.js';
 import { GetAuthURLOptions, GetAuthURLResult, State } from './interfaces.js';
 import { getWorkOS } from './workos.js';
 
@@ -10,8 +10,8 @@ async function fetchClaimNonce(baseURL: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        client_id: WORKOS_CLIENT_ID,
-        claim_token: WORKOS_CLAIM_TOKEN,
+        client_id: config.clientId,
+        claim_token: config.claimToken,
       }),
     });
     if (!response.ok) {
@@ -53,7 +53,7 @@ async function getAuthorizationUrl({
   })();
 
   const pkce = await getWorkOS().pkce.generate();
-  const claimNonce = WORKOS_CLAIM_TOKEN ? await fetchClaimNonce(getWorkOS().baseURL) : null;
+  const claimNonce = config.claimToken ? await fetchClaimNonce(getWorkOS().baseURL) : null;
 
   const state = {
     nonce: crypto.randomUUID(),
@@ -62,12 +62,12 @@ async function getAuthorizationUrl({
     returnPathname,
   } satisfies State;
 
-  const sealedState = await sealData(state, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
+  const sealedState = await sealData(state, { password: config.cookiePassword, ttl: 600 });
 
   const url = getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit' as const,
-    clientId: WORKOS_CLIENT_ID,
-    redirectUri: redirectUriToUse ?? WORKOS_REDIRECT_URI,
+    clientId: config.clientId,
+    redirectUri: redirectUriToUse ?? config.redirectUri,
     screenHint,
     organizationId,
     loginHint,

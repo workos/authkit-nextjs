@@ -2,12 +2,9 @@ describe('cookie.ts', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
-    // Reset modules to ensure fresh imports
+    // Reset modules and clear shared overrides singleton to ensure fresh config state
     vi.resetModules();
-    // Re-mock env-variables with a fresh copy each time
-    vi.doMock('./env-variables', async (importOriginal) => {
-      return { ...(await importOriginal<typeof import('./env-variables')>()) };
-    });
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for('workos.authkit.overrides')];
   });
 
   describe('getCookieOptions', () => {
@@ -28,12 +25,8 @@ describe('cookie.ts', () => {
     });
 
     it('should return the cookie options with custom values', async () => {
-      // Import the mocked module
-      const envVars = await import('./env-variables');
-
-      // Set the mock values
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: '1000' });
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: 'foobar.com' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ cookieMaxAge: 1000, cookieDomain: 'foobar.com' });
 
       const { getCookieOptions } = await import('./cookie');
       const options = getCookieOptions('http://example.com');
@@ -46,7 +39,7 @@ describe('cookie.ts', () => {
         }),
       );
 
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+      initAuthKit({ cookieDomain: '' });
 
       const options2 = getCookieOptions('http://example.com');
       expect(options2).toEqual(
@@ -58,7 +51,7 @@ describe('cookie.ts', () => {
       );
 
       const options3 = getCookieOptions('https://example.com', true);
-      // Domain should not be included when WORKOS_COOKIE_DOMAIN is empty
+      // Domain should not be included when cookieDomain is empty
       expect(options3).toEqual(expect.not.stringContaining('Domain='));
     });
 
@@ -82,9 +75,9 @@ describe('cookie.ts', () => {
       expect(options2).toEqual(expect.stringContaining('Domain=example.com'));
     });
 
-    it('allows the sameSite config to be set by the WORKOS_COOKIE_SAMESITE env variable', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
+    it('allows the sameSite config to be set by the cookieSameSite config option', async () => {
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ cookieSameSite: 'none' });
 
       const { getCookieOptions } = await import('./cookie');
       const options = getCookieOptions('http://example.com');
@@ -92,16 +85,17 @@ describe('cookie.ts', () => {
     });
 
     it('throws an error if the sameSite value is invalid', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'invalid' });
+      process.env.WORKOS_COOKIE_SAMESITE = 'invalid';
 
       const { getCookieOptions } = await import('./cookie');
       expect(() => getCookieOptions('http://example.com')).toThrow('Invalid SameSite value: invalid');
+
+      delete process.env.WORKOS_COOKIE_SAMESITE;
     });
 
     it('defaults to secure=true when no URL is available', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: '' });
 
       const { getCookieOptions } = await import('./cookie');
       const options = getCookieOptions();
@@ -109,9 +103,8 @@ describe('cookie.ts', () => {
     });
 
     it('defaults to secure=true when no URL is available with lax sameSite', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'lax' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: '', cookieSameSite: 'lax' });
 
       const { getCookieOptions } = await import('./cookie');
       const options = getCookieOptions();
@@ -125,17 +118,18 @@ describe('cookie.ts', () => {
     });
 
     it('handles invalid WORKOS_COOKIE_MAX_AGE gracefully', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: 'invalid-number' });
+      process.env.WORKOS_COOKIE_MAX_AGE = 'invalid-number';
 
       const { getCookieOptions } = await import('./cookie');
       const options = getCookieOptions();
       expect(options).toEqual(expect.objectContaining({ maxAge: 34560000 })); // Falls back to default
+
+      delete process.env.WORKOS_COOKIE_MAX_AGE;
     });
 
     it('properly formats cookie string without Domain when not set', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ cookieDomain: '' });
 
       const { getCookieOptions } = await import('./cookie');
       const cookieString = getCookieOptions('https://example.com', true);
@@ -190,9 +184,8 @@ describe('cookie.ts', () => {
     it('should handle invalid URLs with no fallback URL', async () => {
       process.env.NODE_ENV = 'production';
 
-      // Mock no WORKOS_REDIRECT_URI
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: '' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: '' });
 
       const { getJwtCookie } = await import('./cookie');
 
@@ -201,9 +194,9 @@ describe('cookie.ts', () => {
       expect(cookie).toContain('Secure'); // Should default to secure in production when no fallback
     });
 
-    it('should fall back to WORKOS_REDIRECT_URI when invalid URL provided', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://app.workos.com/callback' });
+    it('should fall back to redirectUri config when invalid URL provided', async () => {
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: 'https://app.workos.com/callback' });
 
       const { getJwtCookie } = await import('./cookie');
 
@@ -212,40 +205,40 @@ describe('cookie.ts', () => {
       expect(cookie).toContain('Secure'); // Should use HTTPS from fallback URL
     });
 
-    it('should set secure to false when WORKOS_REDIRECT_URI parsing fails', async () => {
+    it('should set secure to false when redirectUri parsing fails', async () => {
       process.env.NODE_ENV = 'development'; // Not production
 
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'also-invalid-url' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: 'also-invalid-url' });
 
       const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie('token', null); // This triggers the WORKOS_REDIRECT_URI path
+      const cookie = getJwtCookie('token', null); // This triggers the redirectUri fallback path
 
-      expect(cookie).not.toContain('Secure'); // Should be false when URL parsing fails (line 128)
+      expect(cookie).not.toContain('Secure'); // Should be false when URL parsing fails
     });
 
     it('should handle both main URL and fallback URL parsing failures', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'invalid-fallback-url' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: 'invalid-fallback-url' });
 
       const { getJwtCookie } = await import('./cookie');
 
-      // Invalid main URL with invalid fallback URL - should hit line 118
+      // Invalid main URL with invalid fallback URL
       const cookie = getJwtCookie('token', 'invalid-main-url');
 
-      expect(cookie).not.toContain('Secure'); // Line 118: secure = false when fallback parsing fails
+      expect(cookie).not.toContain('Secure'); // secure = false when fallback parsing fails
     });
 
-    it('should use WORKOS_REDIRECT_URI when no URL provided', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://secure.example.com' });
+    it('should use redirectUri config when no URL provided', async () => {
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ redirectUri: 'https://secure.example.com' });
 
       const { getJwtCookie } = await import('./cookie');
 
       const cookie = getJwtCookie('token', null);
 
-      expect(cookie).toContain('Secure'); // Should use HTTPS from WORKOS_REDIRECT_URI
+      expect(cookie).toContain('Secure'); // Should use HTTPS from redirectUri
     });
 
     it('should create expired JWT cookie for deletion', async () => {
@@ -314,8 +307,8 @@ describe('cookie.ts', () => {
     });
 
     it('should downgrade SameSite=Strict to Lax', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
+      const { initAuthKit } = await import('./config');
+      initAuthKit({ cookieSameSite: 'strict' });
 
       const { getPKCECookieOptions } = await import('./cookie');
 

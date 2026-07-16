@@ -1,12 +1,12 @@
 import { NextMiddleware, NextRequest } from 'next/server';
 import { updateSessionMiddleware, updateSession } from './session.js';
 import { AuthkitMiddlewareOptions, AuthkitOptions, AuthkitResponse } from './interfaces.js';
-import { WORKOS_REDIRECT_URI } from './env-variables.js';
+import { config } from './config.js';
 
 export function authkitProxy({
   debug = false,
   middlewareAuth = { enabled: false, unauthenticatedPaths: [] },
-  redirectUri = WORKOS_REDIRECT_URI,
+  redirectUri = config.redirectUri,
   signUpPaths = [],
   eagerAuth = false,
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {

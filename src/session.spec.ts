@@ -12,14 +12,9 @@ import {
   checkRecentAuth,
 } from './session.js';
 import { getWorkOS } from './workos.js';
-import * as envVariables from './env-variables.js';
+import { initAuthKit } from './config.js';
 
 import { jwtVerify } from 'jose';
-
-// Helper to override env variable exports without triggering no-import-assign on the import binding
-function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
-  Object.defineProperty(mod, key, { value, configurable: true });
-}
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 import { getStateFromPKCECookieValue } from './pkce.js';
@@ -93,6 +88,7 @@ describe('session.ts', () => {
   afterEach(() => {
     consoleLogSpy.mockRestore();
     vi.resetModules();
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for('workos.authkit.overrides')];
   });
 
   describe('withAuth', () => {
@@ -173,9 +169,7 @@ describe('session.ts', () => {
 
   describe('updateSessionMiddleware', () => {
     it('should throw an error if the redirect URI is not set', async () => {
-      const originalWorkosRedirectUri = envVariables.WORKOS_REDIRECT_URI;
-
-      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', '');
+      initAuthKit({ redirectUri: '' });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -190,13 +184,11 @@ describe('session.ts', () => {
         );
       }).rejects.toThrow('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
 
-      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
+      initAuthKit({ redirectUri: undefined });
     });
 
     it('should throw an error if the cookie password is not set', async () => {
-      const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
-
-      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
+      initAuthKit({ cookiePassword: '' });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -213,13 +205,11 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      initAuthKit({ cookiePassword: undefined });
     });
 
     it('should throw an error if the cookie password is less than 32 characters', async () => {
-      const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
-
-      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
+      initAuthKit({ cookiePassword: 'short' });
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -236,7 +226,7 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      initAuthKit({ cookiePassword: undefined });
     });
 
     it('should return early if there is no session', async () => {

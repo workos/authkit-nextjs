@@ -30,18 +30,16 @@ describe('setPKCECookie SameSite override', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    delete (globalThis as Record<symbol, unknown>)[Symbol.for('workos.authkit.overrides')];
     vi.doMock('next/headers', () => ({
       cookies: async () => ({ set: mockSet, get: vi.fn(), getAll: vi.fn(), delete: vi.fn() }),
       headers: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }),
     }));
-    vi.doMock('./env-variables', async (importOriginal) => {
-      return { ...(await importOriginal<typeof import('./env-variables')>()) };
-    });
   });
 
   it('should downgrade strict to lax', async () => {
-    const envVars = await import('./env-variables');
-    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
+    const { initAuthKit } = await import('./config');
+    initAuthKit({ cookieSameSite: 'strict' });
 
     const { setPKCECookie } = await import('./pkce');
     await setPKCECookie('sealed-state');
@@ -54,8 +52,8 @@ describe('setPKCECookie SameSite override', () => {
   });
 
   it('should preserve none for iframe/cross-origin flows', async () => {
-    const envVars = await import('./env-variables');
-    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
+    const { initAuthKit } = await import('./config');
+    initAuthKit({ cookieSameSite: 'none' });
 
     const { setPKCECookie } = await import('./pkce');
     await setPKCECookie('sealed-state');
@@ -68,11 +66,13 @@ describe('setPKCECookie SameSite override', () => {
   });
 
   it('should downgrade mixed-case Strict to lax', async () => {
-    const envVars = await import('./env-variables');
-    Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'Strict' });
+    // 'Strict' isn't in AuthKitConfig's union type, so use process.env to test mixed-case handling
+    process.env.WORKOS_COOKIE_SAMESITE = 'Strict';
 
     const { setPKCECookie } = await import('./pkce');
     await setPKCECookie('sealed-state');
+
+    delete process.env.WORKOS_COOKIE_SAMESITE;
 
     expect(mockSet).toHaveBeenCalledWith(
       getPKCECookieNameForState('sealed-state'),
