@@ -1031,6 +1031,31 @@ describe('session.ts', () => {
         );
       });
 
+      it('should delete the session when a proactive refresh fails and the token expired during the attempt', async () => {
+        const mockErrorCallback = vi.fn();
+        const accessToken = await generateTokenWithExpiry(30);
+        const request = await requestWithSessionToken(accessToken);
+
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockImplementation(async () => {
+          // The token runs out while the refresh round trip is in flight
+          vi.useFakeTimers();
+          vi.setSystemTime(Date.now() + 31_000);
+          throw new Error('Refresh failed');
+        });
+
+        try {
+          const response = await updateSession(request, { debug: true, onSessionRefreshError: mockErrorCallback });
+
+          expect(response.session.user).toBeNull();
+          expect(response.authorizationUrl).toBeDefined();
+          expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=;'))).toBe(true);
+          expect(mockErrorCallback).toHaveBeenCalledTimes(1);
+          expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
       it('should call onSessionRefreshSuccess when a proactive refresh succeeds', async () => {
         const mockSuccessCallback = vi.fn();
         const newAccessToken = await generateTestToken();

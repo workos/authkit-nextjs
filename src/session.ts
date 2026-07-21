@@ -331,16 +331,21 @@ async function updateSession(
     };
   } catch (e) {
     if (isExpiring) {
-      // The current token is still valid, so a failed proactive refresh is not fatal.
-      // Refresh tokens are single-use, so a concurrent request in the same buffer
-      // window may have already rotated this one; that request has persisted the new
-      // session cookie. Serve this request with the current token instead of
-      // destroying the session.
-      if (options.debug) {
-        console.log('Proactive refresh failed. Serving request with the still-valid access token.', e);
-      }
+      // A failed proactive refresh is not fatal while the current token is still
+      // valid. Refresh tokens are single-use, so a concurrent request in the same
+      // buffer window may have already rotated this one; that request has persisted
+      // the new session cookie. Serve this request with the current token instead of
+      // destroying the session. Re-check validity here: the token may have expired
+      // during the refresh round trip, in which case fall through to the
+      // delete-cookie path below.
+      const { exp } = decodeJwt(session.accessToken);
+      if (typeof exp === 'number' && exp > Math.floor(Date.now() / 1000)) {
+        if (options.debug) {
+          console.log('Proactive refresh failed. Serving request with the still-valid access token.', e);
+        }
 
-      return respondWithCurrentToken();
+        return respondWithCurrentToken();
+      }
     }
 
     if (options.debug) {

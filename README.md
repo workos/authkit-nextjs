@@ -847,7 +847,9 @@ export default authkitProxy({
 });
 ```
 
-If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current, still-valid access token; the session is never destroyed while the access token remains valid.
+If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current access token, provided it is still valid at that point; the session is never destroyed while the access token remains valid. If the token expired during the failed refresh attempt, the session is cleared and the request is redirected to sign in, as with any expired session.
+
+Note that when several requests land inside the buffer window at the same time, only one wins the refresh; each of the others may pay a failed-refresh round trip to WorkOS before being served with the current token. This costs some added latency on those requests during the buffer window, but no user-visible failure.
 
 ### Signing out
 
