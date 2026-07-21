@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { sealData, unsealData } from 'iron-session';
 import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
