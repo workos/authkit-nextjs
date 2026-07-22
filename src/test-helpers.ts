@@ -8,6 +8,7 @@ import { User } from '@workos-inc/node';
 
 export async function generateTestToken(payload = {}, expired = false) {
   const defaultPayload = {
+    sub: 'user_123',
     sid: 'session_123',
     org_id: 'org_123',
     role: 'member',

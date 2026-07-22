@@ -66,6 +66,12 @@ export interface NoUserInfo {
 }
 
 export interface AccessToken {
+  /**
+   * The subject of the token — the WorkOS user id the access token was issued
+   * for. Always present on a signature-verified WorkOS access token; used to
+   * bind the sealed session `user` to the token in `withAuth`.
+   */
+  sub?: string;
   sid: string;
   org_id?: string;
   role?: string;

@@ -111,6 +111,42 @@ describe('session.ts', () => {
       expect(result.user).toEqual(mockSession.user);
     });
 
+    it('rejects the session when the sealed user does not match the access token subject', async () => {
+      // SEC-1219: an attacker with their own valid access token (sub) but a
+      // forged sealed `user` must not be able to impersonate that user.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({ sub: 'user_attacker' });
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('redirects on a mismatched session when ensureSignedIn is true', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({ sub: 'user_attacker' });
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'https://example.com/protected');
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      await withAuth({ ensureSignedIn: true });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      warnSpy.mockRestore();
+    });
+
     it('should return null when user is not authenticated', async () => {
       const result = await withAuth();
 
