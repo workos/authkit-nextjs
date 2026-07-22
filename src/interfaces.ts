@@ -123,6 +123,16 @@ export interface AuthkitMiddlewareOptions {
   redirectUri?: string;
   signUpPaths?: string[];
   eagerAuth?: boolean;
+  /**
+   * Number of seconds before access token expiry at which the proxy/middleware
+   * proactively refreshes the session, so server-side consumers of the access
+   * token never receive a token that expires mid-request.
+   *
+   * Defaults to the same buffer the client token store uses: 60 seconds, or 30
+   * seconds for tokens with a total lifetime of 5 minutes or less. Set to `0`
+   * to disable proactive refresh and only refresh once the token has expired.
+   */
+  refreshBufferSeconds?: number;
 }
 
 export interface AuthkitOptions {
@@ -130,6 +140,12 @@ export interface AuthkitOptions {
   debug?: boolean;
   redirectUri?: string;
   screenHint?: 'sign-up' | 'sign-in';
+  /**
+   * Number of seconds before access token expiry at which the session is
+   * proactively refreshed. Defaults to 60 seconds (30 seconds for tokens with
+   * a total lifetime of 5 minutes or less). Set to `0` to disable.
+   */
+  refreshBufferSeconds?: number;
   onSessionRefreshSuccess?: (data: {
     accessToken: string;
     user: User;

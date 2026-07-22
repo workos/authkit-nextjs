@@ -200,13 +200,14 @@ export const config = { matcher: ['/', '/admin'] };
 
 The proxy/middleware can be configured with several options.
 
-| Option           | Default     | Description                                                                                                             |
-| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                  |
-| `middlewareAuth` | `undefined` | Used to configure proxy/middleware auth options. See [middleware auth](#middleware-auth) for more details.              |
-| `debug`          | `false`     | Enables debug logs.                                                                                                     |
-| `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                            |
-| `eagerAuth`      | `false`     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details. |
+| Option                 | Default                                                     | Description                                                                                                                                                     |
+| ---------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redirectUri`          | `undefined`                                                 | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                                                          |
+| `middlewareAuth`       | `undefined`                                                 | Used to configure proxy/middleware auth options. See [middleware auth](#middleware-auth) for more details.                                                      |
+| `debug`                | `false`                                                     | Enables debug logs.                                                                                                                                             |
+| `signUpPaths`          | `[]`                                                        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                                                                    |
+| `eagerAuth`            | `false`                                                     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details.                                         |
+| `refreshBufferSeconds` | `60` (`30` for tokens with a lifetime of 5 minutes or less) | Seconds before access token expiry at which the session is proactively refreshed. See [proactive session refresh](#proactive-session-refresh) for more details. |
 
 #### Custom redirect URI
 
@@ -833,6 +834,22 @@ Eager auth makes tokens briefly accessible via JavaScript (30-second window) to 
 
 - Most API calls where a brief loading state is acceptable
 - When you don't need immediate token access on page load
+
+### Proactive session refresh
+
+The proxy/middleware proactively refreshes the session when the access token is within a buffer of its expiry, mirroring the buffer the client token store already uses: 60 seconds, or 30 seconds for tokens with a total lifetime of 5 minutes or less. This ensures a token handed to `withAuth()` and then to a server-side consumer (a Server Component fetch, an API call to a service that validates the token) cannot expire mid-request due to render latency, network round trips, or clock skew.
+
+Use the `refreshBufferSeconds` option to tune the buffer, or set it to `0` to disable proactive refresh and only refresh once the token has expired:
+
+```ts
+export default authkitProxy({
+  refreshBufferSeconds: 120,
+});
+```
+
+If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current access token, provided it is still valid at that point; the session is never destroyed while the access token remains valid. If the token expired during the failed refresh attempt, the session is cleared and the request is redirected to sign in, as with any expired session.
+
+Note that when several requests land inside the buffer window at the same time, only one wins the refresh; each of the others may pay a failed-refresh round trip to WorkOS before being served with the current token. This costs some added latency on those requests during the buffer window, but no user-visible failure.
 
 ### Signing out
 

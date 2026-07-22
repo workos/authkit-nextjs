@@ -9,9 +9,18 @@ export function authkitProxy({
   redirectUri = WORKOS_REDIRECT_URI,
   signUpPaths = [],
   eagerAuth = false,
+  refreshBufferSeconds,
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
-    return updateSessionMiddleware(request, debug, middlewareAuth, redirectUri, signUpPaths, eagerAuth);
+    return updateSessionMiddleware(
+      request,
+      debug,
+      middlewareAuth,
+      redirectUri,
+      signUpPaths,
+      eagerAuth,
+      refreshBufferSeconds,
+    );
   };
 }
 

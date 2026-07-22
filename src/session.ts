@@ -95,6 +95,7 @@ async function updateSessionMiddleware(
   redirectUri: string,
   signUpPaths: string[],
   eagerAuth = false,
+  refreshBufferSeconds?: number,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -140,6 +141,7 @@ async function updateSessionMiddleware(
     redirectUri,
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     eagerAuth,
+    refreshBufferSeconds,
   });
 
   // Record the sign up paths so we can use them later
@@ -210,12 +212,13 @@ async function updateSession(
   }
 
   const hasValidSession = await verifyAccessToken(session.accessToken);
+  const isExpiring = hasValidSession && isTokenExpiring(session.accessToken, options.refreshBufferSeconds);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
   applyCacheSecurityHeaders(newRequestHeaders, request, session);
 
-  if (hasValidSession) {
+  const respondWithCurrentToken = (): AuthkitResponse => {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
 
     const {
@@ -253,13 +256,19 @@ async function updateSession(
       },
       headers: newRequestHeaders,
     };
+  };
+
+  if (hasValidSession && !isExpiring) {
+    return respondWithCurrentToken();
   }
 
   try {
     if (options.debug) {
       // istanbul ignore next
       console.log(
-        `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
+        isExpiring
+          ? `Session expiring soon. Proactively refreshing access token that ends in ${session.accessToken.slice(-10)}`
+          : `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
       );
     }
 
@@ -321,6 +330,24 @@ async function updateSession(
       headers: newRequestHeaders,
     };
   } catch (e) {
+    if (isExpiring) {
+      // A failed proactive refresh is not fatal while the current token is still
+      // valid. Refresh tokens are single-use, so a concurrent request in the same
+      // buffer window may have already rotated this one; that request has persisted
+      // the new session cookie. Serve this request with the current token instead of
+      // destroying the session. Re-check validity here: the token may have expired
+      // during the refresh round trip, in which case fall through to the
+      // delete-cookie path below.
+      const { exp } = decodeJwt(session.accessToken);
+      if (typeof exp === 'number' && exp > Math.floor(Date.now() / 1000)) {
+        if (options.debug) {
+          console.log('Proactive refresh failed. Serving request with the still-valid access token.', e);
+        }
+
+        return respondWithCurrentToken();
+      }
+    }
+
     if (options.debug) {
       console.log('Failed to refresh. Deleting cookie.', e);
     }
@@ -556,6 +583,33 @@ async function verifyAccessToken(accessToken: string) {
   try {
     await jwtVerify(accessToken, JWKS());
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determines whether a still-valid access token is close enough to expiry that it
+ * should be proactively refreshed, so it cannot expire in the hands of a
+ * server-side consumer (render latency, network round trips, clock skew).
+ *
+ * Mirrors the buffer the client token store uses (`components/tokenStore.ts`):
+ * 60 seconds, or 30 seconds for tokens with a total lifetime of 5 minutes or
+ * less, unless an explicit `refreshBufferSeconds` is provided. A buffer of 0
+ * disables proactive refresh.
+ */
+function isTokenExpiring(accessToken: string, refreshBufferSeconds?: number): boolean {
+  try {
+    const { exp, iat } = decodeJwt(accessToken);
+    if (typeof exp !== 'number') {
+      return false;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const totalTokenLifetime = exp - (iat ?? exp);
+    const bufferSeconds = refreshBufferSeconds ?? (totalTokenLifetime <= 300 ? 30 : 60);
+
+    return exp < now + bufferSeconds;
   } catch {
     return false;
   }
