@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getPKCECookieOptions } from './cookie.js';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { CallbackError } from './errors.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
 import { saveSession } from './session.js';
@@ -32,12 +33,21 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     const code = requestUrl.searchParams.get('code');
     const state = requestUrl.searchParams.get('state');
 
+    // Attribution for thrown errors: which request failed and what it carried,
+    // with param values omitted since `code` is a live credential.
+    const errorContext = {
+      path: requestUrl.pathname,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+      hasCode: code !== null,
+      hasState: state !== null,
+    };
+
     // We want to catch any & all errors and respond the same way, always
     // destroying the 1-use PKCE cookie to prevent replay attacks or stale
     // cookies affecting future auth attempts.
     try {
       if (!code || !state) {
-        throw new Error('Missing required auth parameter');
+        throw new CallbackError('Missing required auth parameter', 'missing_auth_params', errorContext);
       }
 
       // Derive the flow-specific cookie name from the state param so each
@@ -50,11 +60,15 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // CSRF verification: both channels (cookie + URL state) must be present and match
       if (!pkceCookie) {
-        throw new Error('Sign-in session could not be verified. Please try signing in again.');
+        throw new CallbackError(
+          'Sign-in session could not be verified. Please try signing in again.',
+          'missing_pkce_cookie',
+          errorContext,
+        );
       }
 
       if (state !== pkceCookie) {
-        throw new Error('OAuth state mismatch');
+        throw new CallbackError('OAuth state mismatch', 'oauth_state_mismatch', errorContext);
       }
 
       const {
@@ -72,7 +86,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         });
 
       if (!accessToken || !refreshToken) {
-        throw new Error('response is missing tokens');
+        throw new CallbackError('response is missing tokens', 'missing_tokens', errorContext);
       }
 
       // If baseURL is provided, use it instead of request.nextUrl
