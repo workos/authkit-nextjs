@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.3.0](https://github.com/workos/authkit-nextjs/compare/v4.2.0...v4.3.0) (2026-07-22)
+
+
+### Features
+
+* add CallbackError with request attribution ([#455](https://github.com/workos/authkit-nextjs/issues/455)) ([0dd39fe](https://github.com/workos/authkit-nextjs/commit/0dd39fe0022858d640082e2b651aa1fd94b6a0a4))
+
+
+### Bug Fixes
+
+* prevent session helpers from being exposed as Server Actions ([#454](https://github.com/workos/authkit-nextjs/issues/454)) ([0ae2672](https://github.com/workos/authkit-nextjs/commit/0ae2672874e0225472b70a6649484238afd90da7))
+* proactively refresh near-expiry access tokens in the proxy middleware ([#453](https://github.com/workos/authkit-nextjs/issues/453)) ([55da9cb](https://github.com/workos/authkit-nextjs/commit/55da9cb0a1a3c2697336e6bd140b532f2abf159f))
+
 ## [4.2.0](https://github.com/workos/authkit-nextjs/compare/v4.1.4...v4.2.0) (2026-06-30)
 
 
