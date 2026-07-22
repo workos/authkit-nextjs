@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { decodeJwt } from 'jose';
 import { revalidatePath, revalidateTag } from 'next/cache';

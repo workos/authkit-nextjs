@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { sealData, unsealData } from 'iron-session';
 import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
@@ -512,6 +512,7 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
   }
 
   const {
+    sub,
     sid: sessionId,
     org_id: organizationId,
     role,
@@ -520,6 +521,22 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     entitlements,
     feature_flags: featureFlags,
   } = decodeJwt<AccessToken>(session.accessToken);
+
+  // Defense-in-depth (SEC-1219): bind the sealed `user` to the access token's
+  // subject. `saveSession` seals whatever `user` object it is handed, so a
+  // caller presenting their own valid access token alongside a forged `user`
+  // must not have that identity trusted here. A signature-verified WorkOS
+  // access token always carries `sub`; when it disagrees with the sealed user
+  // id, treat the session as unauthenticated rather than impersonate the user.
+  if (session.user && sub && session.user.id !== sub) {
+    console.warn(
+      `withAuth: sealed session user (${session.user.id}) does not match the access token subject (${sub}); rejecting session.`,
+    );
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
 
   return {
     sessionId,

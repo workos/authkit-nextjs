@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { getWorkOS } from './workos.js';
 import { headers } from 'next/headers';

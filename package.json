@@ -41,6 +41,7 @@
     "iron-session": "^8.0.4",
     "jose": "^5.10.0",
     "path-to-regexp": "^6.3.0",
+    "server-only": "^0.0.1",
     "valibot": "^1.2.0"
   },
   "peerDependencies": {
