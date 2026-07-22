@@ -12,6 +12,40 @@ export class AuthKitError extends Error {
   }
 }
 
+export type CallbackErrorCode =
+  | 'missing_auth_params'
+  | 'missing_pkce_cookie'
+  | 'oauth_state_mismatch'
+  | 'missing_tokens';
+
+export interface CallbackErrorContext {
+  path?: string;
+  userAgent?: string;
+  hasCode?: boolean;
+  hasState?: boolean;
+}
+
+// Carries the request that actually threw, so `onError` consumers can report
+// accurate attribution without relying on ambient (per-request) APM scope,
+// which can misattribute under concurrency.
+export class CallbackError extends AuthKitError {
+  readonly code: CallbackErrorCode;
+  readonly path?: string;
+  readonly userAgent?: string;
+  readonly hasCode?: boolean;
+  readonly hasState?: boolean;
+
+  constructor(message: string, code: CallbackErrorCode, context?: CallbackErrorContext) {
+    super(message);
+    this.name = 'CallbackError';
+    this.code = code;
+    this.path = context?.path;
+    this.userAgent = context?.userAgent;
+    this.hasCode = context?.hasCode;
+    this.hasState = context?.hasState;
+  }
+}
+
 export interface TokenRefreshErrorContext {
   userId?: string;
   sessionId?: string;

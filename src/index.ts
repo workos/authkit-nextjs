@@ -1,6 +1,6 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
-import { AuthKitError, TokenRefreshError } from './errors.js';
+import { AuthKitError, CallbackError, TokenRefreshError } from './errors.js';
 import { authkit, authkitMiddleware, authkitProxy } from './middleware.js';
 export {
   applyResponseHeaders,
@@ -21,8 +21,11 @@ import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
 
+export type { CallbackErrorCode, CallbackErrorContext } from './errors.js';
+
 export {
   AuthKitError,
+  CallbackError,
   TokenRefreshError,
   authkit,
   authkitMiddleware,
