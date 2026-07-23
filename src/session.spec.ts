@@ -402,6 +402,90 @@ describe('session.ts', () => {
       );
     });
 
+    it.each([
+      ['a rate limit (429)', Object.assign(new Error('Too many requests'), { status: 429 })],
+      ['a server error (503)', Object.assign(new Error('Service unavailable'), { status: 503 })],
+      ['a request timeout (408)', Object.assign(new Error('Request timeout'), { status: 408 })],
+      ['a network error', new TypeError('fetch failed')],
+      // The SDK re-wraps a raw network TypeError in a plain Error with the
+      // TypeError as its cause; the classifier must follow the cause chain.
+      [
+        'an SDK-wrapped network error',
+        new Error('Unexpected error: TypeError: fetch failed', { cause: new TypeError('fetch failed') }),
+      ],
+    ])('should preserve the cookie when refreshing fails transiently: %s', async (_label, transientError) => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      (jwtVerify as Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(transientError);
+
+      const request = new NextRequest(new URL('http://example.com'));
+
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSessionMiddleware(
+        request,
+        true,
+        {
+          enabled: false,
+          unauthenticatedPaths: [],
+        },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(response.status).toBe(200);
+      // The sealed session cookie must not be cleared on a transient failure.
+      expect(response.headers.get('Set-Cookie') ?? '').not.toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith(
+        'Failed to refresh due to a transient error. Preserving the session cookie so it can be retried.',
+        transientError,
+      );
+    });
+
+    it('should delete the cookie for a terminal refresh failure (invalid_grant)', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      (jwtVerify as Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const terminalError = Object.assign(new Error('invalid_grant'), { status: 400 });
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(terminalError);
+
+      const request = new NextRequest(new URL('http://example.com'));
+
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSessionMiddleware(
+        request,
+        true,
+        {
+          enabled: false,
+          unauthenticatedPaths: [],
+        },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Set-Cookie')).toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', terminalError);
+    });
+
     describe('middleware auth', () => {
       it('should redirect unauthenticated users on protected routes', async () => {
         vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -948,6 +1032,7 @@ describe('session.ts', () => {
       expect(mockErrorCallback).toHaveBeenCalledWith({
         error: mockError,
         request,
+        isTransient: false,
       });
     });
 

@@ -348,21 +348,37 @@ async function updateSession(
       }
     }
 
+    // Only tear down the session for a terminal failure. A transient failure
+    // (network error, request timeout, 429, or 5xx that survived the SDK's
+    // internal retries) is not a signal that the refresh token is dead —
+    // deleting the cookie here would turn a brief outage into a forced
+    // re-authentication, and the still-valid refresh token would be lost. Keep
+    // the sealed cookie so a later request refreshes successfully once the
+    // condition clears.
+    const isTransient = isTransientRefreshError(e);
+
     if (options.debug) {
-      console.log('Failed to refresh. Deleting cookie.', e);
+      console.log(
+        isTransient
+          ? 'Failed to refresh due to a transient error. Preserving the session cookie so it can be retried.'
+          : 'Failed to refresh. Deleting cookie.',
+        e,
+      );
     }
 
-    // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-    const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
-    newRequestHeaders.append('Set-Cookie', deleteCookie);
+    if (!isTransient) {
+      // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
+      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+      newRequestHeaders.append('Set-Cookie', deleteCookie);
 
-    // Delete JWT cookie if eagerAuth is enabled
-    if (options.eagerAuth) {
-      const deleteJwtCookie = getJwtCookie(null, request.url, true);
-      newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+      // Delete JWT cookie if eagerAuth is enabled
+      if (options.eagerAuth) {
+        const deleteJwtCookie = getJwtCookie(null, request.url, true);
+        newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+      }
     }
 
-    options.onSessionRefreshError?.({ error: e, request });
+    options.onSessionRefreshError?.({ error: e, request, isTransient });
 
     const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
@@ -414,7 +430,7 @@ async function refreshSession({
     throw new TokenRefreshError(
       `Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`,
       error,
-      getSessionErrorContext(session),
+      { ...getSessionErrorContext(session), isTransient: isTransientRefreshError(error) },
     );
   }
 
@@ -613,6 +629,55 @@ function isTokenExpiring(accessToken: string, refreshBufferSeconds?: number): bo
   } catch {
     return false;
   }
+}
+
+// HTTP statuses the WorkOS SDK treats as idempotent/retryable and retries
+// internally. If one of these still surfaces, the failure is transient rather
+// than a dead refresh token: request timeouts (normalized to 408), rate limits
+// (429), and 5xx.
+const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+
+// A network-level fetch failure surfaces as a TypeError ("fetch failed" /
+// "Failed to fetch"). Match its message so an unrelated programming TypeError
+// isn't misclassified as a transient (and therefore session-preserving) error.
+const NETWORK_ERROR_MESSAGE = /fetch failed|failed to fetch|network|load failed|terminated/i;
+
+// A raw network TypeError is not an HttpClientError, so the WorkOS SDK re-wraps
+// it in a plain Error whose `cause` is the original TypeError. Follow the cause
+// chain to recognize it.
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return NETWORK_ERROR_MESSAGE.test(error.message);
+  }
+
+  if (error instanceof Error && error.cause != null && error.cause !== error) {
+    return isNetworkError(error.cause);
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether a failed refresh is transient (should preserve the
+ * session and be retried) rather than terminal (the refresh token is dead and
+ * the user must re-authenticate).
+ *
+ * Mirrors the WorkOS SDK's own retry classification: transient HTTP responses
+ * (request timeout normalized to `408`, `429`, and `5xx`) surface as an
+ * exception carrying a retryable numeric `status`, and a network-level failure
+ * surfaces as a `TypeError` (wrapped by the SDK in an `Error` with the
+ * `TypeError` as its `cause`). Anything else (a terminal `invalid_grant` at
+ * 400, a 401, or an unrecognized error) is treated as terminal.
+ */
+export function isTransientRefreshError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const { status } = error;
+    if (typeof status === 'number' && RETRYABLE_REFRESH_STATUS_CODES.has(status)) {
+      return true;
+    }
+  }
+
+  return isNetworkError(error);
 }
 
 export async function getSessionFromCookie(request?: NextRequest) {
