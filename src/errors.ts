@@ -49,17 +49,26 @@ export class CallbackError extends AuthKitError {
 export interface TokenRefreshErrorContext {
   userId?: string;
   sessionId?: string;
+  /**
+   * Whether the refresh failed for a transient reason (network error, timeout,
+   * 429, or 5xx) rather than a terminal one (the refresh token is dead). When
+   * `true`, the existing session is still valid and the caller should keep it
+   * and retry rather than signing the user out.
+   */
+  isTransient?: boolean;
 }
 
 export class TokenRefreshError extends AuthKitError {
   readonly userId?: string;
   readonly sessionId?: string;
+  readonly isTransient: boolean;
 
   constructor(message: string, cause?: unknown, context?: TokenRefreshErrorContext) {
     super(message, cause);
     this.name = 'TokenRefreshError';
     this.userId = context?.userId;
     this.sessionId = context?.sessionId;
+    this.isTransient = context?.isTransient ?? false;
   }
 }
 
