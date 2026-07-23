@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.3.1](https://github.com/workos/authkit-nextjs/compare/v4.3.0...v4.3.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* Preserve session on transient refresh failures ([#461](https://github.com/workos/authkit-nextjs/issues/461)) ([07b8dfa](https://github.com/workos/authkit-nextjs/commit/07b8dfac63321d2a5f7fdacd033d02728c099ebe))
+
 ## [4.3.0](https://github.com/workos/authkit-nextjs/compare/v4.2.0...v4.3.0) (2026-07-22)
 
 
