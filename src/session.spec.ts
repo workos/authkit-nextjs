@@ -407,6 +407,12 @@ describe('session.ts', () => {
       ['a server error (503)', Object.assign(new Error('Service unavailable'), { status: 503 })],
       ['a request timeout (408)', Object.assign(new Error('Request timeout'), { status: 408 })],
       ['a network error', new TypeError('fetch failed')],
+      // The SDK re-wraps a raw network TypeError in a plain Error with the
+      // TypeError as its cause; the classifier must follow the cause chain.
+      [
+        'an SDK-wrapped network error',
+        new Error('Unexpected error: TypeError: fetch failed', { cause: new TypeError('fetch failed') }),
+      ],
     ])('should preserve the cookie when refreshing fails transiently: %s', async (_label, transientError) => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -1026,6 +1032,7 @@ describe('session.ts', () => {
       expect(mockErrorCallback).toHaveBeenCalledWith({
         error: mockError,
         request,
+        isTransient: false,
       });
     });
 

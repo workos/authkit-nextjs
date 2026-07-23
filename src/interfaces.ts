@@ -152,7 +152,16 @@ export interface AuthkitOptions {
     impersonator?: Impersonator;
     organizationId?: string;
   }) => void | Promise<void>;
-  onSessionRefreshError?: (params: { error?: unknown; request: NextRequest }) => void | Promise<void>;
+  onSessionRefreshError?: (params: {
+    error?: unknown;
+    request: NextRequest;
+    /**
+     * Whether the refresh failed for a transient reason (network error,
+     * timeout, 429, or 5xx) rather than a terminal one. When `true` the sealed
+     * session cookie is preserved for a later retry instead of being cleared.
+     */
+    isTransient: boolean;
+  }) => void | Promise<void>;
 }
 
 export interface AuthkitResponse {
