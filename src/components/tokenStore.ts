@@ -41,15 +41,17 @@ export class TokenStore {
       error: null,
     };
 
-    /* istanbul ignore next */
     if (initialToken) {
       // Mark as consumed if we found a token
       this.fastCookieConsumed = true;
-      // Schedule refresh based on token expiry
-      const tokenData = this.parseToken(initialToken);
-      if (tokenData) {
-        this.scheduleRefresh(tokenData.timeUntilExpiry);
-      }
+      // The store is constructed at module-evaluation time, before hydration.
+      // A refresh timer that fires before Next.js initializes its router
+      // action queue makes the Server Action throw inside React's
+      // startTransition, and the action promise never settles — wedging
+      // refreshPromise for the rest of the page lifetime. Defer scheduling
+      // until the first subscriber attaches (subscribers attach from effects,
+      // which run after hydration).
+      this.initialRefreshPending = true;
     }
   }
 
@@ -57,9 +59,18 @@ export class TokenStore {
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
   private fastCookieConsumed = false;
+  private initialRefreshPending = false;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
+
+    if (this.initialRefreshPending) {
+      this.initialRefreshPending = false;
+      const tokenData = this.parseToken(this.state.token);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+    }
     return () => {
       this.listeners.delete(listener);
       if (this.listeners.size === 0 && this.refreshTimeout) {
@@ -400,6 +411,7 @@ export class TokenStore {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
     this.fastCookieConsumed = false;
+    this.initialRefreshPending = false;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
