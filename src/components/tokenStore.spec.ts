@@ -865,20 +865,31 @@ describe('tokenStore', () => {
         expect(store.getSnapshot().token).toBe(freshToken);
       });
 
-      it('should schedule the deferred refresh only once across subscribers', () => {
+      it('should not schedule again while other subscribers remain', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+      });
+
+      it('should restore the refresh timer when a subscriber attaches after all unsubscribed', () => {
         setupMockEnv(`workos-access-token=${expiringJwt()};`);
         const store = new TokenStore();
 
         const unsubscribe = store.subscribe(() => {});
         expect(vi.getTimerCount()).toBe(1);
 
-        // Last unsubscribe clears the timer; a new subscriber must not re-run
-        // the initial scheduling
+        // Last unsubscribe clears the timer
         unsubscribe();
         expect(vi.getTimerCount()).toBe(0);
 
+        // A later subscriber restores background refresh for the cached token
         store.subscribe(() => {});
-        expect(vi.getTimerCount()).toBe(0);
+        expect(vi.getTimerCount()).toBe(1);
       });
 
       it('should not schedule on subscribe when the initial token is opaque', () => {

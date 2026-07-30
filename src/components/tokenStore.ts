@@ -42,16 +42,13 @@ export class TokenStore {
     };
 
     if (initialToken) {
-      // Mark as consumed if we found a token
+      // Mark as consumed if we found a token. Refresh scheduling is deferred
+      // to the first subscriber: the store is constructed at module-evaluation
+      // time, before hydration, and a refresh timer that fires before Next.js
+      // initializes its router action queue makes the Server Action throw
+      // inside React's startTransition without ever settling the action
+      // promise — wedging refreshPromise for the rest of the page lifetime.
       this.fastCookieConsumed = true;
-      // The store is constructed at module-evaluation time, before hydration.
-      // A refresh timer that fires before Next.js initializes its router
-      // action queue makes the Server Action throw inside React's
-      // startTransition, and the action promise never settles — wedging
-      // refreshPromise for the rest of the page lifetime. Defer scheduling
-      // until the first subscriber attaches (subscribers attach from effects,
-      // which run after hydration).
-      this.initialRefreshPending = true;
     }
   }
 
@@ -59,13 +56,15 @@ export class TokenStore {
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
   private fastCookieConsumed = false;
-  private initialRefreshPending = false;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
 
-    if (this.initialRefreshPending) {
-      this.initialRefreshPending = false;
+    // Unsubscribing the last listener clears the refresh timer, so restore it
+    // whenever the store goes from zero to one subscribers. Subscribers attach
+    // from effects, which run after hydration, so a timer scheduled here can
+    // never dispatch a Server Action before the router is ready.
+    if (this.listeners.size === 1 && !this.refreshTimeout) {
       const tokenData = this.parseToken(this.state.token);
       if (tokenData) {
         this.scheduleRefresh(tokenData.timeUntilExpiry);
@@ -411,7 +410,6 @@ export class TokenStore {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
     this.fastCookieConsumed = false;
-    this.initialRefreshPending = false;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
