@@ -827,5 +827,79 @@ describe('tokenStore', () => {
 
       expect(result).toBe(token);
     });
+
+    describe('deferred initial refresh scheduling', () => {
+      const makeJwt = (payload: Record<string, unknown>) =>
+        `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
+
+      const expiringJwt = () => {
+        const now = Math.floor(Date.now() / 1000);
+        return makeJwt({ sub: 'user_123', sid: 'session_123', iat: now - 3600, exp: now + 30 });
+      };
+
+      it('should not schedule a refresh timer during construction, even for an expiring token', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+
+        new TokenStore();
+
+        expect(vi.getTimerCount()).toBe(0);
+        expect(mockRefreshAccessTokenAction).not.toHaveBeenCalled();
+      });
+
+      it('should schedule the refresh when the first subscriber attaches', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const freshToken = makeJwt({ sub: 'user_123', sid: 'session_123', iat: now, exp: now + 3600 });
+        mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: freshToken });
+
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        // Expiring token schedules an immediate refresh
+        await vi.runOnlyPendingTimersAsync();
+        await Promise.resolve();
+
+        expect(mockRefreshAccessTokenAction).toHaveBeenCalledTimes(1);
+        expect(store.getSnapshot().token).toBe(freshToken);
+      });
+
+      it('should not schedule again while other subscribers remain', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+      });
+
+      it('should restore the refresh timer when a subscriber attaches after all unsubscribed', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        const unsubscribe = store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        // Last unsubscribe clears the timer
+        unsubscribe();
+        expect(vi.getTimerCount()).toBe(0);
+
+        // A later subscriber restores background refresh for the cached token
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+      });
+
+      it('should not schedule on subscribe when the initial token is opaque', () => {
+        setupMockEnv('workos-access-token=opaque-token;');
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+
+        expect(vi.getTimerCount()).toBe(0);
+      });
+    });
   });
 });

@@ -41,15 +41,14 @@ export class TokenStore {
       error: null,
     };
 
-    /* istanbul ignore next */
     if (initialToken) {
-      // Mark as consumed if we found a token
+      // Mark as consumed if we found a token. Refresh scheduling is deferred
+      // to the first subscriber: the store is constructed at module-evaluation
+      // time, before hydration, and a refresh timer that fires before Next.js
+      // initializes its router action queue makes the Server Action throw
+      // inside React's startTransition without ever settling the action
+      // promise — wedging refreshPromise for the rest of the page lifetime.
       this.fastCookieConsumed = true;
-      // Schedule refresh based on token expiry
-      const tokenData = this.parseToken(initialToken);
-      if (tokenData) {
-        this.scheduleRefresh(tokenData.timeUntilExpiry);
-      }
     }
   }
 
@@ -60,6 +59,17 @@ export class TokenStore {
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
+
+    // Unsubscribing the last listener clears the refresh timer, so restore it
+    // whenever the store goes from zero to one subscribers. Subscribers attach
+    // from effects, which run after hydration, so a timer scheduled here can
+    // never dispatch a Server Action before the router is ready.
+    if (this.listeners.size === 1 && !this.refreshTimeout) {
+      const tokenData = this.parseToken(this.state.token);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+    }
     return () => {
       this.listeners.delete(listener);
       if (this.listeners.size === 0 && this.refreshTimeout) {
