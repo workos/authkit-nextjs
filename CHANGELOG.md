@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.3.2](https://github.com/workos/authkit-nextjs/compare/v4.3.1...v4.3.2) (2026-08-03)
+
+
+### Bug Fixes
+
+* defer initial token refresh until first subscriber ([#467](https://github.com/workos/authkit-nextjs/issues/467)) ([587c5d7](https://github.com/workos/authkit-nextjs/commit/587c5d767e61902c08cd18933b8797f4517ef5ab))
+
 ## [4.3.1](https://github.com/workos/authkit-nextjs/compare/v4.3.0...v4.3.1) (2026-07-30)
 
 
