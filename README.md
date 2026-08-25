@@ -162,6 +162,35 @@ In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and
 > [!IMPORTANT]
 > The Sign-in URL is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
 
+### Google One Tap
+
+Google One Tap posts its signed ID token to your application so the token and the resulting WorkOS session stay server-side.
+
+Configure Google OAuth with your own credentials in the WorkOS Dashboard. In Google Cloud, add your application origin to **Authorized JavaScript origins** and the handler URL below to **Authorized redirect URIs**. WorkOS sandbox demo credentials cannot be used for One Tap. This flow requires `@workos-inc/node` 10.12 or newer.
+
+```tsx
+// app/page.tsx
+import { GoogleOneTap } from '@workos-inc/authkit-nextjs/components';
+
+export default function Page() {
+  return (
+    <GoogleOneTap
+      clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
+      loginUri="https://example.com/auth/google-one-tap"
+    />
+  );
+}
+```
+
+```ts
+// app/auth/google-one-tap/route.ts
+import { handleGoogleOneTap } from '@workos-inc/authkit-nextjs';
+
+export const POST = handleGoogleOneTap({ returnPathname: '/dashboard' });
+```
+
+`handleGoogleOneTap` verifies Google's double-submit CSRF token, exchanges the ID token through WorkOS, and stores the normal encrypted AuthKit session. The token never enters a URL. If One Tap cannot complete—for example, because another authentication step is required—the handler falls back to Hosted AuthKit. Keep the standard sign-in button visible because browsers can suppress the prompt, and this flow does not return Google access or refresh tokens for additional scopes.
+
 ### Proxy / Middleware
 
 This library relies on Next.js proxy (called "middleware" in Next.js ≤15) to provide session management for routes.
