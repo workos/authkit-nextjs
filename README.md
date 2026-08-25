@@ -186,10 +186,18 @@ export default function Page() {
 // app/auth/google-one-tap/route.ts
 import { handleGoogleOneTap } from '@workos-inc/authkit-nextjs';
 
-export const POST = handleGoogleOneTap({ returnPathname: '/dashboard' });
+export const POST = handleGoogleOneTap({
+  returnPathname: '/dashboard',
+  // Set this when request.url uses an internal proxy or container hostname.
+  baseURL: 'https://example.com',
+});
 ```
 
-`handleGoogleOneTap` verifies Google's double-submit CSRF token, exchanges the ID token through WorkOS, and stores the normal encrypted AuthKit session. The token never enters a URL. If One Tap cannot complete—for example, because another authentication step is required—the handler falls back to Hosted AuthKit. Keep the standard sign-in button visible because browsers can suppress the prompt, and this flow does not return Google access or refresh tokens for additional scopes.
+`handleGoogleOneTap` verifies Google's double-submit CSRF token, exchanges the ID token through WorkOS, and stores the normal encrypted AuthKit session. The token never enters a URL. If One Tap cannot complete—for example, because another authentication step is required—the handler sets the PKCE cookie and falls back to Hosted AuthKit. Authentication errors are logged with the `[AuthKit Google One Tap error]` prefix and can be handled with the `onError` option.
+
+Google's HTML API scans the fixed `#g_id_onload` element when its script executes. Render one `GoogleOneTap` instance in an initially loaded page or layout; mounting it only after a client-side navigation may not show the prompt. The optional `nonce` prop is passed to the Google script for strict CSP deployments.
+
+Keep the standard sign-in button visible because browsers can suppress the prompt, and this identity-only flow does not return Google access or refresh tokens for additional scopes.
 
 ### Proxy / Middleware
 

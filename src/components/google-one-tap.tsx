@@ -7,12 +7,19 @@ export interface GoogleOneTapProps {
   loginUri: string;
   context?: 'signin' | 'signup' | 'use';
   cancelOnTapOutside?: boolean;
+  nonce?: string;
 }
 
-export function GoogleOneTap({ clientId, loginUri, context = 'signin', cancelOnTapOutside = true }: GoogleOneTapProps) {
+export function GoogleOneTap({
+  clientId,
+  loginUri,
+  context = 'signin',
+  cancelOnTapOutside = true,
+  nonce,
+}: GoogleOneTapProps) {
   return (
     <>
-      <script async src="https://accounts.google.com/gsi/client" />
+      <script async nonce={nonce} src="https://accounts.google.com/gsi/client" />
       <div
         id="g_id_onload"
         data-cancel_on_tap_outside={String(cancelOnTapOutside)}

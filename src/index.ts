@@ -21,7 +21,6 @@ import { getFeatureFlagsRuntimeClient } from './feature-flags.js';
 import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
-export type { HandleGoogleOneTapOptions } from './google-one-tap-route.js';
 
 export type { CallbackErrorCode, CallbackErrorContext } from './errors.js';
 

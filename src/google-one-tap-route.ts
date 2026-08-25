@@ -2,37 +2,57 @@ import type { AuthenticationResponse } from '@workos-inc/node';
 import { NextRequest } from 'next/server';
 import { WORKOS_CLIENT_ID } from './env-variables.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
+import type { HandleGoogleOneTapOptions } from './interfaces.js';
+import { appendPKCESetCookieHeader } from './pkce.js';
 import { saveSession } from './session.js';
-import { redirectWithFallback, setCachePreventionHeaders } from './utils.js';
+import { setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
 
-export interface HandleGoogleOneTapOptions {
-  returnPathname?: string;
-  onError?: (params: { error?: unknown; request: NextRequest }) => Response | Promise<Response>;
-  onSuccess?: (data: Awaited<ReturnType<typeof authenticate>>) => void | Promise<void>;
-}
+const nodeSdkVersionError = '@workos-inc/node 10.12 or newer is required for Google One Tap.';
+
+class UnsupportedNodeSdkError extends Error {}
+
+type AuthenticateWithGoogleIdToken = (options: {
+  clientId: string;
+  token: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) => Promise<AuthenticationResponse>;
 
 const authenticate = async (request: NextRequest, token: string): Promise<AuthenticationResponse> => {
   const userManagement = getWorkOS().userManagement;
-  const authenticateWithGoogleIdToken = Reflect.get(userManagement, 'authenticateWithGoogleIdToken');
+  const authenticateWithGoogleIdToken = (
+    userManagement as typeof userManagement & {
+      authenticateWithGoogleIdToken?: AuthenticateWithGoogleIdToken;
+    }
+  ).authenticateWithGoogleIdToken;
+
   if (typeof authenticateWithGoogleIdToken !== 'function') {
-    throw new Error('@workos-inc/node 10.12 or newer is required for Google One Tap.');
+    throw new UnsupportedNodeSdkError(nodeSdkVersionError);
   }
 
-  return Reflect.apply(authenticateWithGoogleIdToken, userManagement, [
-    {
-      clientId: WORKOS_CLIENT_ID,
-      token,
-      ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
-      userAgent: request.headers.get('user-agent') ?? undefined,
-    },
-  ]);
+  return authenticateWithGoogleIdToken.call(userManagement, {
+    clientId: WORKOS_CLIENT_ID,
+    token,
+    ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+    userAgent: request.headers.get('user-agent') ?? undefined,
+  });
 };
 
 export function handleGoogleOneTap(options: HandleGoogleOneTapOptions = {}) {
-  const { returnPathname = '/', onError, onSuccess } = options;
+  const { returnPathname = '/', baseURL, onError, onSuccess } = options;
+
+  if (baseURL) {
+    try {
+      new URL(baseURL);
+    } catch (error) {
+      throw new Error(`Invalid baseURL: ${baseURL}`, { cause: error });
+    }
+  }
 
   return async function POST(request: NextRequest): Promise<Response> {
+    let authenticationResponse: AuthenticationResponse;
+
     try {
       const formData = await request.formData();
       const token = formData.get('credential');
@@ -48,24 +68,37 @@ export function handleGoogleOneTap(options: HandleGoogleOneTapOptions = {}) {
         return noStore(new Response('Invalid Google One Tap request.', { status: 400 }));
       }
 
-      const authenticationResponse = await authenticate(request, token);
+      authenticationResponse = await authenticate(request, token);
       await saveSession(authenticationResponse, request);
-      await onSuccess?.(authenticationResponse);
-
-      const redirectUrl = new URL(request.url);
-      const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
-      redirectUrl.pathname = parsedReturnUrl.pathname;
-      redirectUrl.search = parsedReturnUrl.search;
-      return noStore(redirectWithFallback(redirectUrl.toString()));
     } catch (error) {
+      console.error('[AuthKit Google One Tap error]', error);
+
       if (onError) {
         return noStore(await onError({ error, request }));
       }
 
-      const { url } = await getAuthorizationUrl({ returnPathname });
-      return noStore(redirectWithFallback(url));
+      if (error instanceof UnsupportedNodeSdkError) {
+        throw error;
+      }
+
+      const { url, sealedState } = await getAuthorizationUrl({ returnPathname });
+      const response = noStore(redirectAfterPost(url));
+      appendPKCESetCookieHeader(request, response.headers, sealedState);
+      return response;
     }
+
+    await onSuccess?.(authenticationResponse);
+
+    const redirectUrl = baseURL ? new URL(baseURL) : new URL(request.url);
+    const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
+    redirectUrl.pathname = parsedReturnUrl.pathname;
+    redirectUrl.search = parsedReturnUrl.search;
+    return noStore(redirectAfterPost(redirectUrl.toString()));
   };
+}
+
+function redirectAfterPost(url: string): Response {
+  return new Response(null, { status: 303, headers: { Location: url } });
 }
 
 function noStore(response: Response): Response {

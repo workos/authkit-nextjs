@@ -11,10 +11,12 @@ describe('GoogleOneTap', () => {
         loginUri="https://example.com/auth/google-one-tap"
         context="signup"
         cancelOnTapOutside={false}
+        nonce="csp-nonce"
       />,
     );
 
     expect(document.querySelector('script')).toHaveAttribute('src', 'https://accounts.google.com/gsi/client');
+    expect(document.querySelector('script')).toHaveAttribute('nonce', 'csp-nonce');
     expect(container.querySelector('#g_id_onload')).toHaveAttribute('data-client_id', 'google-client-id');
     expect(container.querySelector('#g_id_onload')).toHaveAttribute(
       'data-login_uri',
