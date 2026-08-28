@@ -18,6 +18,10 @@
       "types": "./dist/esm/types/components/index.d.ts",
       "import": "./dist/esm/components/index.js"
     },
+    "./interfaces": {
+      "types": "./dist/esm/types/interfaces.d.ts",
+      "import": "./dist/esm/interfaces.js"
+    },
     ".": {
       "types": "./dist/esm/types/index.d.ts",
       "import": "./dist/esm/index.js"
