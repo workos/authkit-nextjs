@@ -601,9 +601,20 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
   };
 }
 
+function getExpectedIssuer(): string | string[] | undefined {
+  if (!WORKOS_ISSUER) {
+    return undefined;
+  }
+  const issuers = WORKOS_ISSUER.split(',')
+    .map((issuer) => issuer.trim())
+    .filter(Boolean);
+  return issuers.length <= 1 ? issuers[0] : issuers;
+}
+
 async function verifyAccessToken(accessToken: string) {
   try {
-    await jwtVerify(accessToken, JWKS(), WORKOS_ISSUER ? { issuer: WORKOS_ISSUER } : undefined);
+    const issuer = getExpectedIssuer();
+    await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
     return true;
   } catch {
     return false;
