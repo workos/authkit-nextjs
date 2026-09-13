@@ -18,12 +18,7 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
-import {
-  appendPKCESetCookieHeader,
-  isInitialDocumentRequest,
-  setPKCECookie,
-  setPendingPKCERedirectHeaders,
-} from './pkce.js';
+import { appendPKCESetCookieHeader, isInitialDocumentRequest, setPendingPKCERedirectHeaders } from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
@@ -496,11 +491,16 @@ async function redirectToSignIn() {
   const pathname = new URL(url).pathname;
   const screenHint = getScreenHint(signUpPaths, pathname);
 
-  const returnPathname = getReturnPathname(url);
-
-  const { url: authkitUrl, sealedState } = await getAuthorizationUrl({ returnPathname, screenHint });
-  await setPKCECookie(sealedState);
-  redirect(authkitUrl);
+  // Server Components cannot write cookies. Start PKCE on a document request to the existing callback instead.
+  const redirectUri = headersList.get('x-redirect-uri') ?? WORKOS_REDIRECT_URI;
+  const startUrl = new URL(redirectUri);
+  const routing = await sealData(
+    { purpose: 'authkit-start', redirectUri, returnPathname: getReturnPathname(url), screenHint },
+    // Routing data is not an OAuth credential; a cached link can always start a fresh flow.
+    { password: WORKOS_COOKIE_PASSWORD, ttl: 0 },
+  );
+  startUrl.searchParams.set('__authkit_start', routing);
+  redirect(startUrl.toString());
 }
 
 export async function getTokenClaims<T = Record<string, unknown>>(

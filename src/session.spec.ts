@@ -20,9 +20,8 @@ import { SignJWT, jwtVerify } from 'jose';
 function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
   Object.defineProperty(mod, key, { value, configurable: true });
 }
-import { sealData } from 'iron-session';
+import { sealData, unsealData } from 'iron-session';
 import { User } from '@workos-inc/node';
-import { getStateFromPKCECookieValue } from './pkce.js';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
 
 vi.mock('jose', async () => {
@@ -198,12 +197,12 @@ describe('session.ts', () => {
 
       await withAuth({ ensureSignedIn: true });
 
-      // The state is now sealed, se we need to unseal it
-      const redirectUrl = new URL((redirect as unknown as Mock).mock.calls[0][0]);
-      const sealedState = redirectUrl.searchParams.get('state')!;
-      const { returnPathname } = await getStateFromPKCECookieValue(sealedState);
-
-      expect(returnPathname).toBe('/protected?test=123');
+      const redirectUrl = new URL(vi.mocked(redirect).mock.calls[0][0]);
+      const routing = await unsealData(redirectUrl.searchParams.get('__authkit_start')!, {
+        password: process.env.WORKOS_COOKIE_PASSWORD!,
+        ttl: 0,
+      });
+      expect(routing).toMatchObject({ returnPathname: '/protected?test=123' });
     });
   });
 
@@ -735,7 +734,12 @@ describe('session.ts', () => {
 
           await withAuth({ ensureSignedIn: true });
           expect(redirect).toHaveBeenCalledTimes(1);
-          expect(redirect).toHaveBeenCalledWith(expect.stringContaining('screen_hint=sign-up'));
+          const redirectUrl = new URL(vi.mocked(redirect).mock.calls[0][0]);
+          const routing = await unsealData(redirectUrl.searchParams.get('__authkit_start')!, {
+            password: process.env.WORKOS_COOKIE_PASSWORD!,
+            ttl: 0,
+          });
+          expect(routing).toMatchObject({ screenHint: 'sign-up' });
         });
       });
     });

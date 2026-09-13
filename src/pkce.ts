@@ -63,7 +63,12 @@ export function setPendingPKCERedirectHeaders(headers: Headers, authorizationUrl
  * AuthKit. Fetch/XHR/RSC/prefetch requests never follow cross-origin redirects
  * to complete OAuth, so they do not need verifier cookies.
  */
-export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers, sealedState: string): void {
+export function appendPKCESetCookieHeader(
+  request: NextRequest,
+  headers: Headers,
+  sealedState: string,
+  cookieUrl = request.url,
+): void {
   if (!isInitialDocumentRequest(request)) {
     return;
   }
@@ -76,7 +81,7 @@ export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers
   // A small number of concurrent PKCE cookies is normal (multiple tabs each
   // starting an OAuth flow). Only purge when accumulation risks HTTP 431.
   if (pkceCookies.length >= MAX_PKCE_COOKIES) {
-    const expiredOptions = getPKCECookieOptions(request.url, true, true);
+    const expiredOptions = getPKCECookieOptions(cookieUrl, true, true);
     for (const { name } of pkceCookies) {
       if (name !== newCookieName) {
         headers.append('Set-Cookie', `${name}=; ${expiredOptions}`);
@@ -84,7 +89,7 @@ export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers
     }
   }
 
-  headers.append('Set-Cookie', `${newCookieName}=${sealedState}; ${getPKCECookieOptions(request.url, true)}`);
+  headers.append('Set-Cookie', `${newCookieName}=${sealedState}; ${getPKCECookieOptions(cookieUrl, true)}`);
 }
 
 export function stripPKCESetCookieHeaders(headers: Headers): void {
