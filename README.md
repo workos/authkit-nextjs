@@ -157,7 +157,7 @@ export const GET = async () => {
 };
 ```
 
-In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and set the **Sign-in URL** to match this route (e.g., `http://localhost:3000/sign-in`).
+In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and set the **Sign-in URL** to match this route (e.g., `http://localhost:3000/sign-in`). Use a normal `<a>` link to this route so navigation, not prefetching, starts sign-in.
 
 > [!IMPORTANT]
 > The Sign-in URL is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
@@ -388,32 +388,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 For pages where you want to display a signed-in and signed-out view, use `withAuth` to retrieve the user session from WorkOS.
 
 ```jsx
-import Link from 'next/link';
-import { getSignInUrl, getSignUpUrl, withAuth, signOut } from '@workos-inc/authkit-nextjs';
+import { withAuth, signOut } from '@workos-inc/authkit-nextjs';
 
 export default async function HomePage() {
   // Retrieves the user from the session or returns `null` if no user is signed in
   const { user } = await withAuth();
 
   if (!user) {
-    // Get the URL to redirect the user to AuthKit to sign in
-    const signInUrl = await getSignInUrl();
-
-    // Get the URL to redirect the user to AuthKit to sign up
-    const signUpUrl = await getSignUpUrl();
-
-    // You can also pass custom state data through the auth flow
-    const signInUrlWithState = await getSignInUrl({
-      state: JSON.stringify({
-        teamId: 'team_123',
-        referrer: 'homepage',
-      }),
-    });
-
     return (
       <>
-        <Link href={signInUrl}>Log in</Link>
-        <Link href={signUpUrl}>Sign Up</Link>
+        <a href="/sign-in">Log in</a>
+        <a href="/sign-up">Sign up</a>
       </>
     );
   }
@@ -429,6 +414,18 @@ export default async function HomePage() {
       <button type="submit">Sign out</button>
     </form>
   );
+}
+```
+
+`getSignInUrl()` and `getSignUpUrl()` set a PKCE cookie, so call them in a Route Handler or Server Action, not while rendering a Server Component. Use the [sign-in route](#sign-in-url) above and an equivalent sign-up route:
+
+```ts
+// app/sign-up/route.ts
+import { getSignUpUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
+
+export async function GET() {
+  redirect(await getSignUpUrl());
 }
 ```
 
@@ -511,7 +508,7 @@ const { user } = await withAuth({ ensureSignedIn: true });
 const { user, loading } = useAuth({ ensureSignedIn: true });
 ```
 
-Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
+Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated. The Server Component guard first visits your existing `handleAuth()` callback route to set up PKCE; no additional route or configuration is needed. Rendering or prefetching the page does not set a verifier cookie. The cookie is created when the browser navigates to start authentication.
 
 ### Re-authentication
 
@@ -666,20 +663,32 @@ JWT tokens are sensitive credentials and should be handled carefully:
 
 ### Passing Custom State Through Authentication
 
-You can pass custom state data through the authentication flow using the `state` parameter. The state parameter is a string value that gets passed through OAuth and returned in the callback. To pass complex data, serialize it as JSON:
+You can pass custom state data through the authentication flow using the `state` parameter. The state parameter is a string value that gets passed through OAuth and returned in the callback. Generate the URL in a Route Handler or Server Action, serializing complex data as JSON:
 
 ```ts
-// When generating sign-in/sign-up URLs, serialize your data as JSON
-const signInUrl = await getSignInUrl({
-  state: JSON.stringify({
-    teamId: 'team_123',
-    feature: 'billing',
-    referrer: 'pricing-page',
-    timestamp: Date.now(),
-  }),
-});
+// app/sign-in/route.ts
+import { getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
 
-// The state data is available in the callback handler
+export async function GET() {
+  const signInUrl = await getSignInUrl({
+    state: JSON.stringify({
+      teamId: 'team_123',
+      feature: 'billing',
+      referrer: 'pricing-page',
+      timestamp: Date.now(),
+    }),
+  });
+  redirect(signInUrl);
+}
+```
+
+The state data is available in the callback handler:
+
+```ts
+// app/callback/route.ts
+import { handleAuth } from '@workos-inc/authkit-nextjs';
+
 export const GET = handleAuth({
   onSuccess: async ({ user, state }) => {
     // Parse the state string back to an object

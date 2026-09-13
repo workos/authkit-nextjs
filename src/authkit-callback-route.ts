@@ -1,12 +1,28 @@
+import { unsealData } from 'iron-session';
 import { NextRequest } from 'next/server';
+import * as v from 'valibot';
 import { getPKCECookieOptions } from './cookie.js';
-import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { CallbackError } from './errors.js';
+import { getAuthorizationUrl } from './get-authorization-url.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
+import {
+  PKCE_COOKIE_NAME,
+  appendPKCESetCookieHeader,
+  getPKCECookieNameForState,
+  getStateFromPKCECookieValue,
+  isInitialDocumentRequest,
+} from './pkce.js';
 import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
+
+const AuthStartSchema = v.strictObject({
+  purpose: v.literal('authkit-start'),
+  redirectUri: v.pipe(v.string(), v.url()),
+  returnPathname: v.string(),
+  screenHint: v.picklist(['sign-in', 'sign-up']),
+});
 
 function preventCaching(headers: Headers): void {
   headers.set('Vary', 'Cookie');
@@ -32,6 +48,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     // Gather mandatory information
     const code = requestUrl.searchParams.get('code');
     const state = requestUrl.searchParams.get('state');
+    const authStart = requestUrl.searchParams.get('__authkit_start');
 
     // Attribution for thrown errors: which request failed and what it carried,
     // with param values omitted since `code` is a live credential.
@@ -46,6 +63,33 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     // destroying the 1-use PKCE cookie to prevent replay attacks or stale
     // cookies affecting future auth attempts.
     try {
+      if (code === null && state === null && authStart !== null) {
+        if (requestUrl.searchParams.getAll('__authkit_start').length !== 1) {
+          throw new Error('Invalid authentication start request');
+        }
+        const { redirectUri, returnPathname, screenHint } = v.parse(
+          AuthStartSchema,
+          await unsealData(authStart, { password: WORKOS_COOKIE_PASSWORD, ttl: 0 }),
+        );
+        const returnUrl = new URL(returnPathname, redirectUri);
+        if (!returnPathname.startsWith('/') || returnUrl.origin !== new URL(redirectUri).origin) {
+          throw new Error('Authentication return path must be on the application origin');
+        }
+
+        const responseHeaders = new Headers();
+        preventCaching(responseHeaders);
+        if (!isInitialDocumentRequest(request)) {
+          // Next ignores non-Flight prefetches and uses a full navigation when the user follows the redirect.
+          responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+          return new Response('', { headers: responseHeaders });
+        }
+
+        // Use the configured URI, not Next's normalized request URL. Never reuse routing data as OAuth state.
+        const { url, sealedState } = await getAuthorizationUrl({ returnPathname, screenHint, redirectUri });
+        appendPKCESetCookieHeader(request, responseHeaders, sealedState, redirectUri);
+        return redirectWithFallback(url, responseHeaders);
+      }
+
       if (!code || !state) {
         throw new CallbackError('Missing required auth parameter', 'missing_auth_params', errorContext);
       }
