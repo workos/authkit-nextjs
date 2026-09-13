@@ -176,10 +176,14 @@ describe('page authentication start', () => {
 
     const substitutedState = new URL(startUrl);
     substitutedState.searchParams.set('__authkit_start', flowA.state);
-    const rejectedStart = await handler(new NextRequest(substitutedState, { headers: documentHeaders }));
+    const onError = vi.fn(() => new Response(null, { status: 500 }));
+    const rejectedStart = await handleAuth({ onError })(
+      new NextRequest(substitutedState, { headers: documentHeaders }),
+    );
     expect(rejectedStart.status).toBe(500);
     expect(rejectedStart.headers.getSetCookie()).toEqual([]);
     expect(exchange).not.toHaveBeenCalled();
+    expect(JSON.stringify(onError.mock.calls[0])).not.toContain(flowA.data.codeVerifier);
   });
 
   it.each([

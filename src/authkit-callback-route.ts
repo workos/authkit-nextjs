@@ -64,13 +64,15 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     // cookies affecting future auth attempts.
     try {
       if (code === null && state === null && authStart !== null) {
-        if (requestUrl.searchParams.getAll('__authkit_start').length !== 1) {
-          throw new Error('Invalid authentication start request');
-        }
-        const { redirectUri, returnPathname, screenHint } = v.parse(
+        const routing = v.safeParse(
           AuthStartSchema,
           await unsealData(authStart, { password: WORKOS_COOKIE_PASSWORD, ttl: 0 }),
         );
+        // Schema errors include their input. Do not expose decrypted data through logs or onError.
+        if (requestUrl.searchParams.getAll('__authkit_start').length !== 1 || !routing.success) {
+          throw new Error('Invalid authentication start request');
+        }
+        const { redirectUri, returnPathname, screenHint } = routing.output;
         const returnUrl = new URL(returnPathname, redirectUri);
         if (!returnPathname.startsWith('/') || returnUrl.origin !== new URL(redirectUri).origin) {
           throw new Error('Authentication return path must be on the application origin');
