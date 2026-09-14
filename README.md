@@ -853,9 +853,9 @@ Note that when several requests land inside the buffer window at the same time, 
 
 ### Signing out
 
-Use the `signOut` method to sign out the current logged in user and redirect to your app's default Logout URI. The Logout URI is set in your WorkOS dashboard settings under "Redirect".
+Use the `signOut` method to sign out the current logged in user and redirect to your app's default Sign-out URI. Sign-out URIs are set in your WorkOS dashboard under your application's "Redirects" tab.
 
-To use a non-default Logout URI, you can use the `returnTo` parameter.
+To use a non-default Sign-out URI, you can use the `returnTo` parameter.
 
 ```tsx
 await signOut({ returnTo: 'https://your-app.com/signed-out' });
