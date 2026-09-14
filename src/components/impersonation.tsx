@@ -4,7 +4,6 @@ import * as React from 'react';
 import { Button } from './button.js';
 import { MinMaxButton } from './min-max-button.js';
 import { getOrganizationAction, handleSignOutAction } from '../actions.js';
-import type { Organization } from '@workos-inc/node';
 import { useAuth } from './authkit-provider.js';
 
 interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
@@ -15,7 +14,7 @@ interface ImpersonationProps extends React.ComponentPropsWithoutRef<'div'> {
 export function Impersonation({ side = 'bottom', returnTo, ...props }: ImpersonationProps) {
   const { user, impersonator, organizationId } = useAuth();
 
-  const [organization, setOrganization] = React.useState<Organization | null>(null);
+  const [organization, setOrganization] = React.useState<{ id: string; name: string } | null>(null);
 
   React.useEffect(() => {
     if (!organizationId || !impersonator || !user) return;
@@ -29,35 +28,40 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
     <div
       {...props}
       data-workos-impersonation-root=""
-      style={{
-        'position': 'fixed',
-        'inset': 0,
-        'pointerEvents': 'none',
-        'zIndex': 9999,
+      style={
+        {
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 9999,
 
-        // short properties with defaults for authoring convenience
-        '--wi-minimized': '0',
-        '--wi-s': 'min(max(var(--workos-impersonation-size, 4px), 2px), 15px)',
-        '--wi-bgc': 'var(--workos-impersonation-background-color, #fce654)',
-        '--wi-c': 'var(--workos-impersonation-color, #1a1600)',
-        '--wi-bc': 'var(--workos-impersonation-border-color, #e0c36c)',
-        '--wi-bw': 'var(--workos-impersonation-border-width, 1px)',
+          // short properties with defaults for authoring convenience
+          '--wi-minimized': '0',
+          '--wi-s': 'min(max(var(--workos-impersonation-size, 4px), 2px), 15px)',
+          '--wi-bgc': 'var(--workos-impersonation-background-color, #fce654)',
+          '--wi-c': 'var(--workos-impersonation-color, #1a1600)',
+          '--wi-bc': 'var(--workos-impersonation-border-color, #e0c36c)',
+          '--wi-bw': 'var(--workos-impersonation-border-width, 1px)',
 
-        ...props.style,
-      }}
+          ...props.style,
+        } as React.CSSProperties
+      }
     >
       <div
-        style={{
-          '--wi-frame-size': 'calc(var(--wi-s) * (1 - var(--wi-minimized)) + var(--wi-minimized) * var(--wi-bw) * -1)',
-          'position': 'absolute',
-          'inset': 'calc(var(--wi-frame-size) * -1)',
-          'borderRadius': 'calc(var(--wi-frame-size) * 3)',
-          'boxShadow': `
+        style={
+          {
+            '--wi-frame-size':
+              'calc(var(--wi-s) * (1 - var(--wi-minimized)) + var(--wi-minimized) * var(--wi-bw) * -1)',
+            position: 'absolute',
+            inset: 'calc(var(--wi-frame-size) * -1)',
+            borderRadius: 'calc(var(--wi-frame-size) * 3)',
+            boxShadow: `
 						inset 0 0 0 calc(var(--wi-frame-size) * 2) var(--wi-bgc),
 						inset 0 0 0 calc(var(--wi-frame-size) * 2 + var(--wi-bw)) var(--wi-bc)
 					`,
-          'transition': 'all 500ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
+            transition: 'all 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+          } as React.CSSProperties
+        }
       />
 
       <div

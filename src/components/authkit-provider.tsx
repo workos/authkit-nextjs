@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   checkSessionAction,
   getAuthAction,
@@ -9,7 +9,7 @@ import {
   switchToOrganizationAction,
 } from '../actions.js';
 import type { Impersonator, User } from '@workos-inc/node';
-import type { UserInfo, SwitchToOrganizationOptions } from '../interfaces.js';
+import type { UserInfo, SwitchToOrganizationOptions, NoUserInfo } from '../interfaces.js';
 
 type AuthContextType = {
   user: User | null;
@@ -40,24 +40,44 @@ interface AuthKitProviderProps {
    * You can also pass this as `false` to disable the expired session checks.
    */
   onSessionExpired?: false | (() => void);
+  /**
+   * Initial auth data from the server. If provided, the provider will skip the initial client-side fetch.
+   */
+  initialAuth?: Omit<UserInfo | NoUserInfo, 'accessToken'>;
 }
 
-export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
-  const [role, setRole] = useState<string | undefined>(undefined);
-  const [roles, setRoles] = useState<string[] | undefined>(undefined);
-  const [permissions, setPermissions] = useState<string[] | undefined>(undefined);
-  const [entitlements, setEntitlements] = useState<string[] | undefined>(undefined);
-  const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(undefined);
-  const [impersonator, setImpersonator] = useState<Impersonator | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: AuthKitProviderProps) => {
+  const [user, setUser] = useState<User | null>(initialAuth?.user ?? null);
+  const [sessionId, setSessionId] = useState<string | undefined>(initialAuth?.sessionId);
+  const [organizationId, setOrganizationId] = useState<string | undefined>(initialAuth?.organizationId);
+  const [role, setRole] = useState<string | undefined>(initialAuth?.role);
+  const [roles, setRoles] = useState<string[] | undefined>(initialAuth?.roles);
+  const [permissions, setPermissions] = useState<string[] | undefined>(initialAuth?.permissions);
+  const [entitlements, setEntitlements] = useState<string[] | undefined>(initialAuth?.entitlements);
+  const [featureFlags, setFeatureFlags] = useState<string[] | undefined>(initialAuth?.featureFlags);
+  const [impersonator, setImpersonator] = useState<Impersonator | undefined>(initialAuth?.impersonator);
+  const [loading, setLoading] = useState(!initialAuth);
+  const redirectingRef = useRef(false);
+
+  // Redirect client-side to avoid CORS errors that occur when redirect()
+  // is called from a server action to an external URL.
+  const handleSignInRedirect = useCallback((auth: Record<string, unknown>): boolean => {
+    if ('signInUrl' in auth && auth.signInUrl) {
+      redirectingRef.current = true;
+      window.location.href = auth.signInUrl as string;
+      return true;
+    }
+    return false;
+  }, []);
 
   const getAuth = useCallback(async ({ ensureSignedIn = false }: { ensureSignedIn?: boolean } = {}) => {
+    if (redirectingRef.current) return;
     setLoading(true);
     try {
       const auth = await getAuthAction({ ensureSignedIn });
+
+      if (handleSignInRedirect(auth)) return;
+
       setUser(auth.user);
       setSessionId(auth.sessionId);
       setOrganizationId(auth.organizationId);
@@ -67,7 +87,7 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
       setEntitlements(auth.entitlements);
       setFeatureFlags(auth.featureFlags);
       setImpersonator(auth.impersonator);
-    } catch (error) {
+    } catch {
       setUser(null);
       setSessionId(undefined);
       setOrganizationId(undefined);
@@ -101,9 +121,12 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
 
   const refreshAuth = useCallback(
     async ({ ensureSignedIn = false, organizationId }: { ensureSignedIn?: boolean; organizationId?: string } = {}) => {
+      if (redirectingRef.current) return;
       try {
         setLoading(true);
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+
+        if (handleSignInRedirect(auth)) return;
 
         setUser(auth.user);
         setSessionId(auth.sessionId);
@@ -128,7 +151,9 @@ export const AuthKitProvider = ({ children, onSessionExpired }: AuthKitProviderP
   }, []);
 
   useEffect(() => {
-    getAuth();
+    if (!initialAuth) {
+      getAuth();
+    }
 
     // Return early if the session expired checks are disabled.
     if (onSessionExpired === false) {

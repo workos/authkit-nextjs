@@ -3,3 +3,15 @@ node_modules
 dist
 coverage
 .idea
+package-lock.json
+
+# Example apps
+examples/next/.next
+examples/next/.env.local
+examples/next/next-env.d.ts
+*.tsbuildinfo
+examples/vinext/.env.local
+examples/vinext/.dev.vars
+examples/vinext/.wrangler
+examples/vinext/worker
+examples/vinext/dist

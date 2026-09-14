@@ -1,9 +1,14 @@
 'use server';
 
-import { signOut, switchToOrganization } from './auth.js';
+import { getSignInUrl, signOut, switchToOrganization } from './auth.js';
 import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
+
+export interface RefreshAccessTokenActionResult {
+  accessToken: string | undefined;
+  error?: string;
+}
 
 /**
  * This function is used to sanitize the auth object.
@@ -31,11 +36,35 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
 };
 
 export const getOrganizationAction = async (organizationId: string) => {
-  return await getWorkOS().organizations.getOrganization(organizationId);
+  // Authorization: only resolve the organization the caller is currently
+  // authenticated within. The WorkOS client uses the app's API key, which can
+  // read any organization in the environment, so without this check any caller
+  // could fetch arbitrary organizations by ID (authorization bypass / IDOR).
+  const { user, organizationId: sessionOrganizationId } = await withAuth();
+  if (!user || sessionOrganizationId !== organizationId) {
+    return null;
+  }
+
+  // Return only the fields the client needs. Avoids disclosing the full
+  // organization object (metadata, externalId, stripeCustomerId, domains).
+  const { id, name } = await getWorkOS().organizations.getOrganization(organizationId);
+  return { id, name };
 };
 
 export const getAuthAction = async (options?: { ensureSignedIn?: boolean }) => {
-  return sanitize(await withAuth(options));
+  // Never pass ensureSignedIn to withAuth from a server action, because withAuth
+  // would call redirect() to an external URL, which causes CORS errors when
+  // invoked via a client-side fetch. Instead, return the sign-in URL so the
+  // client can redirect via window.location.href.
+  const auth = await withAuth();
+  const sanitized = sanitize(auth);
+
+  if (options?.ensureSignedIn && !auth.user) {
+    const signInUrl = await getSignInUrl();
+    return { ...sanitized, signInUrl };
+  }
+
+  return sanitized;
 };
 
 export const refreshAuthAction = async ({
@@ -45,7 +74,17 @@ export const refreshAuthAction = async ({
   ensureSignedIn?: boolean;
   organizationId?: string;
 }) => {
-  return sanitize(await refreshSession({ ensureSignedIn, organizationId }));
+  // Never pass ensureSignedIn to refreshSession from a server action for the
+  // same CORS reason as getAuthAction above.
+  const auth = await refreshSession({ organizationId });
+  const sanitized = sanitize(auth);
+
+  if (ensureSignedIn && !auth.user) {
+    const signInUrl = await getSignInUrl();
+    return { ...sanitized, signInUrl };
+  }
+
+  return sanitized;
 };
 
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
@@ -64,8 +103,19 @@ export async function getAccessTokenAction() {
 /**
  * This action is used to refresh the access token from the auth object.
  * It is used to fetch the access token from the server.
+ *
+ * Errors are caught and returned as data rather than thrown, to prevent
+ * Next.js from returning 500 responses for server action failures.
  */
-export async function refreshAccessTokenAction() {
-  const auth = await refreshSession();
-  return auth.accessToken;
+export async function refreshAccessTokenAction(): Promise<RefreshAccessTokenActionResult> {
+  try {
+    const auth = await refreshSession();
+    return { accessToken: auth.accessToken };
+  } catch (error) {
+    console.warn('Failed to refresh access token:', error instanceof Error ? error.message : String(error));
+    return {
+      accessToken: undefined,
+      error: 'Failed to refresh access token',
+    };
+  }
 }

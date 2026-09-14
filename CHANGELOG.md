@@ -1,0 +1,144 @@
+# Changelog
+
+## [4.3.1](https://github.com/workos/authkit-nextjs/compare/v4.3.0...v4.3.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* Preserve session on transient refresh failures ([#461](https://github.com/workos/authkit-nextjs/issues/461)) ([07b8dfa](https://github.com/workos/authkit-nextjs/commit/07b8dfac63321d2a5f7fdacd033d02728c099ebe))
+
+## [4.3.0](https://github.com/workos/authkit-nextjs/compare/v4.2.0...v4.3.0) (2026-07-22)
+
+
+### Features
+
+* add CallbackError with request attribution ([#455](https://github.com/workos/authkit-nextjs/issues/455)) ([0dd39fe](https://github.com/workos/authkit-nextjs/commit/0dd39fe0022858d640082e2b651aa1fd94b6a0a4))
+
+
+### Bug Fixes
+
+* prevent session helpers from being exposed as Server Actions ([#454](https://github.com/workos/authkit-nextjs/issues/454)) ([0ae2672](https://github.com/workos/authkit-nextjs/commit/0ae2672874e0225472b70a6649484238afd90da7))
+* proactively refresh near-expiry access tokens in the proxy middleware ([#453](https://github.com/workos/authkit-nextjs/issues/453)) ([55da9cb](https://github.com/workos/authkit-nextjs/commit/55da9cb0a1a3c2697336e6bd140b532f2abf159f))
+
+## [4.2.0](https://github.com/workos/authkit-nextjs/compare/v4.1.4...v4.2.0) (2026-06-30)
+
+
+### Features
+
+* add recent-auth checking (checkRecentAuth + useRecentAuth) and maxAge step-up ([#446](https://github.com/workos/authkit-nextjs/issues/446)) ([34f92ac](https://github.com/workos/authkit-nextjs/commit/34f92acb281cf27510a7027d04c60e9f10083407))
+
+## [4.1.4](https://github.com/workos/authkit-nextjs/compare/v4.1.3...v4.1.4) (2026-06-25)
+
+
+### Bug Fixes
+
+* **deps:** move @workos-inc/node to peerDependencies ([#423](https://github.com/workos/authkit-nextjs/issues/423)) ([18163d7](https://github.com/workos/authkit-nextjs/commit/18163d794db3efc1c7ff59339a1b00485e4b2056))
+
+## [4.1.3](https://github.com/workos/authkit-nextjs/compare/v4.1.2...v4.1.3) (2026-06-24)
+
+
+### Bug Fixes
+
+* prevent cross-organization disclosure in getOrganizationAction ([#443](https://github.com/workos/authkit-nextjs/issues/443)) ([6b2ea66](https://github.com/workos/authkit-nextjs/commit/6b2ea661e0ba61f872330d8a61633ca532ac0d3f))
+
+## [4.1.2](https://github.com/workos/authkit-nextjs/compare/v4.1.1...v4.1.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* Improve auth cookie missing error message ([#440](https://github.com/workos/authkit-nextjs/issues/440)) ([39af2bb](https://github.com/workos/authkit-nextjs/commit/39af2bb2cbe1af4e3c0d542c62ac3c00c61ecc88))
+
+## [4.1.1](https://github.com/workos/authkit-nextjs/compare/v4.1.0...v4.1.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* defer PKCE cookie write until AuthKit redirect ([#432](https://github.com/workos/authkit-nextjs/issues/432)) ([4f63d2f](https://github.com/workos/authkit-nextjs/commit/4f63d2f35f0ef1a07888a34e8872278881d0405a))
+
+## [4.1.0](https://github.com/workos/authkit-nextjs/compare/v4.0.1...v4.1.0) (2026-05-15)
+
+
+### Features
+
+* Add feature flags runtime client helper ([#428](https://github.com/workos/authkit-nextjs/issues/428)) ([be6b932](https://github.com/workos/authkit-nextjs/commit/be6b9328dd75327211dcfc5be89c77b48bd18bd3))
+
+## [4.0.1](https://github.com/workos/authkit-nextjs/compare/v4.0.0...v4.0.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* persist authenticationMethod in sealed session cookie ([#410](https://github.com/workos/authkit-nextjs/issues/410)) ([a8f7def](https://github.com/workos/authkit-nextjs/commit/a8f7def7cf3cbbb38dd1805e8da82a4b10bdf1d9))
+
+## [4.0.0](https://github.com/workos/authkit-nextjs/compare/v3.0.1...v4.0.0) (2026-04-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Upgrade @workos-inc/node to v9 ([#407](https://github.com/workos/authkit-nextjs/issues/407))
+* set minimum Node.js version to 22.11.0 ([#408](https://github.com/workos/authkit-nextjs/issues/408))
+
+### Miscellaneous Chores
+
+* set minimum Node.js version to 22.11.0 ([#408](https://github.com/workos/authkit-nextjs/issues/408)) ([c394669](https://github.com/workos/authkit-nextjs/commit/c3946698b6a7f369becce8ac9bba83fe7540300b))
+* Upgrade @workos-inc/node to v9 ([#407](https://github.com/workos/authkit-nextjs/issues/407)) ([0183951](https://github.com/workos/authkit-nextjs/commit/0183951e281146e973fd4a9884162b008a3dd38d))
+
+## [3.0.1](https://github.com/workos/authkit-nextjs/compare/v3.0.0...v3.0.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* isolate concurrent PKCE flows to prevent cookie clobbering ([#403](https://github.com/workos/authkit-nextjs/issues/403)) ([3740a83](https://github.com/workos/authkit-nextjs/commit/3740a835df8b51027e8d5bf5011a3877c8648cec))
+* set PKCE cookie in ensureSignedIn server action flow ([#406](https://github.com/workos/authkit-nextjs/issues/406)) ([a55bb64](https://github.com/workos/authkit-nextjs/commit/a55bb6467942042325d3015ea735ebd4fa7912d5))
+
+## [3.0.0](https://github.com/workos/authkit-nextjs/compare/v2.17.0...v3.0.0) (2026-03-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* add OAuth state verification on callback to prevent CSRF attacks ([#388](https://github.com/workos/authkit-nextjs/issues/388))
+
+### Features
+
+* add OAuth state verification on callback to prevent CSRF attacks ([#388](https://github.com/workos/authkit-nextjs/issues/388)) ([ebef6e7](https://github.com/workos/authkit-nextjs/commit/ebef6e7b51556bf08b1714e2d3f5765a59d9c7f0))
+* **middleware:** add authkitProxy and handleAuthkitProxy aliases for proxy.ts ([#384](https://github.com/workos/authkit-nextjs/issues/384)) ([4c3f27b](https://github.com/workos/authkit-nextjs/commit/4c3f27b40c9a4ea295ef002dd0a2c32b9740f1ae))
+
+
+### Bug Fixes
+
+* **actions:** catch TokenRefreshError in refreshAccessTokenAction to prevent 500s ([#383](https://github.com/workos/authkit-nextjs/issues/383)) ([5c46c39](https://github.com/workos/authkit-nextjs/commit/5c46c394fe00b9552665b51ca42b23d00416c704))
+* **auth:** return signInUrl from server actions to avoid CORS errors ([#386](https://github.com/workos/authkit-nextjs/issues/386)) ([7d52400](https://github.com/workos/authkit-nextjs/commit/7d52400b8e62bc9d1a4f40b3400ae7586e511098))
+* harden PKCE/CSRF for v3.0.0 release ([#398](https://github.com/workos/authkit-nextjs/issues/398)) ([8054829](https://github.com/workos/authkit-nextjs/commit/80548297ac45f15f0774b84e5981b80009412b8b))
+
+## [2.17.0](https://github.com/workos/authkit-nextjs/compare/v2.16.1...v2.17.0) (2026-03-13)
+
+
+### Features
+
+* Automatically pass claim nonce for unclaimed environments ([#389](https://github.com/workos/authkit-nextjs/issues/389)) ([67dfc92](https://github.com/workos/authkit-nextjs/commit/67dfc921660e1b87e202472a18fa5e5868352275))
+
+## [2.16.1](https://github.com/workos/authkit-nextjs/compare/v2.16.0...v2.16.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* make PKCE opt-in to avoid breaking custom middleware proxies ([#392](https://github.com/workos/authkit-nextjs/issues/392)) ([9e09fcb](https://github.com/workos/authkit-nextjs/commit/9e09fcb85f16c73f3ed3bc00e2799fadc685feca))
+
+## [2.16.0](https://github.com/workos/authkit-nextjs/compare/v2.15.0...v2.16.0) (2026-03-11)
+
+
+### Features
+
+* add PKCE support for OAuth 2.1 compliance ([#374](https://github.com/workos/authkit-nextjs/issues/374)) ([de01c7f](https://github.com/workos/authkit-nextjs/commit/de01c7fde33b6d0b65024741a5ba3c492686ec4a))
+
+
+### Bug Fixes
+
+* improve compatibility with non-Next.js environments ([#378](https://github.com/workos/authkit-nextjs/issues/378)) ([734311a](https://github.com/workos/authkit-nextjs/commit/734311a827a42502d6d2d7897ddbbdfd2d5e3b94))
+* resolve Dependabot security alerts ([#380](https://github.com/workos/authkit-nextjs/issues/380)) ([519dccf](https://github.com/workos/authkit-nextjs/commit/519dccff6c76a6d7feb23dabe40e95405406b9f7))
+
+## [2.15.0](https://github.com/workos/authkit-nextjs/compare/v2.14.0...v2.15.0) (2026-02-25)
+
+
+### Features
+
+* Add `returnTo` option to `getSignInUrl` and `getSignUpUrl ` functions ([#375](https://github.com/workos/authkit-nextjs/issues/375)) ([fc75708](https://github.com/workos/authkit-nextjs/commit/fc7570897068a082f657a60261f5c51d63f1faa5))

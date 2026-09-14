@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-
 import { validateApiKey } from './validate-api-key.js';
 import { getWorkOS } from './workos.js';
 
-// These are mocked in jest.setup.ts
+// These are mocked in vitest.setup.ts
 import { headers } from 'next/headers';
 
 const workos = getWorkOS();
@@ -11,14 +9,14 @@ const workos = getWorkOS();
 describe('validate-api-key.ts', () => {
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     const nextHeaders = await headers();
     // @ts-expect-error - _reset is part of the mock
     nextHeaders._reset();
   });
 
-  describe('validateApiKey', () => {
+  describe('createValidation', () => {
     it('should return valid API key when Bearer token is present and valid', async () => {
       const mockApiKeyResponse = {
         apiKey: {
@@ -34,14 +32,14 @@ describe('validate-api-key.ts', () => {
         },
       };
 
-      jest.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockApiKeyResponse);
+      vi.spyOn(workos.apiKeys, 'createValidation').mockResolvedValue(mockApiKeyResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer sk_test_1234567890');
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).toHaveBeenCalledWith({
+      expect(workos.apiKeys.createValidation).toHaveBeenCalledWith({
         value: 'sk_test_1234567890',
       });
       expect(result).toEqual(mockApiKeyResponse);
@@ -51,7 +49,7 @@ describe('validate-api-key.ts', () => {
       // Don't set any authorization header
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -61,7 +59,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -71,7 +69,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -81,7 +79,7 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
@@ -91,20 +89,20 @@ describe('validate-api-key.ts', () => {
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).not.toHaveBeenCalled();
+      expect(workos.apiKeys.createValidation).not.toHaveBeenCalled();
       expect(result).toEqual({ apiKey: null });
     });
 
     it('should return { apiKey: null } when WorkOS validation fails', async () => {
       const mockResponse = { apiKey: null };
-      jest.spyOn(workos.apiKeys, 'validateApiKey').mockResolvedValue(mockResponse);
+      vi.spyOn(workos.apiKeys, 'createValidation').mockResolvedValue(mockResponse);
 
       const nextHeaders = await headers();
       nextHeaders.set('authorization', 'Bearer invalid_key');
 
       const result = await validateApiKey();
 
-      expect(workos.apiKeys.validateApiKey).toHaveBeenCalledWith({
+      expect(workos.apiKeys.createValidation).toHaveBeenCalledWith({
         value: 'invalid_key',
       });
       expect(result).toEqual({ apiKey: null });

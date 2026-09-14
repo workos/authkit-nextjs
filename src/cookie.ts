@@ -92,6 +92,41 @@ export function getCookieOptions(
   };
 }
 
+const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
+
+/**
+ * Cookie options for the PKCE verifier cookie.
+ * 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
+ * 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
+ * Max-age is always capped to 10 minutes — PKCE cookies are single-use and short-lived.
+ */
+export function getPKCECookieOptions(): CookieOptions;
+export function getPKCECookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
+export function getPKCECookieOptions(
+  redirectUri?: string | null,
+  asString?: boolean,
+  expired?: boolean,
+): CookieOptions | string;
+export function getPKCECookieOptions(
+  redirectUri?: string | null,
+  asString: boolean = false,
+  expired: boolean = false,
+): CookieOptions | string {
+  if (asString) {
+    const options = getCookieOptions(redirectUri, true, expired);
+    return options
+      .replace(/SameSite=Strict/i, 'SameSite=Lax')
+      .replace(/Max-Age=\d+/, `Max-Age=${expired ? 0 : PKCE_COOKIE_MAX_AGE}`);
+  }
+
+  const options = getCookieOptions(redirectUri);
+  return {
+    ...options,
+    sameSite: options.sameSite.toLowerCase() === 'strict' ? 'lax' : options.sameSite,
+    maxAge: expired ? 0 : PKCE_COOKIE_MAX_AGE,
+  };
+}
+
 export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: string | null, expired?: boolean): string {
   const cookie = `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`;
 

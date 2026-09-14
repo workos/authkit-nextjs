@@ -1,12 +1,13 @@
-'use server';
+import 'server-only';
 
 import { sealData, unsealData } from 'iron-session';
 import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getCookieOptions, getJwtCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
   AccessToken,
@@ -17,11 +18,18 @@ import {
   Session,
   UserInfo,
 } from './interfaces.js';
+import {
+  appendPKCESetCookieHeader,
+  isInitialDocumentRequest,
+  setPKCECookie,
+  setPendingPKCERedirectHeaders,
+} from './pkce.js';
 import { getWorkOS } from './workos.js';
 
 import type { AuthenticationResponse } from '@workos-inc/node';
 import { parse, tokensToRegexp } from 'path-to-regexp';
-import { lazy, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
+import { handleAuthkitHeaders } from './middleware-helpers.js';
+import { evaluateRecentAuth, lazy, setCachePreventionHeaders } from './utils.js';
 
 const sessionHeaderName = 'x-workos-session';
 const middlewareHeaderName = 'x-workos-middleware';
@@ -73,21 +81,6 @@ function applyCacheSecurityHeaders(
   setCachePreventionHeaders(headers);
 }
 
-/**
- * Determines if a request is for an initial document load (not API/RSC/prefetch)
- */
-function isInitialDocumentRequest(request: NextRequest): boolean {
-  const accept = request.headers.get('accept') || '';
-  const isDocumentRequest = accept.includes('text/html');
-  const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
-  const isPrefetch =
-    request.headers.get('Purpose') === 'prefetch' ||
-    request.headers.get('Sec-Purpose') === 'prefetch' ||
-    request.headers.has('Next-Router-Prefetch');
-
-  return isDocumentRequest && !isRSCRequest && !isPrefetch;
-}
-
 async function encryptSession(session: Session) {
   return sealData(session, {
     password: WORKOS_COOKIE_PASSWORD,
@@ -102,6 +95,7 @@ async function updateSessionMiddleware(
   redirectUri: string,
   signUpPaths: string[],
   eagerAuth = false,
+  refreshBufferSeconds?: number,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -147,16 +141,8 @@ async function updateSessionMiddleware(
     redirectUri,
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     eagerAuth,
+    refreshBufferSeconds,
   });
-
-  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
-  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
-    if (debug) {
-      console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
-    }
-
-    return redirectWithFallback(authorizationUrl as string, headers);
-  }
 
   // Record the sign up paths so we can use them later
   if (signUpPaths.length > 0) {
@@ -165,33 +151,16 @@ async function updateSessionMiddleware(
 
   applyCacheSecurityHeaders(headers, request, session);
 
-  // Create a new request with modified headers (for page handlers)
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(middlewareHeaderName, headers.get(middlewareHeaderName)!);
-  requestHeaders.set('x-url', headers.get('x-url')!);
-  if (headers.has('x-redirect-uri')) {
-    requestHeaders.set('x-redirect-uri', headers.get('x-redirect-uri')!);
-  }
-  if (headers.has(signUpPathsHeaderName)) {
-    requestHeaders.set(signUpPathsHeaderName, headers.get(signUpPathsHeaderName)!);
+  // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
+  if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
+    if (debug) {
+      console.log(`Unauthenticated user on protected route ${request.url}, redirecting to AuthKit`);
+    }
+
+    return handleAuthkitHeaders(request, headers, { redirect: authorizationUrl as string });
   }
 
-  // Pass session to page handlers via request header
-  // This ensures handlers see refreshed sessions immediately (before Set-Cookie reaches browser)
-  const sessionHeader = headers.get(sessionHeaderName);
-  if (sessionHeader) {
-    requestHeaders.set(sessionHeaderName, sessionHeader);
-  }
-
-  // Remove session header from response headers to prevent leakage
-  headers.delete(sessionHeaderName);
-
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-    headers,
-  });
+  return handleAuthkitHeaders(request, headers);
 }
 
 async function updateSession(
@@ -226,24 +195,30 @@ async function updateSession(
       console.log('No session found from cookie');
     }
 
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+      screenHint: options.screenHint,
+    });
+
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
+
     return {
       session: { user: null },
       headers: newRequestHeaders,
-      authorizationUrl: await getAuthorizationUrl({
-        returnPathname: getReturnPathname(request.url),
-        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
-        screenHint: options.screenHint,
-      }),
+      authorizationUrl,
     };
   }
 
   const hasValidSession = await verifyAccessToken(session.accessToken);
+  const isExpiring = hasValidSession && isTokenExpiring(session.accessToken, options.refreshBufferSeconds);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
   applyCacheSecurityHeaders(newRequestHeaders, request, session);
 
-  if (hasValidSession) {
+  const respondWithCurrentToken = (): AuthkitResponse => {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
 
     const {
@@ -281,19 +256,25 @@ async function updateSession(
       },
       headers: newRequestHeaders,
     };
+  };
+
+  if (hasValidSession && !isExpiring) {
+    return respondWithCurrentToken();
   }
 
   try {
     if (options.debug) {
       // istanbul ignore next
       console.log(
-        `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
+        isExpiring
+          ? `Session expiring soon. Proactively refreshing access token that ends in ${session.accessToken.slice(-10)}`
+          : `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
       );
     }
 
     const { org_id: organizationIdFromAccessToken } = decodeJwt<AccessToken>(session.accessToken);
 
-    const { accessToken, refreshToken, user, impersonator } =
+    const { accessToken, refreshToken, user, impersonator, authenticationMethod } =
       await getWorkOS().userManagement.authenticateWithRefreshToken({
         clientId: WORKOS_CLIENT_ID,
         refreshToken: session.refreshToken,
@@ -309,6 +290,7 @@ async function updateSession(
       refreshToken,
       user,
       impersonator,
+      authenticationMethod,
     });
 
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
@@ -348,29 +330,68 @@ async function updateSession(
       headers: newRequestHeaders,
     };
   } catch (e) {
+    if (isExpiring) {
+      // A failed proactive refresh is not fatal while the current token is still
+      // valid. Refresh tokens are single-use, so a concurrent request in the same
+      // buffer window may have already rotated this one; that request has persisted
+      // the new session cookie. Serve this request with the current token instead of
+      // destroying the session. Re-check validity here: the token may have expired
+      // during the refresh round trip, in which case fall through to the
+      // delete-cookie path below.
+      const { exp } = decodeJwt(session.accessToken);
+      if (typeof exp === 'number' && exp > Math.floor(Date.now() / 1000)) {
+        if (options.debug) {
+          console.log('Proactive refresh failed. Serving request with the still-valid access token.', e);
+        }
+
+        return respondWithCurrentToken();
+      }
+    }
+
+    // Only tear down the session for a terminal failure. A transient failure
+    // (network error, request timeout, 429, or 5xx that survived the SDK's
+    // internal retries) is not a signal that the refresh token is dead —
+    // deleting the cookie here would turn a brief outage into a forced
+    // re-authentication, and the still-valid refresh token would be lost. Keep
+    // the sealed cookie so a later request refreshes successfully once the
+    // condition clears.
+    const isTransient = isTransientRefreshError(e);
+
     if (options.debug) {
-      console.log('Failed to refresh. Deleting cookie.', e);
+      console.log(
+        isTransient
+          ? 'Failed to refresh due to a transient error. Preserving the session cookie so it can be retried.'
+          : 'Failed to refresh. Deleting cookie.',
+        e,
+      );
     }
 
-    // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-    const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
-    newRequestHeaders.append('Set-Cookie', deleteCookie);
+    if (!isTransient) {
+      // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
+      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+      newRequestHeaders.append('Set-Cookie', deleteCookie);
 
-    // Delete JWT cookie if eagerAuth is enabled
-    if (options.eagerAuth) {
-      const deleteJwtCookie = getJwtCookie(null, request.url, true);
-      newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+      // Delete JWT cookie if eagerAuth is enabled
+      if (options.eagerAuth) {
+        const deleteJwtCookie = getJwtCookie(null, request.url, true);
+        newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
+      }
     }
 
-    options.onSessionRefreshError?.({ error: e, request });
+    options.onSessionRefreshError?.({ error: e, request, isTransient });
+
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+    });
+
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
 
     return {
       session: { user: null },
       headers: newRequestHeaders,
-      authorizationUrl: await getAuthorizationUrl({
-        returnPathname: getReturnPathname(request.url),
-        redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
-      }),
+      authorizationUrl,
     };
   }
 }
@@ -406,9 +427,11 @@ async function refreshSession({
       organizationId: nextOrganizationId ?? organizationIdFromAccessToken,
     });
   } catch (error) {
-    throw new Error(`Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`, {
-      cause: error,
-    });
+    throw new TokenRefreshError(
+      `Failed to refresh session: ${error instanceof Error ? error.message : String(error)}`,
+      error,
+      { ...getSessionErrorContext(session), isTransient: isTransientRefreshError(error) },
+    );
   }
 
   const headersList = await headers();
@@ -475,7 +498,9 @@ async function redirectToSignIn() {
 
   const returnPathname = getReturnPathname(url);
 
-  redirect(await getAuthorizationUrl({ returnPathname, screenHint }));
+  const { url: authkitUrl, sealedState } = await getAuthorizationUrl({ returnPathname, screenHint });
+  await setPKCECookie(sealedState);
+  redirect(authkitUrl);
 }
 
 export async function getTokenClaims<T = Record<string, unknown>>(
@@ -487,6 +512,34 @@ export async function getTokenClaims<T = Record<string, unknown>>(
   }
 
   return decodeJwt<T>(token);
+}
+
+/**
+ * Check how recently the current user authenticated, using the `auth_time`
+ * claim on the access token. Returns data only — it never redirects — so it is
+ * safe to call as the enforcement step inside a sensitive server action or in a
+ * server component where you decide what to do.
+ *
+ * @example
+ * ```typescript
+ * // Guard a sensitive server action
+ * const { isStale } = await checkRecentAuth({ maxAge: 300 });
+ * if (isStale) {
+ *   return { status: 'reauth_required' };
+ * }
+ * ```
+ *
+ * @remarks
+ * To send the user through re-authentication, redirect to your sign-in route
+ * with `maxAge` (e.g. `getSignInUrl({ maxAge: 300 })`), which forwards OIDC
+ * `max_age` so the IdP forces a reauth when the most recent auth is older.
+ *
+ * Requires `@workos-inc/node` >= 10.7.0 for `maxAge` forwarding.
+ */
+export async function checkRecentAuth({ maxAge }: { maxAge: number }) {
+  const { user, accessToken } = await withAuth();
+  const authTime = user && accessToken ? (await getTokenClaims(accessToken)).auth_time : undefined;
+  return evaluateRecentAuth({ authTime, maxAgeSeconds: maxAge, nowSeconds: Math.floor(Date.now() / 1000) });
 }
 
 async function withAuth(options: { ensureSignedIn: true }): Promise<UserInfo>;
@@ -502,6 +555,7 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
   }
 
   const {
+    sub,
     sid: sessionId,
     org_id: organizationId,
     role,
@@ -510,6 +564,22 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     entitlements,
     feature_flags: featureFlags,
   } = decodeJwt<AccessToken>(session.accessToken);
+
+  // Defense-in-depth (SEC-1219): bind the sealed `user` to the access token's
+  // subject. `saveSession` seals whatever `user` object it is handed, so a
+  // caller presenting their own valid access token alongside a forged `user`
+  // must not have that identity trusted here. A signature-verified WorkOS
+  // access token always carries `sub`; when it disagrees with the sealed user
+  // id, treat the session as unauthenticated rather than impersonate the user.
+  if (session.user && sub && session.user.id !== sub) {
+    console.warn(
+      `withAuth: sealed session user (${session.user.id}) does not match the access token subject (${sub}); rejecting session.`,
+    );
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
 
   return {
     sessionId,
@@ -532,6 +602,82 @@ async function verifyAccessToken(accessToken: string) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Determines whether a still-valid access token is close enough to expiry that it
+ * should be proactively refreshed, so it cannot expire in the hands of a
+ * server-side consumer (render latency, network round trips, clock skew).
+ *
+ * Mirrors the buffer the client token store uses (`components/tokenStore.ts`):
+ * 60 seconds, or 30 seconds for tokens with a total lifetime of 5 minutes or
+ * less, unless an explicit `refreshBufferSeconds` is provided. A buffer of 0
+ * disables proactive refresh.
+ */
+function isTokenExpiring(accessToken: string, refreshBufferSeconds?: number): boolean {
+  try {
+    const { exp, iat } = decodeJwt(accessToken);
+    if (typeof exp !== 'number') {
+      return false;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const totalTokenLifetime = exp - (iat ?? exp);
+    const bufferSeconds = refreshBufferSeconds ?? (totalTokenLifetime <= 300 ? 30 : 60);
+
+    return exp < now + bufferSeconds;
+  } catch {
+    return false;
+  }
+}
+
+// HTTP statuses the WorkOS SDK treats as idempotent/retryable and retries
+// internally. If one of these still surfaces, the failure is transient rather
+// than a dead refresh token: request timeouts (normalized to 408), rate limits
+// (429), and 5xx.
+const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+
+// A network-level fetch failure surfaces as a TypeError ("fetch failed" /
+// "Failed to fetch"). Match its message so an unrelated programming TypeError
+// isn't misclassified as a transient (and therefore session-preserving) error.
+const NETWORK_ERROR_MESSAGE = /fetch failed|failed to fetch|network|load failed|terminated/i;
+
+// A raw network TypeError is not an HttpClientError, so the WorkOS SDK re-wraps
+// it in a plain Error whose `cause` is the original TypeError. Follow the cause
+// chain to recognize it.
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return NETWORK_ERROR_MESSAGE.test(error.message);
+  }
+
+  if (error instanceof Error && error.cause != null && error.cause !== error) {
+    return isNetworkError(error.cause);
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether a failed refresh is transient (should preserve the
+ * session and be retried) rather than terminal (the refresh token is dead and
+ * the user must re-authenticate).
+ *
+ * Mirrors the WorkOS SDK's own retry classification: transient HTTP responses
+ * (request timeout normalized to `408`, `429`, and `5xx`) surface as an
+ * exception carrying a retryable numeric `status`, and a network-level failure
+ * surfaces as a `TypeError` (wrapped by the SDK in an `Error` with the
+ * `TypeError` as its `cause`). Anything else (a terminal `invalid_grant` at
+ * 400, a 401, or an unrecognized error) is treated as terminal.
+ */
+export function isTransientRefreshError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const { status } = error;
+    if (typeof status === 'number' && RETRYABLE_REFRESH_STATUS_CODES.has(status)) {
+      return true;
+    }
+  }
+
+  return isNetworkError(error);
 }
 
 export async function getSessionFromCookie(request?: NextRequest) {
@@ -572,7 +718,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
 function getReturnPathname(url: string): string {
   const newUrl = new URL(url);
 
-  return `${newUrl.pathname}${newUrl.searchParams.size > 0 ? '?' + newUrl.searchParams.toString() : ''}`;
+  return `${newUrl.pathname}${newUrl.search}`;
 }
 
 function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
@@ -623,12 +769,6 @@ export async function saveSession(
   const nextCookies = await cookies();
   const url = typeof request === 'string' ? request : request.url;
   nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
-}
-
-export async function deleteSession() {
-  const nextCookies = await cookies();
-  const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-  nextCookies.delete(cookieName);
 }
 
 export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };

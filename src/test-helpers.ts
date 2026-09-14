@@ -8,6 +8,7 @@ import { User } from '@workos-inc/node';
 
 export async function generateTestToken(payload = {}, expired = false) {
   const defaultPayload = {
+    sub: 'user_123',
     sid: 'session_123',
     org_id: 'org_123',
     role: 'member',
@@ -37,6 +38,7 @@ export async function generateSession(overrides: Partial<User> = {}) {
     email: 'test@example.com',
     emailVerified: true,
     profilePictureUrl: null,
+    name: null,
     firstName: 'Test',
     lastName: 'User',
     object: 'user',

@@ -1,14 +1,13 @@
-import { describe, it, expect } from '@jest/globals';
-
-// Mock at the top of the file
-jest.mock('./env-variables');
-
 describe('cookie.ts', () => {
   beforeEach(() => {
     // Clear all mocks before each test
-    jest.clearAllMocks();
-    // Reset modules
-    jest.resetModules();
+    vi.clearAllMocks();
+    // Reset modules to ensure fresh imports
+    vi.resetModules();
+    // Re-mock env-variables with a fresh copy each time
+    vi.doMock('./env-variables', async (importOriginal) => {
+      return { ...(await importOriginal<typeof import('./env-variables')>()) };
+    });
   });
 
   describe('getCookieOptions', () => {
@@ -147,9 +146,15 @@ describe('cookie.ts', () => {
   });
 
   describe('getJwtCookie', () => {
+    const originalEnv = process.env;
+
     beforeEach(() => {
-      // Reset NODE_ENV for each test
+      process.env = { ...originalEnv };
       delete process.env.NODE_ENV;
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
     it('should create JWT cookie with Secure flag for HTTPS URLs', async () => {
@@ -271,6 +276,55 @@ describe('cookie.ts', () => {
 
       expect(localhostCookie).not.toContain('Secure');
       expect(ipCookie).not.toContain('Secure');
+    });
+  });
+
+  describe('getPKCECookieOptions', () => {
+    it('should use 10-minute max-age, not the session cookie max-age', async () => {
+      const { getPKCECookieOptions } = await import('./cookie');
+
+      const options = getPKCECookieOptions();
+
+      expect(options).toEqual(expect.objectContaining({ maxAge: 600 }));
+    });
+
+    it('should use 10-minute max-age in string format', async () => {
+      const { getPKCECookieOptions } = await import('./cookie');
+
+      const options = getPKCECookieOptions('http://localhost:3000', true);
+
+      expect(options).toContain('Max-Age=600');
+      expect(options).not.toContain('Max-Age=34560000');
+    });
+
+    it('should use max-age 0 when expired in object format', async () => {
+      const { getPKCECookieOptions } = await import('./cookie');
+
+      const options = getPKCECookieOptions(undefined, false, true);
+
+      expect(options).toEqual(expect.objectContaining({ maxAge: 0 }));
+    });
+
+    it('should use max-age 0 when expired in string format', async () => {
+      const { getPKCECookieOptions } = await import('./cookie');
+
+      const options = getPKCECookieOptions('http://localhost:3000', true, true);
+
+      expect(options).toContain('Max-Age=0');
+    });
+
+    it('should downgrade SameSite=Strict to Lax', async () => {
+      const envVars = await import('./env-variables');
+      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
+
+      const { getPKCECookieOptions } = await import('./cookie');
+
+      const objectOptions = getPKCECookieOptions();
+      expect(objectOptions).toEqual(expect.objectContaining({ sameSite: 'lax' }));
+
+      const stringOptions = getPKCECookieOptions('http://localhost:3000', true);
+      expect(stringOptions).toContain('SameSite=Lax');
+      expect(stringOptions).not.toContain('SameSite=Strict');
     });
   });
 });

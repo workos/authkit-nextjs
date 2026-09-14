@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server';
-import { redirectWithFallback, errorResponseWithFallback } from './utils.js';
+import { redirectWithFallback, errorResponseWithFallback, evaluateRecentAuth } from './utils.js';
 
 describe('utils', () => {
   afterEach(() => {
-    jest.resetModules();
+    vi.resetModules();
+    vi.restoreAllMocks();
   });
 
   describe('redirectWithFallback', () => {
     it('uses NextResponse.redirect when available', () => {
       const redirectUrl = 'https://example.com';
-      const mockRedirect = jest.fn().mockReturnValue('redirected');
-      const originalRedirect = NextResponse.redirect;
+      const mockRedirect = vi.fn().mockReturnValue('redirected');
 
-      NextResponse.redirect = mockRedirect;
+      vi.spyOn(NextResponse, 'redirect').mockImplementation(mockRedirect);
 
       const result = redirectWithFallback(redirectUrl);
 
       expect(mockRedirect).toHaveBeenCalledWith(redirectUrl, { headers: undefined });
       expect(result).toBe('redirected');
-
-      NextResponse.redirect = originalRedirect;
     });
 
     it('uses headers when provided', () => {
@@ -35,9 +33,9 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse exists but redirect is undefined', async () => {
       const redirectUrl = 'https://example.com';
 
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: {
           // exists but has no redirect method
         },
@@ -55,10 +53,10 @@ describe('utils', () => {
     it('falls back to standard Response when NextResponse is undefined', async () => {
       const redirectUrl = 'https://example.com';
 
-      jest.resetModules();
+      vi.resetModules();
 
       // Mock with undefined NextResponse
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: undefined,
       }));
 
@@ -81,8 +79,8 @@ describe('utils', () => {
     };
 
     it('uses NextResponse.json when available', () => {
-      const mockJson = jest.fn().mockReturnValue('error json response');
-      NextResponse.json = mockJson;
+      const mockJson = vi.fn().mockReturnValue('error json response');
+      vi.spyOn(NextResponse, 'json').mockImplementation(mockJson);
 
       const result = errorResponseWithFallback(errorBody);
 
@@ -90,25 +88,10 @@ describe('utils', () => {
       expect(result).toBe('error json response');
     });
 
-    it('falls back to standard Response when NextResponse is not available', () => {
-      const originalJson = NextResponse.json;
-
-      // @ts-expect-error - This is to test the fallback
-      delete NextResponse.json;
-
-      const result = errorResponseWithFallback(errorBody);
-
-      expect(result).toBeInstanceOf(Response);
-      expect(result.status).toBe(500);
-      expect(result.headers.get('Content-Type')).toBe('application/json');
-
-      NextResponse.json = originalJson;
-    });
-
     it('falls back to standard Response when NextResponse exists but json is undefined', async () => {
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: {
           // exists but has no json method
         },
@@ -124,9 +107,9 @@ describe('utils', () => {
     });
 
     it('falls back to standard Response when NextResponse is undefined', async () => {
-      jest.resetModules();
+      vi.resetModules();
 
-      jest.mock('next/server', () => ({
+      vi.doMock('next/server', () => ({
         NextResponse: undefined,
       }));
 
@@ -137,6 +120,52 @@ describe('utils', () => {
       expect(result).toBeInstanceOf(Response);
       expect(result.status).toBe(500);
       expect(result.headers.get('Content-Type')).toBe('application/json');
+    });
+  });
+
+  describe('evaluateRecentAuth', () => {
+    const NOW = 1_700_000_000; // fixed epoch seconds
+
+    it('reports recent auth as not stale', () => {
+      const authTime = NOW - 60; // 1 minute ago
+      const result = evaluateRecentAuth({ authTime, maxAgeSeconds: 300, nowSeconds: NOW });
+
+      expect(result.isStale).toBe(false);
+      expect(result.authenticatedAt).toEqual(new Date(authTime * 1000));
+    });
+
+    it('reports auth older than maxAge as stale', () => {
+      const authTime = NOW - 600; // 10 minutes ago
+      const result = evaluateRecentAuth({ authTime, maxAgeSeconds: 300, nowSeconds: NOW });
+
+      expect(result.isStale).toBe(true);
+      expect(result.authenticatedAt).toEqual(new Date(authTime * 1000));
+    });
+
+    it('treats exactly maxAge as not stale (boundary is inclusive)', () => {
+      const result = evaluateRecentAuth({ authTime: NOW - 300, maxAgeSeconds: 300, nowSeconds: NOW });
+      expect(result.isStale).toBe(false);
+    });
+
+    it('fails closed when auth_time is missing', () => {
+      expect(evaluateRecentAuth({ authTime: undefined, maxAgeSeconds: 300, nowSeconds: NOW })).toEqual({
+        authenticatedAt: null,
+        isStale: true,
+      });
+    });
+
+    it('fails closed when auth_time is not a finite number', () => {
+      for (const bad of ['1700000000', NaN, Infinity, null, {}]) {
+        expect(evaluateRecentAuth({ authTime: bad, maxAgeSeconds: 300, nowSeconds: NOW })).toEqual({
+          authenticatedAt: null,
+          isStale: true,
+        });
+      }
+    });
+
+    it('does not treat future auth_time (clock skew) as stale', () => {
+      const result = evaluateRecentAuth({ authTime: NOW + 30, maxAgeSeconds: 300, nowSeconds: NOW });
+      expect(result.isStale).toBe(false);
     });
   });
 });

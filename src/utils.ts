@@ -6,8 +6,6 @@ import { NextResponse } from 'next/server';
  */
 export function setCachePreventionHeaders(headers: Headers): void {
   headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate, max-age=0');
-  headers.set('Pragma', 'no-cache');
-  headers.set('Expires', '0');
   headers.set('x-middleware-cache', 'no-cache');
 }
 
@@ -33,6 +31,33 @@ export function errorResponseWithFallback(errorBody: { error: { message: string;
       });
 }
 
+type EvaluateRecentAuthParameters = {
+  authTime: unknown;
+  maxAgeSeconds: number;
+  nowSeconds: number;
+};
+
+/**
+ * Evaluate whether an authentication is recent enough.
+ *
+ * Fails closed: a missing or non-finite `authTime` is reported as stale. A
+ * future `authTime` (clock skew) is treated as recent rather than stale, and
+ * the `maxAge` boundary is inclusive.
+ */
+export function evaluateRecentAuth({ authTime, maxAgeSeconds, nowSeconds }: EvaluateRecentAuthParameters) {
+  if (typeof authTime !== 'number' || !Number.isFinite(authTime)) {
+    return {
+      authenticatedAt: null,
+      isStale: true,
+    } as const;
+  }
+
+  return {
+    authenticatedAt: new Date(authTime * 1000),
+    isStale: nowSeconds - authTime > maxAgeSeconds,
+  } as const;
+}
+
 /**
  * Returns a function that can only be called once.
  * Subsequent calls will return the result of the first call.
@@ -40,12 +65,12 @@ export function errorResponseWithFallback(errorBody: { error: { message: string;
  * @param fn - The function to be called once.
  * @returns A function that can only be called once.
  */
-export function lazy<T>(fn: () => T): () => T {
+export function lazy<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult): (...args: TArgs) => TResult {
   let called = false;
-  let result: T;
-  return () => {
+  let result: TResult;
+  return (...args: TArgs) => {
     if (!called) {
-      result = fn();
+      result = fn(...args);
       called = true;
     }
     return result;

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "./dist/esm",
+    "declarationDir": "./dist/esm/types",
+    "types": ["node"]
+  },
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    "vitest.server-only-stub.ts",
+    "/dist/**/*",
+    "examples"
+  ]
+}

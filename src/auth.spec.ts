@@ -1,57 +1,63 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import * as session from './session.js';
 import * as cache from 'next/cache';
 import * as workosModule from './workos.js';
 
-// These are mocked in jest.setup.ts
+// These are mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateSession, generateTestToken } from './test-helpers.js';
 import { sealData } from 'iron-session';
 import { getWorkOS } from './workos.js';
+import { getStateFromPKCECookieValue } from './pkce.js';
 
 const workos = getWorkOS();
 
-jest.mock('next/cache', () => {
-  const actual = jest.requireActual<typeof cache>('next/cache');
+vi.mock('next/cache', async () => {
+  const actual = await vi.importActual<typeof cache>('next/cache');
   return {
     ...actual,
-    revalidateTag: jest.fn(),
-    revalidatePath: jest.fn(),
+    revalidateTag: vi.fn(),
+    revalidatePath: vi.fn(),
   };
 });
 
 // Create a fake WorkOS instance that will be used only in the "on error" tests
 const fakeWorkosInstance = {
   userManagement: {
-    authenticateWithRefreshToken: jest.fn(),
-    getAuthorizationUrl: jest.fn(),
-    getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
-    getLogoutUrl: jest.fn(),
+    authenticateWithRefreshToken: vi.fn(),
+    getAuthorizationUrl: vi.fn(),
+    getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    getLogoutUrl: vi.fn(),
+  },
+  pkce: {
+    generate: vi.fn().mockResolvedValue({
+      codeVerifier: 'test-code-verifier',
+      codeChallenge: 'test-code-challenge',
+      codeChallengeMethod: 'S256' as const,
+    }),
   },
 };
 
-const revalidatePath = jest.mocked(cache.revalidatePath);
-const revalidateTag = jest.mocked(cache.revalidateTag);
+const revalidatePath = vi.mocked(cache.revalidatePath);
+const revalidateTag = vi.mocked(cache.revalidateTag);
 // We'll only use these in the "on error" tests
 const authenticateWithRefreshToken = fakeWorkosInstance.userManagement.authenticateWithRefreshToken;
 const getAuthorizationUrl = fakeWorkosInstance.userManagement.getAuthorizationUrl;
 
-jest.mock('../src/session', () => {
-  const actual = jest.requireActual<typeof session>('../src/session');
+vi.mock('../src/session', async () => {
+  const actual = await vi.importActual<typeof session>('../src/session');
 
   return {
     ...actual,
-    refreshSession: jest.fn(actual.refreshSession),
+    refreshSession: vi.fn(actual.refreshSession),
   };
 });
 
 describe('auth.ts', () => {
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Reset the cookie store
     const nextCookies = await cookies();
@@ -75,6 +81,15 @@ describe('auth.ts', () => {
       expect(url).toContain('organization_id=org_123');
       expect(url).toBeDefined();
       expect(() => new URL(url)).not.toThrow();
+    });
+
+    it('should include returnTo as returnPathname in the state parameter', async () => {
+      const url = await getSignInUrl({ returnTo: '/dashboard' });
+      const parsedUrl = new URL(url);
+      const state = parsedUrl.searchParams.get('state');
+      expect(state).toBeDefined();
+      const decoded = await getStateFromPKCECookieValue(state!);
+      expect(decoded.returnPathname).toBe('/dashboard');
     });
   });
 
@@ -102,6 +117,15 @@ describe('auth.ts', () => {
     it('should include prompt=consent when explicitly specified for getSignUpUrl', async () => {
       const url = await getSignUpUrl({ prompt: 'consent' });
       expect(url).toContain('prompt=consent');
+    });
+
+    it('should include returnTo as returnPathname in the state parameter', async () => {
+      const url = await getSignUpUrl({ returnTo: '/welcome' });
+      const parsedUrl = new URL(url);
+      const state = parsedUrl.searchParams.get('state');
+      expect(state).toBeDefined();
+      const decoded = await getStateFromPKCECookieValue(state!);
+      expect(decoded.returnPathname).toBe('/welcome');
     });
   });
 
@@ -135,14 +159,21 @@ describe('auth.ts', () => {
         nextHeaders.set('x-url', 'http://localhost/test');
         await generateSession();
 
+        fakeWorkosInstance.pkce.generate.mockResolvedValue({
+          codeVerifier: 'test-code-verifier',
+          codeChallenge: 'test-code-challenge',
+          codeChallengeMethod: 'S256' as const,
+        });
+
         // Create a WorkOS-like object that matches what our tests need
         const mockWorkOS = {
           userManagement: fakeWorkosInstance.userManagement,
+          pkce: fakeWorkosInstance.pkce,
           // Add minimal properties to satisfy TypeScript
-          createHttpClient: jest.fn(),
-          createWebhookClient: jest.fn(),
-          createActionsClient: jest.fn(),
-          createIronSessionProvider: jest.fn(),
+          createHttpClient: vi.fn(),
+          createWebhookClient: vi.fn(),
+          createActionsClient: vi.fn(),
+          createIronSessionProvider: vi.fn(),
           apiKey: 'test',
           clientId: 'test',
           host: 'test',
@@ -154,12 +185,12 @@ describe('auth.ts', () => {
 
         // Apply the mock for these tests only
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        jest.spyOn(workosModule, 'getWorkOS').mockImplementation(() => mockWorkOS as any);
+        vi.spyOn(workosModule, 'getWorkOS').mockImplementation(() => mockWorkOS as any);
       });
 
       afterEach(() => {
         // Restore all mocks after each test
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
       });
 
       it('should redirect to sign in when error is "sso_required"', async () => {
@@ -243,11 +274,30 @@ describe('auth.ts', () => {
       expect(sessionCookie).toBeUndefined();
     });
 
+    it('should clear lingering PKCE verifier cookies (legacy and per-flow)', async () => {
+      const nextCookies = await cookies();
+      const nextHeaders = await headers();
+
+      nextHeaders.set('x-workos-middleware', 'true');
+      nextCookies.set('wos-session', 'foo');
+      nextCookies.set('wos-auth-verifier', 'legacy-state');
+      nextCookies.set('wos-auth-verifier-a1b2c3d4', 'flow-a-state');
+      nextCookies.set('wos-auth-verifier-deadbeef', 'flow-b-state');
+      nextCookies.set('unrelated-cookie', 'keep-me');
+
+      await signOut();
+
+      expect(nextCookies.get('wos-auth-verifier')).toBeUndefined();
+      expect(nextCookies.get('wos-auth-verifier-a1b2c3d4')).toBeUndefined();
+      expect(nextCookies.get('wos-auth-verifier-deadbeef')).toBeUndefined();
+      expect(nextCookies.get('unrelated-cookie')?.value).toBe('keep-me');
+    });
+
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
-        jest
-          .spyOn(workos.userManagement, 'getLogoutUrl')
-          .mockReturnValue('https://user-management-logout.com/signed-out');
+        vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
+          'https://user-management-logout.com/signed-out',
+        );
         const mockSession = {
           accessToken: await generateTestToken(),
           sessionId: 'session_123',
@@ -306,9 +356,9 @@ describe('auth.ts', () => {
 
         nextCookies.set('wos-session', encryptedSession);
 
-        jest
-          .spyOn(workos.userManagement, 'getLogoutUrl')
-          .mockReturnValue('https://api.workos.com/user_management/sessions/logout?session_id=session_123');
+        vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123',
+        );
 
         await signOut();
 

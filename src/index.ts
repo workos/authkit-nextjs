@@ -1,24 +1,46 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
-import { authkit, authkitMiddleware } from './middleware.js';
-import { getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
+import { AuthKitError, CallbackError, TokenRefreshError } from './errors.js';
+import { authkit, authkitMiddleware, authkitProxy } from './middleware.js';
+export {
+  applyResponseHeaders,
+  handleAuthkitHeaders,
+  handleAuthkitProxy,
+  partitionAuthkitHeaders,
+  isAuthkitRequestHeader,
+  AUTHKIT_REQUEST_HEADERS,
+  type AuthkitHeadersResult,
+  type AuthkitRedirectStatus,
+  type AuthkitRequestHeader,
+  type HandleAuthkitHeadersOptions,
+} from './middleware-helpers.js';
+import { checkRecentAuth, getTokenClaims, refreshSession, saveSession, withAuth } from './session.js';
 import { validateApiKey } from './validate-api-key.js';
+import { getFeatureFlagsRuntimeClient } from './feature-flags.js';
 import { getWorkOS } from './workos.js';
 
 export * from './interfaces.js';
 
+export type { CallbackErrorCode, CallbackErrorContext } from './errors.js';
+
 export {
+  AuthKitError,
+  CallbackError,
+  TokenRefreshError,
   authkit,
   authkitMiddleware,
+  authkitProxy,
+  checkRecentAuth,
   getSignInUrl,
   getSignUpUrl,
+  getFeatureFlagsRuntimeClient,
+  getTokenClaims,
   getWorkOS,
   handleAuth,
   refreshSession,
   saveSession,
   signOut,
   switchToOrganization,
-  withAuth,
-  getTokenClaims,
   validateApiKey,
+  withAuth,
 };

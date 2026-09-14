@@ -1,21 +1,46 @@
+import type { Mock } from 'vitest';
 import { getWorkOS } from './workos.js';
 import { handleAuth } from './authkit-callback-route.js';
+import { getPKCECookieNameForState } from './pkce.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
+import { sealData } from 'iron-session';
 
-// Mocked in jest.setup.ts
+// Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
+import * as nextHeaders from 'next/headers';
+
+const cookieConfig = vi.hoisted(() => ({
+  name: undefined as string | undefined,
+  sameSite: undefined as 'lax' | 'strict' | 'none' | undefined,
+}));
+
+vi.mock('./env-variables.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./env-variables.js')>()),
+  get WORKOS_COOKIE_NAME() {
+    return cookieConfig.name;
+  },
+  get WORKOS_COOKIE_SAMESITE() {
+    return cookieConfig.sameSite;
+  },
+}));
+import { State } from './interfaces.js';
 
 // Mock dependencies
-const fakeWorkosInstance = {
-  userManagement: {
-    authenticateWithCode: jest.fn(),
-    getJwksUrl: jest.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+const { fakeWorkosInstance } = vi.hoisted(() => ({
+  fakeWorkosInstance: {
+    userManagement: {
+      authenticateWithCode: vi.fn(),
+      getJwksUrl: vi.fn(() => 'https://api.workos.com/sso/jwks/client_1234567890'),
+    },
+    pkce: {
+      generate: vi.fn(),
+    },
   },
-};
+}));
 
-jest.mock('../src/workos', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
+vi.mock('../src/workos', () => ({
+  getWorkOS: vi.fn(() => fakeWorkosInstance),
 }));
 
 describe('authkit-callback-route', () => {
@@ -28,6 +53,7 @@ describe('authkit-callback-route', () => {
       email: 'test@example.com',
       emailVerified: true,
       profilePictureUrl: 'https://example.com/photo.jpg',
+      name: null,
       firstName: 'Test',
       lastName: 'User',
       object: 'user' as const,
@@ -46,17 +72,23 @@ describe('authkit-callback-route', () => {
     },
   };
 
+  async function setAuthCookie(req: NextRequest, state: State): Promise<string> {
+    const sealedState = await sealData(state, { password: process.env.WORKOS_COOKIE_PASSWORD! });
+    req.cookies.set(getPKCECookieNameForState(sealedState), sealedState);
+    return sealedState;
+  }
+
   describe('handleAuth', () => {
     let request: NextRequest;
 
     beforeAll(() => {
       // Silence console.error during tests
-      jest.spyOn(console, 'error').mockImplementation(() => { });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     beforeEach(async () => {
       // Reset all mocks
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       // Create a new request with searchParams
       request = new NextRequest(new URL('http://example.com/callback'));
@@ -72,10 +104,12 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle successful authentication', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -83,15 +117,17 @@ describe('authkit-callback-route', () => {
       expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith({
         clientId: process.env.WORKOS_CLIENT_ID,
         code: 'test-code',
+        codeVerifier: 'test-verifier',
       });
       expect(response).toBeInstanceOf(NextResponse);
     });
 
     it('should handle authentication failure', async () => {
-      // Mock authentication failure
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockRejectedValue(new Error('Auth failed'));
+      (workos.userManagement.authenticateWithCode as Mock).mockRejectedValue(new Error('Auth failed'));
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -102,10 +138,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle authentication failure if a non-Error object is thrown', async () => {
-      // Mock authentication failure
-      jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -116,9 +153,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle authentication failure with custom onError handler', async () => {
-      // Mock authentication failure
-      jest.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue('Auth failed');
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({
         onError: () => {
@@ -145,9 +184,11 @@ describe('authkit-callback-route', () => {
     });
 
     it('should respect custom returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({ returnPathname: '/dashboard' });
       const response = await handler(request);
@@ -156,11 +197,15 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle state parameter with returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const state = btoa(JSON.stringify({ returnPathname: '/custom-path' }));
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/custom-path',
+      });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -169,11 +214,15 @@ describe('authkit-callback-route', () => {
     });
 
     it('should extract custom search params from returnPathname', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      const state = btoa(JSON.stringify({ returnPathname: '/custom-path?foo=bar&baz=qux' }));
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/custom-path?foo=bar&baz=qux',
+      });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -181,14 +230,79 @@ describe('authkit-callback-route', () => {
       expect(response.headers.get('Location')).toContain('/custom-path?foo=bar&baz=qux');
     });
 
+    it('should handle full URL in returnPathname by extracting only the pathname', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: 'https://example.com/invite/k0123456789',
+      });
+
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      const handler = handleAuth();
+      const response = await handler(request);
+
+      const location = response.headers.get('Location');
+      expect(location).toContain('/invite/k0123456789');
+      expect(location).not.toContain('https://example.com/invite');
+    });
+
+    // Regression coverage for the open-redirect / javascript:-URI class reported
+    // against the `state` param. `returnPathname` is read only from the sealed
+    // (tamper-proof) PKCE cookie and the callback copies only the pathname +
+    // search onto the app's own origin, so a hostile value can never change the
+    // redirect's scheme or host. These tests pin that invariant so a refactor
+    // that started honoring the full URL would fail loudly.
+    describe('returnPathname is neutralized to the app origin', () => {
+      const appOrigin = 'http://example.com';
+      const hostileReturnPathnames = [
+        'javascript:alert(document.domain)',
+        'data:text/html,<script>alert(1)</script>',
+        'https://evil.com/phishing',
+        '//evil.com/phishing',
+        '/\\evil.com/phishing',
+        'https:/evil.com',
+      ];
+
+      it.each(hostileReturnPathnames)('keeps the redirect same-origin for %s', async (returnPathname) => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, {
+          nonce: 'foo',
+          codeVerifier: 'test-verifier',
+          returnPathname,
+        });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        const location = response.headers.get('Location');
+        expect(location).not.toBeNull();
+        const redirectUrl = new URL(location!);
+
+        // The scheme is never javascript:/data: and the host is never the
+        // attacker's — a hostile value can only ever become a path on our own
+        // origin (e.g. "https:/evil.com" lands at http://example.com/evil.com).
+        expect(redirectUrl.protocol).toBe('http:');
+        expect(redirectUrl.origin).toBe(appOrigin);
+        expect(redirectUrl.hostname).toBe('example.com');
+      });
+    });
+
     it('should use Response if NextResponse.redirect is not available', async () => {
       const originalRedirect = NextResponse.redirect;
       (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
 
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -202,6 +316,10 @@ describe('authkit-callback-route', () => {
     it('should use Response if NextResponse.json is not available', async () => {
       const originalJson = NextResponse.json;
       (NextResponse as Partial<typeof NextResponse>).json = undefined;
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -217,10 +335,12 @@ describe('authkit-callback-route', () => {
     });
 
     it('should use baseURL if provided', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({ baseURL: 'https://base.com' });
       const response = await handler(request);
@@ -229,14 +349,15 @@ describe('authkit-callback-route', () => {
     });
 
     it('should throw an error if response is missing tokens', async () => {
-      const mockAuthResponse = {
+      const incompleteAuthResponse = {
         user: { id: 'user_123' },
       };
 
-      (workos.userManagement.authenticateWithCode as jest.Mock).mockResolvedValue(mockAuthResponse);
+      (workos.userManagement.authenticateWithCode as Mock).mockResolvedValue(incompleteAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
@@ -245,12 +366,14 @@ describe('authkit-callback-route', () => {
     });
 
     it('should call onSuccess if provided', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      // Set up request with code & state
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess: onSuccess });
       await handler(request);
 
@@ -259,12 +382,30 @@ describe('authkit-callback-route', () => {
       expect(session?.accessToken).toBe(mockAuthResponse.accessToken);
     });
 
+    it('should persist authenticationMethod in the sealed session', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue({
+        ...mockAuthResponse,
+        authenticationMethod: 'SSO',
+      });
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      const handler = handleAuth();
+      await handler(request);
+
+      const session = await getSessionFromCookie();
+      expect(session?.authenticationMethod).toBe('SSO');
+    });
+
     it('should allow onSuccess to update session', async () => {
       const newAccessToken = 'new-access-token';
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Set up request with code
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth({
         onSuccess: async (data) => {
@@ -277,20 +418,134 @@ describe('authkit-callback-route', () => {
       expect(session?.accessToken).toBe(newAccessToken);
     });
 
-    it('should pass custom state data to onSuccess callback', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+    describe('onSuccess session cleanup', () => {
+      let cookieResponse: NextResponse;
+      let restoreCookies: () => void;
 
-      // Create state with new format: internal.user
-      const internalState = btoa(JSON.stringify({ returnPathname: '/dashboard' }))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-      const userState = 'custom-user-state-string';
-      const state = `${internalState}.${userState}`;
+      beforeEach(() => {
+        cookieResponse = new NextResponse();
+        const spy = vi.spyOn(nextHeaders, 'cookies').mockImplementation(async () => {
+          // Model asynchronous request-cookie access rather than the option-dropping Map mock.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          return cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>;
+        });
+        restoreCookies = () => spy.mockRestore();
+      });
+
+      afterEach(() => {
+        restoreCookies();
+        cookieConfig.name = undefined;
+        cookieConfig.sameSite = undefined;
+      });
+
+      it.each([
+        { name: undefined, sameSite: undefined, protocol: 'http', secure: false },
+        { name: 'custom-session', sameSite: 'strict' as const, protocol: 'https', secure: true },
+        { name: 'custom-session', sameSite: 'none' as const, protocol: 'http', secure: true },
+      ])('clears the scoped session before onError: %j', async ({ name, sameSite, protocol, secure }) => {
+        cookieConfig.name = name;
+        cookieConfig.sameSite = sameSite;
+        request = new NextRequest(`${protocol}://app.example.com/callback`);
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const failure = new Error('onSuccess failed');
+        let sessionDuringSuccess: Awaited<ReturnType<typeof getSessionFromCookie>>;
+        let cookieDuringError: ReturnType<typeof cookieResponse.cookies.get>;
+        let headerDuringError: string | null | undefined;
+        const onError = vi.fn(({ error }) => {
+          cookieDuringError = cookieResponse.cookies.get(name || 'wos-session');
+          headerDuringError = cookieResponse.headers.get('set-cookie');
+          return new Response(String(error), { status: 403 });
+        });
+        const response = await handleAuth({
+          onSuccess: async (data) => {
+            sessionDuringSuccess = await getSessionFromCookie();
+            await saveSession({ ...data, accessToken: 'updated-token' }, request);
+            throw failure;
+          },
+          onError,
+        })(request);
+
+        expect(sessionDuringSuccess?.accessToken).toBe(mockAuthResponse.accessToken);
+        expect(onError).toHaveBeenCalledWith({ error: failure, request });
+        expect(response.status).toBe(403);
+        expect(cookieDuringError).toMatchObject({
+          name: name || 'wos-session',
+          value: '',
+          domain: 'example.com',
+          path: '/',
+          sameSite: sameSite || 'lax',
+        });
+        expect(Boolean(cookieDuringError?.secure)).toBe(secure);
+        expect(headerDuringError).toContain(`${name || 'wos-session'}=;`);
+        expect(headerDuringError).toContain('Domain=example.com');
+        expect(headerDuringError).toContain('Path=/');
+        expect(headerDuringError).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+        expect(headerDuringError?.toLowerCase()).toContain(`samesite=${sameSite || 'lax'}`);
+        expect(/; secure/i.test(headerDuringError!)).toBe(secure);
+      });
+
+      it('clears the session on a synchronous failure with the default error response', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+        const onSuccess = vi.fn(() => {
+          throw 'callback rejected';
+        });
+
+        const response = await handleAuth({ onSuccess })(request);
+
+        expect(onSuccess).toHaveBeenCalledOnce();
+        expect(response.status).toBe(500);
+        expect(cookieResponse.cookies.get('wos-session')?.value).toBe('');
+      });
+
+      it.each(['redirect', 'permanentRedirect'] as const)(
+        'preserves callback session updates when onError rethrows %s',
+        async (method) => {
+          const navigation = await vi.importActual<typeof import('next/navigation')>('next/navigation');
+          vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+          const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+          request.nextUrl.searchParams.set('code', 'test-code');
+          request.nextUrl.searchParams.set('state', sealedState);
+          const onError = vi.fn(({ error }) => {
+            throw error;
+          });
+
+          await expect(
+            handleAuth({
+              onSuccess: async (data) => {
+                await saveSession({ ...data, accessToken: 'updated-token' }, request);
+                navigation[method]('/dashboard');
+              },
+              onError,
+            })(request),
+          ).rejects.toMatchObject({ message: 'NEXT_REDIRECT' });
+
+          expect(onError).toHaveBeenCalledOnce();
+          expect((await getSessionFromCookie())?.accessToken).toBe('updated-token');
+        },
+      );
+    });
+
+    it('should pass custom state data to onSuccess callback', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/dashboard',
+        customState: 'custom-user-state-string',
+      });
 
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
@@ -308,15 +563,19 @@ describe('authkit-callback-route', () => {
     });
 
     it('should handle state without custom data', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // State with only returnPathname
-      const state = btoa(JSON.stringify({ returnPathname: '/profile' }));
+      const sealedState = await setAuthCookie(request, {
+        nonce: 'foo',
+        codeVerifier: 'test-verifier',
+        returnPathname: '/profile',
+      });
 
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       const handler = handleAuth({ onSuccess });
       await handler(request);
 
@@ -329,52 +588,267 @@ describe('authkit-callback-route', () => {
       );
     });
 
-    it('should handle backward compatibility with old state format', async () => {
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+    it('should NOT handle backward compatibility with old state format', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
       // Old format: just returnPathname
-      const state = btoa(JSON.stringify({ returnPathname: '/old-path' }));
-
+      // @ts-expect-error we're purposely testing backward compatibility with an old format that doesn't match the current State interface
+      const sealedState = await setAuthCookie(request, { returnPathname: '/old-path' });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', state);
+      request.nextUrl.searchParams.set('state', sealedState);
 
       const handler = handleAuth();
       const response = await handler(request);
 
-      // Should still redirect correctly
-      expect(response.headers.get('Location')).toContain('/old-path');
+      // Should error
+      expect(response.status).toBe(500);
+      expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
     });
 
-    it('should return error and set no cookies when onSuccess throws', async () => {
-      // Mock authenticate success
-      jest.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+    it('should not leak nonce-only state as custom state in onSuccess', async () => {
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // Prepare request with code + state
+      // Simulate a nonce-only state (no returnPathname, no custom state)
+      const nonceState = await setAuthCookie(request, { nonce: 'test-nonce', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
-      request.nextUrl.searchParams.set('state', 'dummy-state');
+      request.nextUrl.searchParams.set('state', nonceState);
 
-      // Make onSuccess throw intentionally
-      const onSuccess = jest.fn(() => {
-        throw new Error('onSuccess failed');
+      const onSuccess = vi.fn();
+      const handler = handleAuth({ onSuccess });
+      await handler(request);
+
+      expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ state: undefined }));
+    });
+
+    describe('state verification', () => {
+      it('should reject callback when state does not match stored state', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const state = 'attacker-state';
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', state);
+        await setAuthCookie(request, { nonce: 'legitimate-state', codeVerifier: 'test-verifier' });
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
       });
 
-      const handler = handleAuth({ onSuccess });
+      it('should reject when state is present but no cookie exists', async () => {
+        const sealedState = await sealData(
+          { nonce: 'foo', codeVerifier: 'test-verifier' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
 
-      const response = await handler(request);
+        const handler = handleAuth();
+        const response = await handler(request);
 
-      // 1. Status must be error (400, 500 — depends on your handler)
-      expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
+      });
 
-      // 2. Response should contain error message
-      const body = await response.json();
-      expect(body.error).toBeDefined();
-      expect(body.error.message).toBe('Something went wrong');
+      it('should pass when state matches stored state', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
 
-      // 3. No cookies should be set
-      // NextResponse stores cookies in headers.getSetCookie()
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
 
-      const nextCookies = await cookies();
-      expect(nextCookies.getAll()).toHaveLength(0);
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalled();
+        expect(response.status).not.toBe(500);
+      });
+
+      it('should return 500 when neither state nor cookie exist', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
+      });
+    });
+
+    describe('PKCE', () => {
+      it('should pass codeVerifier and verify state when both are in the cookie', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, {
+          codeVerifier: 'test-verifier-456',
+          returnPathname: '/dashboard',
+          nonce: 'foo',
+        });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: 'test-verifier-456',
+          }),
+        );
+        expect(response.headers.get('Location')).toContain('/dashboard');
+      });
+
+      it('should pass codeVerifier from cookie to authenticateWithCode', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, {
+          nonce: 'foo',
+          codeVerifier: 'test-verifier-123',
+        });
+
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: 'test-code',
+            codeVerifier: 'test-verifier-123',
+          }),
+        );
+      });
+
+      it('should reject when cookie is missing even if state contains valid sealed data', async () => {
+        const sealedState = await sealData(
+          { nonce: 'foo', codeVerifier: 'test-verifier-123' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+        expect(response.status).toBe(500);
+      });
+
+      it('should return an error response when PKCE cookie is corrupted', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Set a corrupted cookie using the flow-specific name
+        const corruptedState = 'not-a-valid-sealed-value';
+        request.cookies.set(getPKCECookieNameForState(corruptedState), corruptedState);
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', corruptedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        expect(workos.userManagement.authenticateWithCode).not.toHaveBeenCalled();
+      });
+
+      it('should delete PKCE cookie after successful authentication', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        // The response should be a redirect (success) and have a Set-Cookie header to delete the flow-specific PKCE cookie
+        expect(response.status).toBe(307);
+
+        const flowCookieName = getPKCECookieNameForState(sealedState);
+        const setCookieHeaders = response.headers.getSetCookie();
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith(`${flowCookieName}=`));
+        expect(pkceDeletionCookie).toBeDefined();
+        expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
+
+      it('should delete PKCE cookie after failed authentication', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue(new Error('Auth failed'));
+
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier-123' });
+        request.nextUrl.searchParams.set('code', 'bad-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(500);
+        const flowCookieName = getPKCECookieNameForState(sealedState);
+        const setCookieHeaders = response.headers.getSetCookie();
+        const pkceDeletionCookie = setCookieHeaders.find((c: string) => c.startsWith(`${flowCookieName}=`));
+        expect(pkceDeletionCookie).toBeDefined();
+        expect(pkceDeletionCookie).toContain('Max-Age=0');
+      });
+
+      it('should isolate concurrent auth flows using per-flow cookie names', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        // Simulate two concurrent auth flows with different sealed states
+        const sealedStateA = await sealData(
+          { nonce: 'nonce-a', codeVerifier: 'verifier-a' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+        const sealedStateB = await sealData(
+          { nonce: 'nonce-b', codeVerifier: 'verifier-b' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Both cookies exist on the request (set by different middleware redirects)
+        request.cookies.set(getPKCECookieNameForState(sealedStateA), sealedStateA);
+        request.cookies.set(getPKCECookieNameForState(sealedStateB), sealedStateB);
+
+        // Callback for flow A — should find its own cookie
+        request.nextUrl.searchParams.set('code', 'code-a');
+        request.nextUrl.searchParams.set('state', sealedStateA);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(307);
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({ codeVerifier: 'verifier-a' }),
+        );
+
+        // Flow B's cookie should NOT have been deleted
+        const setCookieHeaders = response.headers.getSetCookie();
+        const flowBCookieName = getPKCECookieNameForState(sealedStateB);
+        const flowBDeletion = setCookieHeaders.find((c: string) => c.startsWith(`${flowBCookieName}=`));
+        expect(flowBDeletion).toBeUndefined();
+      });
+
+      it('should fall back to the legacy shared PKCE cookie for v3.0.x in-flight flows', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+
+        const sealedState = await sealData(
+          { nonce: 'legacy', codeVerifier: 'legacy-verifier' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD! },
+        );
+
+        // Simulate a user mid-OAuth on v3.0.x: only the legacy cookie name exists
+        request.cookies.set('wos-auth-verifier', sealedState);
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const handler = handleAuth();
+        const response = await handler(request);
+
+        expect(response.status).toBe(307);
+        expect(workos.userManagement.authenticateWithCode).toHaveBeenCalledWith(
+          expect.objectContaining({ codeVerifier: 'legacy-verifier' }),
+        );
+      });
     });
   });
 });

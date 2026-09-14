@@ -1,20 +1,21 @@
+import type { Mock } from 'vitest';
 import { tokenStore, TokenStore } from './tokenStore.js';
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
 
-jest.mock('../actions.js', () => ({
-  getAccessTokenAction: jest.fn(),
-  refreshAccessTokenAction: jest.fn(),
+vi.mock('../actions.js', () => ({
+  getAccessTokenAction: vi.fn(),
+  refreshAccessTokenAction: vi.fn(),
 }));
 
-const mockGetAccessTokenAction = getAccessTokenAction as jest.Mock;
-const mockRefreshAccessTokenAction = refreshAccessTokenAction as jest.Mock;
+const mockGetAccessTokenAction = getAccessTokenAction as Mock;
+const mockRefreshAccessTokenAction = refreshAccessTokenAction as Mock;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _global = global as any;
 
 describe('tokenStore', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.resetAllMocks();
+    vi.useFakeTimers();
+    vi.resetAllMocks();
     tokenStore.reset();
 
     // Clean up DOM globals
@@ -23,10 +24,10 @@ describe('tokenStore', () => {
   });
 
   afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
     tokenStore.reset();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
 
     // Clean up DOM globals
     delete _global.document;
@@ -54,7 +55,7 @@ describe('tokenStore', () => {
         resolvePromise = resolve;
       });
 
-      mockRefreshAccessTokenAction.mockReturnValue(slowPromise);
+      mockRefreshAccessTokenAction.mockReturnValue(slowPromise.then((t) => ({ accessToken: t })));
 
       expect(tokenStore.isRefreshing()).toBe(false);
 
@@ -124,18 +125,25 @@ describe('tokenStore', () => {
       const refreshedToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-      // Set expiring token first
+      // Set expiring token first — also set refresh mock since getAccessTokenSilently
+      // will trigger refresh for expiring tokens
       mockGetAccessTokenAction.mockResolvedValue(expiringToken);
+      mockRefreshAccessTokenAction.mockResolvedValueOnce({ accessToken: expiringToken });
       await tokenStore.getAccessTokenSilently();
 
-      // Setup refresh mock
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      // Clear mocks to track subsequent calls
+      mockGetAccessTokenAction.mockClear();
+      mockRefreshAccessTokenAction.mockClear();
 
-      // Now call getAccessToken - should trigger refresh
+      // Setup refresh to return new token
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
+
+      // Now call getAccessToken - should trigger refresh due to expiring token
       const token = await tokenStore.getAccessToken();
 
-      expect(token).toBe(refreshedToken);
+      // Should have called refresh since existing token was expiring
       expect(mockRefreshAccessTokenAction).toHaveBeenCalled();
+      expect(token).toBe(refreshedToken);
     });
 
     it('should refresh when no token exists', async () => {
@@ -192,7 +200,7 @@ describe('tokenStore', () => {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
       mockGetAccessTokenAction.mockResolvedValue(expiredToken);
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
 
       const token = await tokenStore.getAccessTokenSilently();
 
@@ -213,7 +221,7 @@ describe('tokenStore', () => {
       };
       const validToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(validPayload))}.mock-signature`;
 
-      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
       mockGetAccessTokenAction.mockResolvedValue(validToken);
 
       await tokenStore.getAccessTokenSilently();
@@ -227,7 +235,7 @@ describe('tokenStore', () => {
 
   describe('subscriber management', () => {
     it('should notify subscribers when state changes', () => {
-      const listener = jest.fn();
+      const listener = vi.fn();
       const unsubscribe = tokenStore.subscribe(listener);
 
       // Trigger a state change
@@ -256,14 +264,14 @@ describe('tokenStore', () => {
       mockGetAccessTokenAction.mockResolvedValue(validToken);
 
       // Subscribe to create a listener
-      const listener = jest.fn();
+      const listener = vi.fn();
       const unsubscribe = tokenStore.subscribe(listener);
 
       // Get token to schedule a refresh
       await tokenStore.getAccessTokenSilently();
 
       // Spy on clearTimeout
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
       // Unsubscribe the last (only) subscriber - should clear timeout
       unsubscribe();
@@ -287,15 +295,18 @@ describe('tokenStore', () => {
       const refreshedToken =
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoZWQiLCJzaWQiOiJzZXNzaW9uXzEyMyIsImV4cCI6OTk5OTk5OTk5OX0.mock-signature-2';
 
-      // First set an expiring token
+      // First set an expiring token — also set refresh mock since getAccessTokenSilently
+      // will trigger refresh for expiring tokens
       mockGetAccessTokenAction.mockResolvedValue(expiringToken);
+      mockRefreshAccessTokenAction.mockResolvedValueOnce({ accessToken: expiringToken });
       await tokenStore.getAccessTokenSilently();
 
       // Clear mocks
       mockGetAccessTokenAction.mockClear();
+      mockRefreshAccessTokenAction.mockClear();
 
       // Setup refresh to return new token
-      mockRefreshAccessTokenAction.mockResolvedValue(refreshedToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: refreshedToken });
 
       // Call getAccessToken again - should trigger refresh due to expiring token
       const token = await tokenStore.getAccessToken();
@@ -354,7 +365,7 @@ describe('tokenStore', () => {
 
     it('should consume eager auth cookie on first getAccessToken call', async () => {
       const eagerToken = 'eager-auth-token';
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       // Mock document.cookie with both getter and setter
       let cookieValue = `workos-access-token=${eagerToken};`;
@@ -404,7 +415,7 @@ describe('tokenStore', () => {
         iat: now - 40,
       };
       const fastToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(fastPayload))}.mock-signature`;
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       let cookieValue = `workos-access-token=${fastToken};`;
 
@@ -433,7 +444,7 @@ describe('tokenStore', () => {
         configurable: true,
       });
 
-      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
 
       // Call getAccessTokenSilently to trigger fast cookie consumption and refresh scheduling
       const token = await tokenStore.getAccessTokenSilently();
@@ -480,7 +491,7 @@ describe('tokenStore', () => {
 
     it('should handle HTTP protocol for cookie deletion', async () => {
       const eagerToken = 'http-token';
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       let cookieValue = `workos-access-token=${eagerToken};`;
 
@@ -526,11 +537,14 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Now simulate network error during refresh
-      mockRefreshAccessTokenAction.mockRejectedValue(new Error('Network error'));
+      mockRefreshAccessTokenAction.mockResolvedValue({
+        accessToken: undefined,
+        error: 'Failed to refresh access token',
+      });
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 
@@ -543,11 +557,11 @@ describe('tokenStore', () => {
     it('should convert non-Error objects to Error instances', async () => {
       const errorString = 'network timeout';
 
-      mockRefreshAccessTokenAction.mockRejectedValue(errorString);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: undefined, error: errorString });
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 
@@ -624,7 +638,7 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Spy on clearTimeout
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
       // Clear token should clear the refresh timeout
       tokenStore.clearToken();
@@ -649,7 +663,7 @@ describe('tokenStore', () => {
 
       mockRefreshAccessTokenAction.mockImplementation(() => {
         callCount++;
-        return slowPromise;
+        return slowPromise.then((t) => ({ accessToken: t }));
       });
 
       // Clear any existing refresh promise
@@ -691,21 +705,22 @@ describe('tokenStore', () => {
   });
 
   describe('refresh state management', () => {
-    it('should preserve Error instances without conversion', async () => {
-      const errorInstance = new Error('actual error instance');
+    it('should create Error from server action error string', async () => {
+      const errorMessage = 'actual error instance';
 
-      // Mock refresh to throw an Error instance
-      mockRefreshAccessTokenAction.mockRejectedValue(errorInstance);
+      // Mock refresh to return an error result (as server actions do)
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: undefined, error: errorMessage });
 
       try {
         await tokenStore.refreshToken();
-      } catch (e) {
+      } catch {
         // Expected to throw
       }
 
-      // Verify the Error instance was preserved without conversion
+      // Verify an Error was created from the error string
       const state = tokenStore.getSnapshot();
-      expect(state.error).toBe(errorInstance); // Same instance, not a new one
+      expect(state.error).toBeInstanceOf(Error);
+      expect(state.error?.message).toBe(errorMessage);
     });
 
     it('should update state for manual refresh', async () => {
@@ -717,7 +732,7 @@ describe('tokenStore', () => {
       await tokenStore.getAccessTokenSilently();
 
       // Mock refresh to return new token
-      mockRefreshAccessTokenAction.mockResolvedValue(newToken);
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: newToken });
 
       // Call manual refresh which should update state
       const result = await tokenStore.refreshToken();
@@ -736,9 +751,9 @@ describe('tokenStore', () => {
 
       // Clear mocks and set up spy on setState
       mockGetAccessTokenAction.mockClear();
-      mockRefreshAccessTokenAction.mockResolvedValue(existingToken); // Same token
+      mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: existingToken }); // Same token
 
-      const listener = jest.fn();
+      const listener = vi.fn();
       tokenStore.subscribe(listener);
 
       // Force a silent refresh that returns the same token
@@ -752,7 +767,7 @@ describe('tokenStore', () => {
 
   describe('TokenStore constructor', () => {
     const setupMockEnv = (cookieValue = '', protocol = 'https:') => {
-      const mockCookieSetter = jest.fn();
+      const mockCookieSetter = vi.fn();
 
       Object.defineProperty(_global, 'document', {
         value: { cookie: cookieValue },
@@ -811,6 +826,80 @@ describe('tokenStore', () => {
       const result = await store.getAccessToken();
 
       expect(result).toBe(token);
+    });
+
+    describe('deferred initial refresh scheduling', () => {
+      const makeJwt = (payload: Record<string, unknown>) =>
+        `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
+
+      const expiringJwt = () => {
+        const now = Math.floor(Date.now() / 1000);
+        return makeJwt({ sub: 'user_123', sid: 'session_123', iat: now - 3600, exp: now + 30 });
+      };
+
+      it('should not schedule a refresh timer during construction, even for an expiring token', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+
+        new TokenStore();
+
+        expect(vi.getTimerCount()).toBe(0);
+        expect(mockRefreshAccessTokenAction).not.toHaveBeenCalled();
+      });
+
+      it('should schedule the refresh when the first subscriber attaches', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const freshToken = makeJwt({ sub: 'user_123', sid: 'session_123', iat: now, exp: now + 3600 });
+        mockRefreshAccessTokenAction.mockResolvedValue({ accessToken: freshToken });
+
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        // Expiring token schedules an immediate refresh
+        await vi.runOnlyPendingTimersAsync();
+        await Promise.resolve();
+
+        expect(mockRefreshAccessTokenAction).toHaveBeenCalledTimes(1);
+        expect(store.getSnapshot().token).toBe(freshToken);
+      });
+
+      it('should not schedule again while other subscribers remain', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+      });
+
+      it('should restore the refresh timer when a subscriber attaches after all unsubscribed', () => {
+        setupMockEnv(`workos-access-token=${expiringJwt()};`);
+        const store = new TokenStore();
+
+        const unsubscribe = store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+
+        // Last unsubscribe clears the timer
+        unsubscribe();
+        expect(vi.getTimerCount()).toBe(0);
+
+        // A later subscriber restores background refresh for the cached token
+        store.subscribe(() => {});
+        expect(vi.getTimerCount()).toBe(1);
+      });
+
+      it('should not schedule on subscribe when the initial token is opaque', () => {
+        setupMockEnv('workos-access-token=opaque-token;');
+        const store = new TokenStore();
+
+        store.subscribe(() => {});
+
+        expect(vi.getTimerCount()).toBe(0);
+      });
     });
   });
 });

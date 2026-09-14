@@ -1,21 +1,39 @@
+import type { Mock, MockInstance } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
-import { withAuth, updateSession, refreshSession, updateSessionMiddleware, getTokenClaims } from './session.js';
+import {
+  withAuth,
+  updateSession,
+  refreshSession,
+  updateSessionMiddleware,
+  getTokenClaims,
+  checkRecentAuth,
+} from './session.js';
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
 
-import { jwtVerify } from 'jose';
+import { SignJWT, jwtVerify } from 'jose';
+
+// Helper to override env variable exports without triggering no-import-assign on the import binding
+function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
+  Object.defineProperty(mod, key, { value, configurable: true });
+}
 import { sealData } from 'iron-session';
 import { User } from '@workos-inc/node';
+import { getStateFromPKCECookieValue } from './pkce.js';
+import { handleAuthkitHeaders } from './middleware-helpers.js';
 
-jest.mock('jose', () => ({
-  jwtVerify: jest.fn(),
-  createRemoteJWKSet: jest.fn(),
-  SignJWT: jest.requireActual('jose').SignJWT,
-  decodeJwt: jest.requireActual('jose').decodeJwt,
-}));
+vi.mock('jose', async () => {
+  const actual = await vi.importActual<typeof import('jose')>('jose');
+  return {
+    jwtVerify: vi.fn(),
+    createRemoteJWKSet: vi.fn(),
+    SignJWT: actual.SignJWT,
+    decodeJwt: actual.decodeJwt,
+  };
+});
 
 // logging is disabled by default, flip this to true to still have logs in the console
 const DEBUG = false;
@@ -47,11 +65,11 @@ describe('session.ts', () => {
     } as User,
   };
 
-  let consoleLogSpy: jest.SpyInstance;
+  let consoleLogSpy: MockInstance;
 
   beforeEach(async () => {
     // Clear all mocks between tests
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Reset the cookie store
     const nextCookies = await cookies();
@@ -63,9 +81,9 @@ describe('session.ts', () => {
     nextHeaders._reset();
     nextHeaders.set('x-workos-middleware', 'true');
 
-    (jwtVerify as jest.Mock).mockReset();
+    (jwtVerify as Mock).mockReset();
 
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args) => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
       if (DEBUG) {
         console.info(...args);
       }
@@ -74,7 +92,7 @@ describe('session.ts', () => {
 
   afterEach(() => {
     consoleLogSpy.mockRestore();
-    jest.resetModules();
+    vi.resetModules();
   });
 
   describe('withAuth', () => {
@@ -91,6 +109,42 @@ describe('session.ts', () => {
       const result = await withAuth();
       expect(result).toHaveProperty('user');
       expect(result.user).toEqual(mockSession.user);
+    });
+
+    it('rejects the session when the sealed user does not match the access token subject', async () => {
+      // SEC-1219: an attacker with their own valid access token (sub) but a
+      // forged sealed `user` must not be able to impersonate that user.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({ sub: 'user_attacker' });
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('redirects on a mismatched session when ensureSignedIn is true', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({ sub: 'user_attacker' });
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'https://example.com/protected');
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      await withAuth({ ensureSignedIn: true });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      warnSpy.mockRestore();
     });
 
     it('should return null when user is not authenticated', async () => {
@@ -144,14 +198,12 @@ describe('session.ts', () => {
 
       await withAuth({ ensureSignedIn: true });
 
-      // URL-safe base64 encoding
-      const pathname = encodeURIComponent(
-        btoa(JSON.stringify({ returnPathname: '/protected?test=123' }))
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_'),
-      );
+      // The state is now sealed, se we need to unseal it
+      const redirectUrl = new URL((redirect as unknown as Mock).mock.calls[0][0]);
+      const sealedState = redirectUrl.searchParams.get('state')!;
+      const { returnPathname } = await getStateFromPKCECookieValue(sealedState);
 
-      expect(redirect).toHaveBeenCalledWith(expect.stringContaining(pathname));
+      expect(returnPathname).toBe('/protected?test=123');
     });
   });
 
@@ -159,7 +211,7 @@ describe('session.ts', () => {
     it('should throw an error if the redirect URI is not set', async () => {
       const originalWorkosRedirectUri = envVariables.WORKOS_REDIRECT_URI;
 
-      jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', '');
+      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', '');
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -174,13 +226,13 @@ describe('session.ts', () => {
         );
       }).rejects.toThrow('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
 
-      jest.replaceProperty(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
+      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
     });
 
     it('should throw an error if the cookie password is not set', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
+      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', '');
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -197,13 +249,13 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
     });
 
     it('should throw an error if the cookie password is less than 32 characters', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
+      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', 'short');
 
       await expect(async () => {
         await updateSessionMiddleware(
@@ -220,7 +272,7 @@ describe('session.ts', () => {
         'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
       );
 
-      jest.replaceProperty(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
+      setEnvVar(envVariables, 'WORKOS_COOKIE_PASSWORD', originalWorkosCookiePassword);
     });
 
     it('should return early if there is no session', async () => {
@@ -241,7 +293,7 @@ describe('session.ts', () => {
     });
 
     it('should return 200 if the session is valid', async () => {
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const nextCookies = await cookies();
       nextCookies.set(
@@ -249,7 +301,7 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         return true;
       });
 
@@ -272,11 +324,11 @@ describe('session.ts', () => {
     it('should attempt to refresh the session when the access token is invalid', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -308,17 +360,15 @@ describe('session.ts', () => {
     });
 
     it('should delete the cookie when refreshing fails', async () => {
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'log').mockImplementation(() => {});
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
-      jest
-        .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-        .mockRejectedValue(new Error('Failed to refresh'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Failed to refresh'));
 
       const request = new NextRequest(new URL('http://example.com'));
 
@@ -352,9 +402,93 @@ describe('session.ts', () => {
       );
     });
 
+    it.each([
+      ['a rate limit (429)', Object.assign(new Error('Too many requests'), { status: 429 })],
+      ['a server error (503)', Object.assign(new Error('Service unavailable'), { status: 503 })],
+      ['a request timeout (408)', Object.assign(new Error('Request timeout'), { status: 408 })],
+      ['a network error', new TypeError('fetch failed')],
+      // The SDK re-wraps a raw network TypeError in a plain Error with the
+      // TypeError as its cause; the classifier must follow the cause chain.
+      [
+        'an SDK-wrapped network error',
+        new Error('Unexpected error: TypeError: fetch failed', { cause: new TypeError('fetch failed') }),
+      ],
+    ])('should preserve the cookie when refreshing fails transiently: %s', async (_label, transientError) => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      (jwtVerify as Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(transientError);
+
+      const request = new NextRequest(new URL('http://example.com'));
+
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSessionMiddleware(
+        request,
+        true,
+        {
+          enabled: false,
+          unauthenticatedPaths: [],
+        },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(response.status).toBe(200);
+      // The sealed session cookie must not be cleared on a transient failure.
+      expect(response.headers.get('Set-Cookie') ?? '').not.toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith(
+        'Failed to refresh due to a transient error. Preserving the session cookie so it can be retried.',
+        transientError,
+      );
+    });
+
+    it('should delete the cookie for a terminal refresh failure (invalid_grant)', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      (jwtVerify as Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      const terminalError = Object.assign(new Error('invalid_grant'), { status: 400 });
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(terminalError);
+
+      const request = new NextRequest(new URL('http://example.com'));
+
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const response = await updateSessionMiddleware(
+        request,
+        true,
+        {
+          enabled: false,
+          unauthenticatedPaths: [],
+        },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Set-Cookie')).toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', terminalError);
+    });
+
     describe('middleware auth', () => {
       it('should redirect unauthenticated users on protected routes', async () => {
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
 
         const request = new NextRequest(new URL('http://example.com/protected'));
         const result = await updateSessionMiddleware(
@@ -374,10 +508,7 @@ describe('session.ts', () => {
         );
       });
 
-      it('should use Response if NextResponse.redirect is not available', async () => {
-        const originalRedirect = NextResponse.redirect;
-        (NextResponse as Partial<typeof NextResponse>).redirect = undefined;
-
+      it('should return a redirect response when middlewareAuth is enabled and user is not authenticated', async () => {
         const request = new NextRequest(new URL('http://example.com/protected'));
         const result = await updateSessionMiddleware(
           request,
@@ -390,10 +521,9 @@ describe('session.ts', () => {
           [],
         );
 
-        expect(result).toBeInstanceOf(Response);
-
-        // Restore the original redirect method
-        (NextResponse as Partial<typeof NextResponse>).redirect = originalRedirect;
+        expect(result).toBeInstanceOf(NextResponse);
+        expect(result.status).toBe(307);
+        expect(result.headers.get('Location')).toContain('workos.com');
       });
 
       it('should automatically add the redirect URI to unauthenticatedPaths when middleware is enabled', async () => {
@@ -429,7 +559,7 @@ describe('session.ts', () => {
         expect(result.headers.get('Location')).toContain('screen_hint=sign-up');
       });
 
-      it('should set the sign up paths in the headers', async () => {
+      it('should not leak sign-up paths header to the browser', async () => {
         const request = new NextRequest(new URL('http://example.com/protected-signup'));
         const result = await updateSessionMiddleware(
           request,
@@ -442,7 +572,8 @@ describe('session.ts', () => {
           ['/protected-signup'],
         );
 
-        expect(result.headers.get('x-sign-up-paths')).toBe('/protected-signup');
+        // x-sign-up-paths is an internal header that should not leak to the browser
+        expect(result.headers.get('x-sign-up-paths')).toBeNull();
       });
 
       it('should allow logged out users on unauthenticated paths', async () => {
@@ -479,11 +610,11 @@ describe('session.ts', () => {
 
       it('should throw an error if the provided regex is invalid and a non-Error object is thrown', async () => {
         // Reset modules to ensure clean import state
-        jest.resetModules();
+        vi.resetModules();
 
         // Import first, then spy
         const pathToRegexp = await import('path-to-regexp');
-        const parseSpy = jest.spyOn(pathToRegexp, 'parse').mockImplementation(() => {
+        const parseSpy = vi.spyOn(pathToRegexp, 'parse').mockImplementation(() => {
           throw 'invalid regex';
         });
 
@@ -507,6 +638,9 @@ describe('session.ts', () => {
 
         // Verify the mock was called
         expect(parseSpy).toHaveBeenCalled();
+
+        // Restore the spy to prevent leaking to subsequent tests
+        parseSpy.mockRestore();
       });
 
       it('should default to the WORKOS_REDIRECT_URI environment variable if no redirect URI is provided', async () => {
@@ -526,17 +660,17 @@ describe('session.ts', () => {
       });
 
       it('should delete the cookie and redirect when refreshing fails', async () => {
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
 
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
-        jest
-          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Failed to refresh'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(
+          new Error('Failed to refresh'),
+        );
 
         const request = new NextRequest(new URL('http://example.com'));
 
@@ -609,7 +743,10 @@ describe('session.ts', () => {
 
   describe('updateSession', () => {
     it('should return an authorization url if the session is invalid', async () => {
-      const result = await updateSession(new NextRequest(new URL('http://example.com/protected')), {
+      const request = new NextRequest(new URL('http://example.com/protected'), {
+        headers: { accept: 'text/html' },
+      });
+      const result = await updateSession(request, {
         debug: true,
         screenHint: 'sign-up',
       });
@@ -617,6 +754,12 @@ describe('session.ts', () => {
       expect(result.authorizationUrl).toBeDefined();
       expect(result.authorizationUrl).toContain('screen_hint=sign-up');
       expect(result.session.user).toBeNull();
+      expect(result.headers.getSetCookie().some((c) => c.includes('wos-auth-verifier'))).toBe(true);
+      expect(
+        handleAuthkitHeaders(request, result.headers)
+          .headers.getSetCookie()
+          .some((c) => c.includes('wos-auth-verifier')),
+      ).toBe(false);
       expect(console.log).toHaveBeenCalledWith('No session found from cookie');
     });
 
@@ -637,12 +780,12 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       // Mock successful refresh
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -670,12 +813,12 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       // Mock refresh failure
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
       const request = new NextRequest(new URL('http://example.com/protected'));
       request.cookies.set(
@@ -692,20 +835,148 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
 
+    describe('PKCE cookie cleanup', () => {
+      function documentRequest(url = 'http://example.com/protected'): NextRequest {
+        return new NextRequest(new URL(url), {
+          headers: { accept: 'text/html' },
+        });
+      }
+
+      function getRedirectSetCookieHeaders(
+        request: NextRequest,
+        result: Awaited<ReturnType<typeof updateSession>>,
+      ): string[] {
+        return handleAuthkitHeaders(request, result.headers, {
+          redirect: result.authorizationUrl,
+        }).headers.getSetCookie();
+      }
+
+      function addStalePKCECookies(request: NextRequest, count: number): void {
+        for (let i = 0; i < count; i++) {
+          request.cookies.set(`wos-auth-verifier-${i.toString(16).padStart(8, '0')}`, `stale-state-${i}`);
+        }
+      }
+
+      it('should not expire PKCE cookies when below the threshold (concurrent flows preserved)', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier-aaaaaaaa', 'stale-sealed-state-a');
+        request.cookies.set('wos-auth-verifier-bbbbbbbb', 'stale-sealed-state-b');
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-aaaaaaaa=;'))).toBe(false);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-bbbbbbbb=;'))).toBe(false);
+        // The new PKCE cookie should still be set
+        expect(
+          setCookies.some(
+            (c) =>
+              c.match(/^wos-auth-verifier-[0-9a-f]{8}=.+/) &&
+              !c.startsWith('wos-auth-verifier-aaaaaaaa') &&
+              !c.startsWith('wos-auth-verifier-bbbbbbbb'),
+          ),
+        ).toBe(true);
+      });
+
+      it('should expire all PKCE cookies when at or above the threshold', async () => {
+        const request = documentRequest();
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        for (let i = 0; i < 5; i++) {
+          const name = `wos-auth-verifier-${i.toString(16).padStart(8, '0')}`;
+          expect(setCookies.some((c) => c.startsWith(`${name}=;`))).toBe(true);
+        }
+        // The new PKCE cookie should also be present
+        expect(setCookies.some((c) => c.match(/^wos-auth-verifier-[0-9a-f]{8}=.+/) && !c.includes('=;'))).toBe(true);
+      });
+
+      it('should expire stale PKCE cookies when refresh fails and threshold exceeded', async () => {
+        mockSession.accessToken = await generateTestToken({}, true);
+
+        (jwtVerify as Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+
+        const request = documentRequest();
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier-00000000=;'))).toBe(true);
+      });
+
+      it('should not expire PKCE cookies for non-document requests', async () => {
+        const request = new NextRequest(new URL('http://example.com/protected'), {
+          headers: { RSC: '1' },
+        });
+        addStalePKCECookies(request, 10);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.includes('wos-auth-verifier'))).toBe(false);
+      });
+
+      it('should not expire non-PKCE cookies', async () => {
+        const request = documentRequest();
+        request.cookies.set('some-other-cookie', 'value');
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('some-other-cookie=;'))).toBe(false);
+      });
+
+      it('should not expire legacy wos-auth-verifier cookie when below threshold', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier', 'legacy-sealed-state');
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier=;'))).toBe(false);
+      });
+
+      it('should expire legacy wos-auth-verifier cookie when threshold exceeded', async () => {
+        const request = documentRequest();
+        request.cookies.set('wos-auth-verifier', 'legacy-sealed-state');
+        addStalePKCECookies(request, 5);
+
+        const result = await updateSession(request);
+
+        const setCookies = getRedirectSetCookieHeaders(request, result);
+        expect(setCookies.some((c) => c.startsWith('wos-auth-verifier=;'))).toBe(true);
+      });
+    });
+
     it('should call onSessionRefreshSuccess when refresh succeeds', async () => {
       // Setup invalid session
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       const newAccessToken = await generateTestToken();
-      const mockSuccessCallback = jest.fn();
+      const mockSuccessCallback = vi.fn();
 
       // Mock successful refresh
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: newAccessToken,
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
@@ -736,15 +1007,15 @@ describe('session.ts', () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
       // Mock token verification to fail
-      (jwtVerify as jest.Mock).mockImplementation(() => {
+      (jwtVerify as Mock).mockImplementation(() => {
         throw new Error('Invalid token');
       });
 
       const mockError = new Error('Refresh failed');
-      const mockErrorCallback = jest.fn();
+      const mockErrorCallback = vi.fn();
 
       // Mock refresh failure
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(mockError);
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(mockError);
 
       const request = new NextRequest(new URL('http://example.com/protected'));
       request.cookies.set(
@@ -761,21 +1032,208 @@ describe('session.ts', () => {
       expect(mockErrorCallback).toHaveBeenCalledWith({
         error: mockError,
         request,
+        isTransient: false,
+      });
+    });
+
+    describe('proactive refresh', () => {
+      // generateTestToken always signs with a 2h expiry, so build tokens with a
+      // controlled exp/iat here to place them inside or outside the refresh buffer.
+      async function generateTokenWithExpiry(secondsUntilExpiry: number, lifetimeSeconds = 3600) {
+        const now = Math.floor(Date.now() / 1000);
+        const secret = new TextEncoder().encode(process.env.WORKOS_COOKIE_PASSWORD as string);
+
+        return await new SignJWT({ sid: 'session_123', org_id: 'org_123' })
+          .setProtectedHeader({ alg: 'HS256' })
+          .setIssuedAt(now - (lifetimeSeconds - secondsUntilExpiry))
+          .setExpirationTime(now + secondsUntilExpiry)
+          .sign(secret);
+      }
+
+      async function requestWithSessionToken(accessToken: string) {
+        const request = new NextRequest(new URL('http://example.com/protected'));
+        request.cookies.set(
+          'wos-session',
+          await sealData({ ...mockSession, accessToken }, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        return request;
+      }
+
+      it('should refresh a valid session that is within the refresh buffer', async () => {
+        const newAccessToken = await generateTestToken();
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: newAccessToken,
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(30));
+        const response = await updateSession(request, { debug: true });
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+        expect(response.session.user).toBeDefined();
+        expect(response.session.accessToken).toBe(newAccessToken);
+        expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=') && c.length > 20)).toBe(true);
+        expect(console.log).toHaveBeenCalledWith(
+          expect.stringContaining('Session expiring soon. Proactively refreshing access token that ends in'),
+        );
+      });
+
+      it('should not refresh a valid session outside the refresh buffer', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+        const accessToken = await generateTokenWithExpiry(300);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request);
+
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect(response.session.accessToken).toBe(accessToken);
+      });
+
+      it('should use a 30 second buffer for tokens with a lifetime of 5 minutes or less', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 45 seconds left on a 5 minute token: outside the 30 second buffer
+        await updateSession(await requestWithSessionToken(await generateTokenWithExpiry(45, 300)));
+        expect(refreshSpy).not.toHaveBeenCalled();
+
+        // 20 seconds left on a 5 minute token: inside the 30 second buffer
+        await updateSession(await requestWithSessionToken(await generateTokenWithExpiry(20, 300)));
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should respect a custom refreshBufferSeconds', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 90 seconds left is outside the default 60 second buffer, but inside a 120 second one
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(90));
+        await updateSession(request, { refreshBufferSeconds: 120 });
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should disable proactive refresh when refreshBufferSeconds is 0', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+        const accessToken = await generateTokenWithExpiry(5);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request, { refreshBufferSeconds: 0 });
+
+        expect(refreshSpy).not.toHaveBeenCalled();
+        expect(response.session.accessToken).toBe(accessToken);
+      });
+
+      it('should serve the request with the still-valid token when a proactive refresh fails', async () => {
+        const mockErrorCallback = vi.fn();
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
+
+        const accessToken = await generateTokenWithExpiry(30);
+        const request = await requestWithSessionToken(accessToken);
+        const response = await updateSession(request, { debug: true, onSessionRefreshError: mockErrorCallback });
+
+        expect(response.session.user).toBeDefined();
+        expect(response.session.accessToken).toBe(accessToken);
+        expect(response.authorizationUrl).toBeUndefined();
+        // The session cookie must not be deleted while the access token is still valid
+        expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=;'))).toBe(false);
+        expect(mockErrorCallback).not.toHaveBeenCalled();
+        expect(console.log).toHaveBeenCalledWith(
+          'Proactive refresh failed. Serving request with the still-valid access token.',
+          expect.any(Error),
+        );
+      });
+
+      it('should delete the session when a proactive refresh fails and the token expired during the attempt', async () => {
+        const mockErrorCallback = vi.fn();
+        const accessToken = await generateTokenWithExpiry(30);
+        const request = await requestWithSessionToken(accessToken);
+
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockImplementation(async () => {
+          // The token runs out while the refresh round trip is in flight
+          vi.useFakeTimers();
+          vi.setSystemTime(Date.now() + 31_000);
+          throw new Error('Refresh failed');
+        });
+
+        try {
+          const response = await updateSession(request, { debug: true, onSessionRefreshError: mockErrorCallback });
+
+          expect(response.session.user).toBeNull();
+          expect(response.authorizationUrl).toBeDefined();
+          expect(response.headers.getSetCookie().some((c) => c.startsWith('wos-session=;'))).toBe(true);
+          expect(mockErrorCallback).toHaveBeenCalledTimes(1);
+          expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('should call onSessionRefreshSuccess when a proactive refresh succeeds', async () => {
+        const mockSuccessCallback = vi.fn();
+        const newAccessToken = await generateTestToken();
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: newAccessToken,
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(30));
+        await updateSession(request, { onSessionRefreshSuccess: mockSuccessCallback });
+
+        expect(mockSuccessCallback).toHaveBeenCalledTimes(1);
+        expect(mockSuccessCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ accessToken: newAccessToken, user: mockSession.user }),
+        );
+      });
+
+      it('should thread refreshBufferSeconds through updateSessionMiddleware', async () => {
+        const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        // 90 seconds left is outside the default 60 second buffer, but inside a 120 second one
+        const request = await requestWithSessionToken(await generateTokenWithExpiry(90));
+        const result = await updateSessionMiddleware(
+          request,
+          false,
+          {
+            enabled: false,
+            unauthenticatedPaths: [],
+          },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          [],
+          false,
+          120,
+        );
+
+        expect(refreshSpy).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe(200);
       });
     });
   });
 
   describe('refreshSession', () => {
     it('should refresh session successfully', async () => {
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
       });
 
-      jest
-        .spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const nextCookies = await cookies();
       nextCookies.set(
@@ -811,15 +1269,15 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken({ org_id: 'org_456' }),
         refreshToken: 'new-refresh-token',
         user: mockSession.user,
       });
 
-      jest
-        .spyOn(workos.userManagement, 'getJwksUrl')
-        .mockReturnValue('https://api.workos.com/sso/jwks/client_1234567890');
+      vi.spyOn(workos.userManagement, 'getJwksUrl').mockReturnValue(
+        'https://api.workos.com/sso/jwks/client_1234567890',
+      );
 
       const result = await refreshSession({ organizationId: 'org_456' });
 
@@ -838,8 +1296,8 @@ describe('session.ts', () => {
         'wos-session',
         await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
-      expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('Failed to refresh session: fail');
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue('fail');
+      await expect(refreshSession({ ensureSignedIn: false })).rejects.toThrow('Failed to refresh session: fail');
     });
 
     it('throws if authenticateWithRefreshToken fails with error', async () => {
@@ -853,7 +1311,7 @@ describe('session.ts', () => {
         'wos-session',
         await sealData(mockSessionWithValidJWT, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
-      jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('error'));
       await expect(refreshSession()).rejects.toThrow('Failed to refresh session: error');
     });
   });
@@ -863,7 +1321,7 @@ describe('session.ts', () => {
       const nextCookies = await cookies();
       // @ts-expect-error - _reset is part of the mock
       nextCookies._reset();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should return all token claims when accessToken is provided', async () => {
@@ -955,9 +1413,47 @@ describe('session.ts', () => {
     });
   });
 
+  describe('checkRecentAuth', () => {
+    async function authenticate(authTime?: number) {
+      mockSession.accessToken = await generateTestToken(authTime === undefined ? {} : { auth_time: authTime });
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+    }
+
+    it('reports recent auth as not stale', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await authenticate(now - 60);
+
+      const result = await checkRecentAuth({ maxAge: 300 });
+
+      expect(result.isStale).toBe(false);
+      expect(result.authenticatedAt).toEqual(new Date((now - 60) * 1000));
+    });
+
+    it('reports stale auth past maxAge', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await authenticate(now - 600);
+
+      expect((await checkRecentAuth({ maxAge: 300 })).isStale).toBe(true);
+    });
+
+    it('fails closed when auth_time claim is missing', async () => {
+      await authenticate(undefined);
+
+      expect(await checkRecentAuth({ maxAge: 300 })).toEqual({ authenticatedAt: null, isStale: true });
+    });
+
+    it('fails closed when there is no authenticated user', async () => {
+      expect(await checkRecentAuth({ maxAge: 300 })).toEqual({ authenticatedAt: null, isStale: true });
+    });
+  });
+
   describe('eager auth functionality', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     describe('isInitialDocumentRequest', () => {
@@ -1051,12 +1547,12 @@ describe('session.ts', () => {
         // Setup invalid session that needs refresh
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
         const newAccessToken = await generateTestToken();
-        jest.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
           accessToken: newAccessToken,
           refreshToken: 'new-refresh-token',
           user: mockSession.user,
@@ -1082,13 +1578,11 @@ describe('session.ts', () => {
         // Setup invalid session
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as jest.Mock).mockImplementation(() => {
+        (jwtVerify as Mock).mockImplementation(() => {
           throw new Error('Invalid token');
         });
 
-        jest
-          .spyOn(workos.userManagement, 'authenticateWithRefreshToken')
-          .mockRejectedValue(new Error('Refresh failed'));
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
         const request = new NextRequest(new URL('http://example.com/page'));
         request.headers.set('accept', 'text/html');

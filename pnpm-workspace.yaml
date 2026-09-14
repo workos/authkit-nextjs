@@ -1,0 +1,9 @@
+packages:
+  - '.'
+  - 'examples/next/'
+  - 'examples/vinext/'
+
+approveBuilds: esbuild
+
+onlyBuiltDependencies:
+  - esbuild

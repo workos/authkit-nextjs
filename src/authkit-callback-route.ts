@@ -1,44 +1,18 @@
 import { NextRequest } from 'next/server';
-import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { cookies } from 'next/headers';
+import { getURLFromRedirectError } from 'next/dist/client/components/redirect.js';
+import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
+import { CallbackError } from './errors.js';
 import { HandleAuthOptions } from './interfaces.js';
-import { deleteSession, saveSession } from './session.js';
+import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
+import { saveSession } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
 
 function preventCaching(headers: Headers): void {
   headers.set('Vary', 'Cookie');
   setCachePreventionHeaders(headers);
-}
-
-function handleState(state: string | null) {
-  let returnPathname: string | undefined = undefined;
-  let userState: string | undefined;
-  if (state?.includes('.')) {
-    const [internal, ...rest] = state.split('.');
-    userState = rest.join('.');
-    try {
-      // Reverse URL-safe base64 encoding
-      const decoded = internal.replace(/-/g, '+').replace(/_/g, '/');
-      returnPathname = JSON.parse(atob(decoded)).returnPathname;
-    } catch {
-      // Malformed internal part, ignore it
-    }
-  } else if (state) {
-    try {
-      const decoded = JSON.parse(atob(state));
-      if (decoded.returnPathname) {
-        returnPathname = decoded.returnPathname;
-      } else {
-        userState = state;
-      }
-    } catch {
-      userState = state;
-    }
-  }
-  return {
-    returnPathname,
-    state: userState,
-  };
 }
 
 export function handleAuth(options: HandleAuthOptions = {}) {
@@ -54,84 +28,138 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   }
 
   return async function GET(request: NextRequest) {
-    const code = request.nextUrl.searchParams.get('code');
-    const state = request.nextUrl.searchParams.get('state');
+    // Fall back to standard URL parsing when nextUrl is not available (e.g., vinext)
+    const requestUrl = request.nextUrl ?? new URL(request.url);
 
-    const { state: customState, returnPathname: returnPathnameState } = handleState(state);
+    // Gather mandatory information
+    const code = requestUrl.searchParams.get('code');
+    const state = requestUrl.searchParams.get('state');
 
-    if (code) {
-      try {
-        // Use the code returned to us by AuthKit and authenticate the user with WorkOS
-        const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
-          await getWorkOS().userManagement.authenticateWithCode({
-            clientId: WORKOS_CLIENT_ID,
-            code,
-          });
+    // Attribution for thrown errors: which request failed and what it carried,
+    // with param values omitted since `code` is a live credential.
+    const errorContext = {
+      path: requestUrl.pathname,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+      hasCode: code !== null,
+      hasState: state !== null,
+    };
 
-        // If baseURL is provided, use it instead of request.nextUrl
-        // This is useful if the app is being run in a container like docker where
-        // the hostname can be different from the one in the request
-        const url = baseURL ? new URL(baseURL) : request.nextUrl.clone();
-
-        // Cleanup params
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-
-        // Redirect to the requested path and store the session
-        const returnPathname = returnPathnameState ?? returnPathnameOption;
-
-        // Extract the search params if they are present
-        if (returnPathname.includes('?')) {
-          const newUrl = new URL(returnPathname, 'https://example.com');
-          url.pathname = newUrl.pathname;
-
-          for (const [key, value] of newUrl.searchParams) {
-            url.searchParams.append(key, value);
-          }
-        } else {
-          url.pathname = returnPathname;
-        }
-
-        // Fall back to standard Response if NextResponse is not available.
-        // This is to support Next.js 13.
-        const response = redirectWithFallback(url.toString());
-        preventCaching(response.headers);
-
-        if (!accessToken || !refreshToken) throw new Error('response is missing tokens');
-
-        await saveSession({ accessToken, refreshToken, user, impersonator }, request);
-
-        if (onSuccess) {
-          try {
-            await onSuccess({
-              accessToken,
-              refreshToken,
-              user,
-              impersonator,
-              oauthTokens,
-              authenticationMethod,
-              organizationId,
-              state: customState,
-            });
-          } catch (error) {
-            deleteSession();
-            throw error;
-          }
-        }
-
-        return response;
-      } catch (error) {
-        const errorRes = {
-          error: error instanceof Error ? error.message : String(error),
-        };
-
-        console.error(errorRes);
-
-        return await errorResponse(request, error);
+    // We want to catch any & all errors and respond the same way, always
+    // destroying the 1-use PKCE cookie to prevent replay attacks or stale
+    // cookies affecting future auth attempts.
+    try {
+      if (!code || !state) {
+        throw new CallbackError('Missing required auth parameter', 'missing_auth_params', errorContext);
       }
-    }
 
-    return await errorResponse(request);
+      // Derive the flow-specific cookie name from the state param so each
+      // concurrent auth flow reads/deletes its own cookie, not a shared one.
+      // Fall back to the legacy shared cookie name so in-flight OAuth flows
+      // started on v3.0.x don't fail on the first callback after upgrade.
+      // Safe to remove once v3.0.x is unsupported.
+      const pkceCookieName = getPKCECookieNameForState(state);
+      const pkceCookie = request.cookies.get(pkceCookieName)?.value ?? request.cookies.get(PKCE_COOKIE_NAME)?.value;
+
+      // CSRF verification: both channels (cookie + URL state) must be present and match
+      if (!pkceCookie) {
+        throw new CallbackError(
+          'Sign-in session could not be verified. Please try signing in again.',
+          'missing_pkce_cookie',
+          errorContext,
+        );
+      }
+
+      if (state !== pkceCookie) {
+        throw new CallbackError('OAuth state mismatch', 'oauth_state_mismatch', errorContext);
+      }
+
+      const {
+        codeVerifier,
+        customState,
+        returnPathname: returnPathnameState,
+      } = await getStateFromPKCECookieValue(pkceCookie);
+
+      // Use the code returned to us by AuthKit and authenticate the user with WorkOS
+      const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
+        await getWorkOS().userManagement.authenticateWithCode({
+          clientId: WORKOS_CLIENT_ID,
+          code,
+          codeVerifier,
+        });
+
+      if (!accessToken || !refreshToken) {
+        throw new CallbackError('response is missing tokens', 'missing_tokens', errorContext);
+      }
+
+      // If baseURL is provided, use it instead of request.nextUrl
+      // This is useful if the app is being run in a container like docker where
+      // the hostname can be different from the one in the request
+      const url = baseURL ? new URL(baseURL) : new URL(requestUrl.toString());
+
+      // Cleanup params
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+
+      // Redirect to the requested path and store the session
+      const returnPathname = returnPathnameState ?? returnPathnameOption;
+
+      // Extract pathname and search params from returnPathname
+      const parsedReturnUrl = new URL(returnPathname, 'https://placeholder.com');
+      url.pathname = parsedReturnUrl.pathname;
+      url.search = parsedReturnUrl.search;
+
+      // Fall back to standard Response if NextResponse is not available.
+      // This is to support Next.js 13.
+      const response = redirectWithFallback(url.toString());
+      preventCaching(response.headers);
+
+      // Always delete the PKCE cookie after handling the callback, regardless of success or error
+      // to avoid stale cookies affecting future auth attempts & prevent replays
+      response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(request.url, true, true)}`);
+
+      await saveSession({ accessToken, refreshToken, user, impersonator, authenticationMethod }, request);
+
+      if (onSuccess) {
+        try {
+          await onSuccess({
+            accessToken,
+            refreshToken,
+            user,
+            impersonator,
+            oauthTokens,
+            authenticationMethod,
+            organizationId,
+            state: customState,
+          });
+        } catch (error) {
+          // Next redirects are control flow, not callback failures. Preserve the
+          // session when onError rethrows them for Next to handle.
+          // Next validates unknown errors at runtime, but its declaration requires a RedirectError.
+          const redirectUrl = getURLFromRedirectError(error as Parameters<typeof getURLFromRedirectError>[0]);
+          if (redirectUrl === null) {
+            const nextCookies = await cookies();
+            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(request.url, false, true));
+          }
+          throw error;
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('[AuthKit callback error]', error);
+      const response = await errorResponse(request, error);
+
+      // Always delete the PKCE cookie after handling the callback, regardless of success or error
+      // to avoid stale cookies affecting future auth attempts & prevent replays
+      if (state) {
+        response.headers.append(
+          'Set-Cookie',
+          `${getPKCECookieNameForState(state)}=; ${getPKCECookieOptions(request.url, true, true)}`,
+        );
+      }
+
+      return response;
+    }
   };
 
   async function errorResponse(request: NextRequest, error?: unknown) {

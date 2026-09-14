@@ -1,5 +1,13 @@
 import { getAccessTokenAction, refreshAccessTokenAction } from '../actions.js';
+import type { RefreshAccessTokenActionResult } from '../actions.js';
 import { decodeJwt } from '../jwt.js';
+
+function unwrapRefreshResult(result: RefreshAccessTokenActionResult): string | undefined {
+  if (result.error) {
+    throw new Error(result.error);
+  }
+  return result.accessToken;
+}
 
 interface TokenState {
   token: string | undefined;
@@ -33,15 +41,14 @@ export class TokenStore {
       error: null,
     };
 
-    /* istanbul ignore next */
     if (initialToken) {
-      // Mark as consumed if we found a token
+      // Mark as consumed if we found a token. Refresh scheduling is deferred
+      // to the first subscriber: the store is constructed at module-evaluation
+      // time, before hydration, and a refresh timer that fires before Next.js
+      // initializes its router action queue makes the Server Action throw
+      // inside React's startTransition without ever settling the action
+      // promise — wedging refreshPromise for the rest of the page lifetime.
       this.fastCookieConsumed = true;
-      // Schedule refresh based on token expiry
-      const tokenData = this.parseToken(initialToken);
-      if (tokenData) {
-        this.scheduleRefresh(tokenData.timeUntilExpiry);
-      }
     }
   }
 
@@ -52,6 +59,17 @@ export class TokenStore {
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
+
+    // Unsubscribing the last listener clears the refresh timer, so restore it
+    // whenever the store goes from zero to one subscribers. Subscribers attach
+    // from effects, which run after hydration, so a timer scheduled here can
+    // never dispatch a Server Action before the router is ready.
+    if (this.listeners.size === 1 && !this.refreshTimeout) {
+      const tokenData = this.parseToken(this.state.token);
+      if (tokenData) {
+        this.scheduleRefresh(tokenData.timeUntilExpiry);
+      }
+    }
     return () => {
       this.listeners.delete(listener);
       if (this.listeners.size === 0 && this.refreshTimeout) {
@@ -323,7 +341,7 @@ export class TokenStore {
 
         if (!silent) {
           // Manual refresh - always force refresh
-          token = await refreshAccessTokenAction();
+          token = unwrapRefreshResult(await refreshAccessTokenAction());
         } else {
           // Silent refresh - only fetch from server if we don't have a local token
           if (!previousToken) {
@@ -342,14 +360,14 @@ export class TokenStore {
 
             // If the token from server is expiring, refresh it
             if (!token || (tokenData && tokenData.isExpiring)) {
-              const refreshedToken = await refreshAccessTokenAction();
+              const refreshedToken = unwrapRefreshResult(await refreshAccessTokenAction());
               if (refreshedToken) {
                 token = refreshedToken;
               }
             }
           } else {
             // We have a local token that needs refreshing (already checked by getAccessTokenSilently)
-            token = await refreshAccessTokenAction();
+            token = unwrapRefreshResult(await refreshAccessTokenAction());
           }
         }
 

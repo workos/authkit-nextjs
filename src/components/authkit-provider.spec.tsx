@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -10,17 +11,17 @@ import {
   switchToOrganizationAction,
 } from '../actions.js';
 
-jest.mock('../actions', () => ({
-  checkSessionAction: jest.fn(),
-  getAuthAction: jest.fn(),
-  refreshAuthAction: jest.fn(),
-  handleSignOutAction: jest.fn(),
-  switchToOrganizationAction: jest.fn(),
+vi.mock('../actions', () => ({
+  checkSessionAction: vi.fn(),
+  getAuthAction: vi.fn(),
+  refreshAuthAction: vi.fn(),
+  handleSignOutAction: vi.fn(),
+  switchToOrganizationAction: vi.fn(),
 }));
 
 describe('AuthKitProvider', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should render children', async () => {
@@ -35,8 +36,125 @@ describe('AuthKitProvider', () => {
     expect(getByText('Test Child')).toBeInTheDocument();
   });
 
+  it('should skip initial getAuthAction call when initialAuth is provided', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        name: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        lastSignInAt: '2024-01-01T00:00:00Z',
+        externalId: null,
+        locale: 'en-US',
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read', 'write'],
+      entitlements: ['feature1'],
+      featureFlags: ['test-flag'],
+      impersonator: undefined,
+    };
+
+    render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <div>Test Child</div>
+      </AuthKitProvider>,
+    );
+
+    // Wait a bit to ensure no call is made
+    await waitFor(
+      () => {
+        expect(getAuthAction).not.toHaveBeenCalled();
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it('should initialize state with initialAuth values', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        name: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        lastSignInAt: '2024-01-01T00:00:00Z',
+        locale: 'en-US',
+        externalId: null,
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read', 'write'],
+      entitlements: ['feature1'],
+      featureFlags: ['test-flag'],
+      impersonator: { email: 'admin@example.com', reason: 'Support request' },
+    };
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="loading">{auth.loading.toString()}</div>
+          <div data-testid="email">{auth.user?.email}</div>
+          <div data-testid="session">{auth.sessionId}</div>
+          <div data-testid="org">{auth.organizationId}</div>
+          <div data-testid="role">{auth.role}</div>
+          <div data-testid="impersonator">{auth.impersonator?.email}</div>
+        </div>
+      );
+    };
+
+    const { getByTestId } = render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    // Should not be loading when initialAuth is provided
+    expect(getByTestId('loading')).toHaveTextContent('false');
+    expect(getByTestId('email')).toHaveTextContent('test@example.com');
+    expect(getByTestId('session')).toHaveTextContent('test-session');
+    expect(getByTestId('org')).toHaveTextContent('test-org');
+    expect(getByTestId('role')).toHaveTextContent('admin');
+    expect(getByTestId('impersonator')).toHaveTextContent('admin@example.com');
+  });
+
+  it('should call getAuthAction when initialAuth is not provided', async () => {
+    (getAuthAction as Mock).mockResolvedValueOnce({
+      user: { email: 'test@example.com' },
+      sessionId: 'test-session',
+    });
+
+    render(
+      <AuthKitProvider>
+        <div>Test Child</div>
+      </AuthKitProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getAuthAction).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('should do nothing if onSessionExpired is false', async () => {
-    jest.spyOn(window, 'addEventListener');
+    vi.spyOn(window, 'addEventListener');
 
     await act(async () => {
       render(
@@ -51,8 +169,8 @@ describe('AuthKitProvider', () => {
   });
 
   it('should call onSessionExpired when session is expired', async () => {
-    (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
-    const onSessionExpired = jest.fn();
+    (checkSessionAction as Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
+    const onSessionExpired = vi.fn();
 
     render(
       <AuthKitProvider onSessionExpired={onSessionExpired}>
@@ -71,8 +189,8 @@ describe('AuthKitProvider', () => {
   });
 
   it('should only call onSessionExpired once if multiple visibility changes occur', async () => {
-    (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
-    const onSessionExpired = jest.fn();
+    (checkSessionAction as Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
+    const onSessionExpired = vi.fn();
 
     render(
       <AuthKitProvider onSessionExpired={onSessionExpired}>
@@ -92,9 +210,9 @@ describe('AuthKitProvider', () => {
   });
 
   it('should pass through if checkSessionAction does not throw "Failed to fetch"', async () => {
-    (checkSessionAction as jest.Mock).mockResolvedValueOnce(false);
+    (checkSessionAction as Mock).mockResolvedValueOnce(false);
 
-    const onSessionExpired = jest.fn();
+    const onSessionExpired = vi.fn();
 
     render(
       <AuthKitProvider onSessionExpired={onSessionExpired}>
@@ -112,74 +230,73 @@ describe('AuthKitProvider', () => {
     });
   });
 
-  it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
-    (checkSessionAction as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
+  describe('window.location.reload behavior', () => {
+    let originalLocationDescriptor: PropertyDescriptor | undefined;
 
-    const originalLocation = window.location;
-
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
-
-    render(
-      <AuthKitProvider>
-        <div>Test Child</div>
-      </AuthKitProvider>,
-    );
-
-    act(() => {
-      // Simulate visibility change
-      window.dispatchEvent(new Event('visibilitychange'));
+    beforeEach(() => {
+      originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { reload: vi.fn() },
+      });
     });
 
-    await waitFor(() => {
-      expect(window.location.reload).toHaveBeenCalled();
+    afterEach(() => {
+      if (originalLocationDescriptor) {
+        Object.defineProperty(window, 'location', originalLocationDescriptor);
+      }
     });
 
-    // Restore original reload function
-    window.location = originalLocation;
-  });
+    it('should reload the page when session is expired and no onSessionExpired handler is provided', async () => {
+      (checkSessionAction as Mock).mockRejectedValueOnce(new Error('Failed to fetch'));
 
-  it('should not call onSessionExpired or reload the page if session is valid', async () => {
-    (checkSessionAction as jest.Mock).mockResolvedValueOnce(true);
-    const onSessionExpired = jest.fn();
+      render(
+        <AuthKitProvider>
+          <div>Test Child</div>
+        </AuthKitProvider>,
+      );
 
-    const originalLocation = window.location;
+      act(() => {
+        // Simulate visibility change
+        window.dispatchEvent(new Event('visibilitychange'));
+      });
 
-    // @ts-expect-error - we're deleting the property to test the mock
-    delete window.location;
-
-    window.location = { ...window.location, reload: jest.fn() };
-
-    render(
-      <AuthKitProvider onSessionExpired={onSessionExpired}>
-        <div>Test Child</div>
-      </AuthKitProvider>,
-    );
-
-    act(() => {
-      // Simulate visibility change
-      window.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => {
+        expect(window.location.reload).toHaveBeenCalled();
+      });
     });
 
-    await waitFor(() => {
-      expect(onSessionExpired).not.toHaveBeenCalled();
-      expect(window.location.reload).not.toHaveBeenCalled();
-    });
+    it('should not call onSessionExpired or reload the page if session is valid', async () => {
+      (checkSessionAction as Mock).mockResolvedValueOnce(true);
+      const onSessionExpired = vi.fn();
 
-    window.location = originalLocation;
+      render(
+        <AuthKitProvider onSessionExpired={onSessionExpired}>
+          <div>Test Child</div>
+        </AuthKitProvider>,
+      );
+
+      act(() => {
+        // Simulate visibility change
+        window.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => {
+        expect(onSessionExpired).not.toHaveBeenCalled();
+        expect(window.location.reload).not.toHaveBeenCalled();
+      });
+    });
   });
 });
 
 describe('useAuth', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should call getAuth when a user is not returned when ensureSignedIn is true', async () => {
     // First and second calls return no user, second call returns a user
-    (getAuthAction as jest.Mock)
+    (getAuthAction as Mock)
       .mockResolvedValueOnce({ user: null, loading: true })
       .mockResolvedValueOnce({ user: { email: 'test@example.com' }, loading: false });
 
@@ -201,6 +318,85 @@ describe('useAuth', () => {
     });
   });
 
+  describe('client-side redirect for ensureSignedIn', () => {
+    let originalLocationDescriptor: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { href: '' },
+      });
+    });
+
+    afterEach(() => {
+      if (originalLocationDescriptor) {
+        Object.defineProperty(window, 'location', originalLocationDescriptor);
+      }
+    });
+
+    it('should redirect via window.location.href when getAuthAction returns signInUrl', async () => {
+      // First call (initial load): no user, no signInUrl
+      // Second call (ensureSignedIn triggered): no user, signInUrl returned
+      (getAuthAction as Mock)
+        .mockResolvedValueOnce({ user: null })
+        .mockResolvedValueOnce({ user: null, signInUrl: 'https://api.workos.com/authorize?client_id=test' });
+
+      const TestComponent = () => {
+        const auth = useAuth({ ensureSignedIn: true });
+        return <div data-testid="loading">{auth.loading.toString()}</div>;
+      };
+
+      render(
+        <AuthKitProvider>
+          <TestComponent />
+        </AuthKitProvider>,
+      );
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://api.workos.com/authorize?client_id=test');
+      });
+    });
+
+    it('should redirect via window.location.href when refreshAuthAction returns signInUrl', async () => {
+      (getAuthAction as Mock).mockResolvedValueOnce({
+        user: { email: 'test@example.com' },
+        sessionId: 'test-session',
+      });
+      (refreshAuthAction as Mock).mockResolvedValueOnce({
+        user: null,
+        signInUrl: 'https://api.workos.com/authorize?client_id=refresh_test',
+      });
+
+      const TestComponent = () => {
+        const auth = useAuth();
+        return (
+          <div>
+            <button onClick={() => auth.refreshAuth({ ensureSignedIn: true })}>Refresh</button>
+          </div>
+        );
+      };
+
+      const { getByRole } = render(
+        <AuthKitProvider>
+          <TestComponent />
+        </AuthKitProvider>,
+      );
+
+      await waitFor(() => {
+        expect(getAuthAction).toHaveBeenCalledTimes(1);
+      });
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://api.workos.com/authorize?client_id=refresh_test');
+      });
+    });
+  });
+
   it('should throw error when used outside of AuthKitProvider', () => {
     const TestComponent = () => {
       const auth = useAuth();
@@ -208,7 +404,7 @@ describe('useAuth', () => {
     };
 
     // Suppress console.error for this test since we expect an error
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(() => {
       render(<TestComponent />);
@@ -218,7 +414,7 @@ describe('useAuth', () => {
   });
 
   it('should provide auth context values when used within AuthKitProvider', async () => {
-    (getAuthAction as jest.Mock).mockResolvedValueOnce({
+    (getAuthAction as Mock).mockResolvedValueOnce({
       user: { email: 'test@example.com' },
       sessionId: 'test-session',
       organizationId: 'test-org',
@@ -266,8 +462,8 @@ describe('useAuth', () => {
       sessionId: 'test-session',
     };
 
-    (getAuthAction as jest.Mock).mockResolvedValueOnce(mockAuth);
-    (refreshAuthAction as jest.Mock).mockResolvedValueOnce({
+    (getAuthAction as Mock).mockResolvedValueOnce(mockAuth);
+    (refreshAuthAction as Mock).mockResolvedValueOnce({
       ...mockAuth,
       sessionId: 'new-session',
     });
@@ -309,10 +505,10 @@ describe('useAuth', () => {
       organizationId: 'new-org',
     };
 
-    (getAuthAction as jest.Mock)
+    (getAuthAction as Mock)
       .mockResolvedValue(mockAuth)
       .mockResolvedValueOnce({ ...mockAuth, organizationId: 'old-org' });
-    (switchToOrganizationAction as jest.Mock).mockResolvedValueOnce(mockAuth);
+    (switchToOrganizationAction as Mock).mockResolvedValueOnce(mockAuth);
 
     const TestComponent = () => {
       const auth = useAuth();
@@ -345,7 +541,7 @@ describe('useAuth', () => {
   });
 
   it('should receive an error when refreshAuth fails with an error', async () => {
-    (refreshAuthAction as jest.Mock).mockRejectedValueOnce(new Error('Refresh failed'));
+    (refreshAuthAction as Mock).mockRejectedValueOnce(new Error('Refresh failed'));
 
     let error: string | undefined;
 
@@ -382,7 +578,7 @@ describe('useAuth', () => {
   });
 
   it('should receive an error when refreshAuth fails with a string error', async () => {
-    (refreshAuthAction as jest.Mock).mockRejectedValueOnce('Refresh failed');
+    (refreshAuthAction as Mock).mockRejectedValueOnce('Refresh failed');
 
     let error: string | undefined;
 
@@ -419,7 +615,7 @@ describe('useAuth', () => {
   });
 
   it('should call handleSignOutAction when signOut is called', async () => {
-    (handleSignOutAction as jest.Mock).mockResolvedValueOnce({});
+    (handleSignOutAction as Mock).mockResolvedValueOnce({});
 
     const TestComponent = () => {
       const auth = useAuth();
@@ -445,7 +641,7 @@ describe('useAuth', () => {
   });
 
   it('should pass returnTo parameter to handleSignOutAction', async () => {
-    (handleSignOutAction as jest.Mock).mockResolvedValueOnce({});
+    (handleSignOutAction as Mock).mockResolvedValueOnce({});
 
     const TestComponent = () => {
       const auth = useAuth();

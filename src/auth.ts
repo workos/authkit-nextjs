@@ -1,13 +1,14 @@
-'use server';
+import 'server-only';
 
 import { decodeJwt } from 'jose';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
-import { getCookieOptions } from './cookie.js';
+import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
-import type { AccessToken, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import type { AccessToken, GetAuthURLOptions, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
+import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
 import { getSessionFromCookie, refreshSession, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
 
@@ -20,36 +21,31 @@ function revalidateTagCompat(tag: string): void {
   return fn(tag, 'max');
 }
 
-export async function getSignInUrl({
-  organizationId,
-  loginHint,
-  redirectUri,
-  prompt,
-  state,
-}: {
-  organizationId?: string;
-  loginHint?: string;
-  redirectUri?: string;
-  prompt?: 'consent';
-  state?: string;
-} = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-in', loginHint, redirectUri, prompt, state });
+async function getAuthURLAndSetPKCECookie(options: GetAuthURLOptions): Promise<string> {
+  const { url, sealedState } = await getAuthorizationUrl(options);
+  await setPKCECookie(sealedState);
+
+  return url;
 }
 
-export async function getSignUpUrl({
-  organizationId,
-  loginHint,
-  redirectUri,
-  prompt,
-  state,
-}: {
-  organizationId?: string;
-  loginHint?: string;
-  redirectUri?: string;
-  prompt?: 'consent';
-  state?: string;
-} = {}) {
-  return getAuthorizationUrl({ organizationId, screenHint: 'sign-up', loginHint, redirectUri, prompt, state });
+type GetSignUrlOptions = Omit<GetAuthURLOptions, 'screenHint' | 'returnPathname'> & {
+  returnTo?: string;
+};
+
+export async function getSignInUrl(authUrlOptions: GetSignUrlOptions = {}) {
+  return getAuthURLAndSetPKCECookie({
+    ...authUrlOptions,
+    returnPathname: authUrlOptions.returnTo,
+    screenHint: 'sign-in',
+  });
+}
+
+export async function getSignUpUrl(authUrlOptions: GetSignUrlOptions = {}) {
+  return getAuthURLAndSetPKCECookie({
+    ...authUrlOptions,
+    returnPathname: authUrlOptions.returnTo,
+    screenHint: 'sign-up',
+  });
 }
 
 /**
@@ -77,7 +73,30 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
     const { domain, path, sameSite, secure } = getCookieOptions();
-    nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
+    try {
+      nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
+    } catch {
+      // Some environments (e.g., vinext) only accept a string cookie name
+      nextCookies.delete(cookieName);
+    }
+
+    // Clear any lingering PKCE verifier cookies so orphans from abandoned
+    // flows don't accumulate toward HTTP 431 or confuse future sign-ins.
+    const pkceOptions = getPKCECookieOptions();
+    for (const { name } of nextCookies.getAll()) {
+      if (!name.startsWith(PKCE_COOKIE_NAME)) continue;
+      try {
+        nextCookies.delete({
+          name,
+          domain: pkceOptions.domain,
+          path: pkceOptions.path,
+          sameSite: pkceOptions.sameSite,
+          secure: pkceOptions.secure,
+        });
+      } catch {
+        nextCookies.delete(name);
+      }
+    }
 
     if (sessionId) {
       redirect(getWorkOS().userManagement.getLogoutUrl({ sessionId, returnTo }));
@@ -108,22 +127,25 @@ export async function switchToOrganization(
       redirect(cause.rawData.authkit_redirect_url);
     } else {
       if (cause?.error === 'sso_required' || cause?.error === 'mfa_enrollment') {
-        const url = await getAuthorizationUrl({ organizationId });
-        return redirect(url);
+        return redirect(await getAuthURLAndSetPKCECookie({ organizationId }));
       }
       throw error;
     }
   }
 
-  switch (revalidationStrategy) {
-    case 'path':
-      revalidatePath(pathname);
-      break;
-    case 'tag':
-      for (const tag of revalidationTags) {
-        revalidateTagCompat(tag);
-      }
-      break;
+  try {
+    switch (revalidationStrategy) {
+      case 'path':
+        revalidatePath(pathname);
+        break;
+      case 'tag':
+        for (const tag of revalidationTags) {
+          revalidateTagCompat(tag);
+        }
+        break;
+    }
+  } catch {
+    // revalidatePath/revalidateTag may not be available in non-Next.js environments (e.g., vinext)
   }
   if (revalidationStrategy !== 'none') {
     redirect(pathname);

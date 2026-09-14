@@ -6,6 +6,9 @@ on:
       - 'main'
   pull_request: {}
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -16,29 +19,38 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [18, 20, 22]
+        node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Configure Socket Firewall
+        uses: workos/setup-socket-firewall@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1
+        with:
+          token: ${{ secrets.PUBLIC_SOCKET_FIREWALL_TOKEN }}
+          allow-external-fork-fallback: true
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ matrix.node }}
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        run: |
-          npm install
+        run: pnpm install
 
-      - name: Prettier
-        run: |
-          npm run prettier
+      - name: Format Check
+        run: pnpm run format:check
 
       - name: Lint
-        run: |
-          npm run lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
 
       - name: Build
-        run: |
-          npm run build
+        run: pnpm run build
 
       - name: Test
-        run: |
-          npm run test -- --coverage
+        run: pnpm run test

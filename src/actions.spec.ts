@@ -8,31 +8,50 @@ import {
   getAccessTokenAction,
   refreshAccessTokenAction,
 } from '../src/actions.js';
-import { signOut, switchToOrganization } from './auth.js';
+import { getSignInUrl, signOut, switchToOrganization } from './auth.js';
 import { getWorkOS } from '../src/workos.js';
 import { withAuth, refreshSession } from '../src/session.js';
 
-jest.mock('../src/auth.js', () => ({
-  signOut: jest.fn().mockResolvedValue(true),
-  switchToOrganization: jest.fn().mockResolvedValue({ organizationId: 'org_123' }),
+vi.mock('../src/auth.js', () => ({
+  getSignInUrl: vi.fn().mockResolvedValue('https://api.workos.com/authorize?...'),
+  signOut: vi.fn().mockResolvedValue(true),
+  switchToOrganization: vi.fn().mockResolvedValue({ organizationId: 'org_123' }),
 }));
 
-const fakeWorkosInstance = {
-  organizations: {
-    getOrganization: jest.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
+const { fakeWorkosInstance } = vi.hoisted(() => ({
+  fakeWorkosInstance: {
+    organizations: {
+      getOrganization: vi.fn().mockResolvedValue({ id: 'org_123', name: 'Test Org' }),
+    },
   },
-};
-jest.mock('../src/workos.js', () => ({
-  getWorkOS: jest.fn(() => fakeWorkosInstance),
+}));
+vi.mock('../src/workos.js', () => ({
+  getWorkOS: vi.fn(() => fakeWorkosInstance),
 }));
 
-jest.mock('../src/session.js', () => ({
-  withAuth: jest.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
-  refreshSession: jest.fn().mockResolvedValue({ session: 'newSession', accessToken: 'refreshed_token' }),
+vi.mock('../src/session.js', () => ({
+  withAuth: vi.fn().mockResolvedValue({ user: 'testUser', accessToken: 'access_token' }),
+  refreshSession: vi.fn().mockResolvedValue({ user: 'testUser', accessToken: 'refreshed_token' }),
 }));
 
 describe('actions', () => {
   const workos = getWorkOS();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Restore default mock implementations
+    vi.mocked(withAuth).mockResolvedValue({
+      user: 'testUser' as never,
+      sessionId: 'session_123',
+      accessToken: 'access_token',
+    });
+    vi.mocked(refreshSession).mockResolvedValue({
+      user: 'testUser' as never,
+      sessionId: 'session_123',
+      accessToken: 'refreshed_token',
+    });
+  });
+
   describe('checkSessionAction', () => {
     it('should return true for authenticated users', async () => {
       const result = await checkSessionAction();
@@ -48,10 +67,60 @@ describe('actions', () => {
   });
 
   describe('getOrganizationAction', () => {
-    it('should return organization details', async () => {
-      const organizationId = 'org_123';
-      const result = await getOrganizationAction(organizationId);
-      expect(workos.organizations.getOrganization).toHaveBeenCalledWith(organizationId);
+    it('should return organization details for the current session organization', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      const result = await getOrganizationAction('org_123');
+      expect(workos.organizations.getOrganization).toHaveBeenCalledWith('org_123');
+      expect(result).toEqual({ id: 'org_123', name: 'Test Org' });
+    });
+
+    it('denies fetching an organization the user is not authenticated within', async () => {
+      // Session is scoped to org_123; the caller requests a different org.
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      const result = await getOrganizationAction('org_456');
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
+    it('returns null when there is no authenticated user', async () => {
+      vi.mocked(withAuth).mockResolvedValue({ user: null } as never);
+      const result = await getOrganizationAction('org_123');
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
+    it('returns only id and name, never the full organization object', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+        organizationId: 'org_123',
+      });
+      vi.mocked(workos.organizations.getOrganization).mockResolvedValueOnce({
+        object: 'organization',
+        id: 'org_123',
+        name: 'Test Org',
+        allowProfilesOutsideOrganization: false,
+        domains: [],
+        stripeCustomerId: 'cus_should_not_leak',
+        externalId: 'ext_should_not_leak',
+        metadata: { secret: 'should_not_leak' },
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      } as never);
+
+      const result = await getOrganizationAction('org_123');
+
       expect(result).toEqual({ id: 'org_123', name: 'Test Org' });
     });
   });
@@ -60,16 +129,52 @@ describe('actions', () => {
     it('should return auth details', async () => {
       const result = await getAuthAction();
       expect(withAuth).toHaveBeenCalled();
-      expect(result).toEqual({ user: 'testUser' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
+    });
+
+    it('should not pass ensureSignedIn to withAuth', async () => {
+      await getAuthAction({ ensureSignedIn: true });
+      expect(withAuth).toHaveBeenCalledWith();
+    });
+
+    it('should return signInUrl when ensureSignedIn is true and no user', async () => {
+      vi.mocked(withAuth).mockResolvedValueOnce({ user: null });
+      const result = await getAuthAction({ ensureSignedIn: true });
+      expect(getSignInUrl).toHaveBeenCalled();
+      expect(result).toEqual({ user: null, signInUrl: 'https://api.workos.com/authorize?...' });
+    });
+
+    it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
+      const result = await getAuthAction({ ensureSignedIn: true });
+      expect(getSignInUrl).not.toHaveBeenCalled();
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });
 
   describe('refreshAuthAction', () => {
     it('should refresh session', async () => {
-      const params = { ensureSignedIn: true, organizationId: 'org_123' };
+      const params = { ensureSignedIn: false, organizationId: 'org_123' };
       const result = await refreshAuthAction(params);
-      expect(refreshSession).toHaveBeenCalledWith(params);
-      expect(result).toEqual({ session: 'newSession' });
+      expect(refreshSession).toHaveBeenCalledWith({ organizationId: 'org_123' });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
+    });
+
+    it('should not pass ensureSignedIn to refreshSession', async () => {
+      await refreshAuthAction({ ensureSignedIn: true, organizationId: 'org_123' });
+      expect(refreshSession).toHaveBeenCalledWith({ organizationId: 'org_123' });
+    });
+
+    it('should return signInUrl when ensureSignedIn is true and no user', async () => {
+      vi.mocked(refreshSession).mockResolvedValueOnce({ user: null });
+      const result = await refreshAuthAction({ ensureSignedIn: true });
+      expect(getSignInUrl).toHaveBeenCalled();
+      expect(result).toEqual({ user: null, signInUrl: 'https://api.workos.com/authorize?...' });
+    });
+
+    it('should not return signInUrl when ensureSignedIn is true and user exists', async () => {
+      const result = await refreshAuthAction({ ensureSignedIn: true });
+      expect(getSignInUrl).not.toHaveBeenCalled();
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
   });
 
@@ -94,7 +199,25 @@ describe('actions', () => {
     it('should refresh access token', async () => {
       const result = await refreshAccessTokenAction();
       expect(refreshSession).toHaveBeenCalled();
-      expect(result).toEqual('refreshed_token');
+      expect(result).toEqual({ accessToken: 'refreshed_token' });
+    });
+
+    it('should catch errors and return a generic error instead of throwing', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(refreshSession).mockRejectedValueOnce(new Error('Rate limit exceeded'));
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'Failed to refresh access token' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to refresh access token:', 'Rate limit exceeded');
+      warnSpy.mockRestore();
+    });
+
+    it('should handle non-Error objects in catch', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(refreshSession).mockRejectedValueOnce('string error');
+      const result = await refreshAccessTokenAction();
+      expect(result).toEqual({ accessToken: undefined, error: 'Failed to refresh access token' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to refresh access token:', 'string error');
+      warnSpy.mockRestore();
     });
   });
 });

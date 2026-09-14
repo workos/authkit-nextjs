@@ -6,16 +6,16 @@ The AuthKit library for Next.js provides convenient helpers for authentication a
 
 ## Installation
 
-Install the package with:
+Install the package alongside the WorkOS Node SDK (a peer dependency):
 
 ```
-npm i @workos-inc/authkit-nextjs
+pnpm i @workos-inc/authkit-nextjs @workos-inc/node
 ```
 
 or
 
 ```
-yarn add @workos-inc/authkit-nextjs
+yarn add @workos-inc/authkit-nextjs @workos-inc/node
 ```
 
 ## Video tutorial
@@ -142,34 +142,72 @@ The `onSuccess` callback receives the following data:
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
-### Middleware / Proxy
+### Sign-in URL
 
-This library relies on Next.js middleware to provide session management for routes.
-
-**For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
-**For Next.js 16+:** Create a `proxy.ts` file in the root of your project.
-
-The code remains the same; only the filename changes:
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Sign-in URL](https://workos.com/docs/authkit/nextjs/2-configure-your-project/configure-a-redirect-uri#sign-in-url)** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
 
 ```ts
+// app/sign-in/route.ts (or app/login/route.ts)
+import { getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
+
+export const GET = async () => {
+  const signInUrl = await getSignInUrl();
+  return redirect(signInUrl);
+};
+```
+
+In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and set the **Sign-in URL** to match this route (e.g., `http://localhost:3000/sign-in`).
+
+> [!IMPORTANT]
+> The Sign-in URL is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
+
+### Proxy / Middleware
+
+This library relies on Next.js proxy (called "middleware" in Next.js ≤15) to provide session management for routes.
+
+**For Next.js 16+:** Create a `proxy.ts` file in the root of your project.
+**For Next.js ≤15:** Create a `middleware.ts` file in the root of your project.
+
+```ts
+// proxy.ts (Next.js 16+)
+import { authkitProxy } from '@workos-inc/authkit-nextjs';
+
+export default authkitProxy();
+
+// Match against pages that require auth
+export const config = { matcher: ['/', '/admin'] };
+```
+
+```ts
+// middleware.ts (Next.js ≤15)
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware();
 
 // Match against pages that require auth
-// Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
 
-The middleware can be configured with several options.
+> [!WARNING]
+> Using a catch-all matcher pattern can intercept static assets (CSS, images, fonts), causing styles to break—particularly with Tailwind CSS v4. If you need a broad matcher, exclude Next.js static paths:
+>
+> ```ts
+> export const config = {
+>   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+> };
+> ```
 
-| Option           | Default     | Description                                                                                                             |
-| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `redirectUri`    | `undefined` | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                  |
-| `middlewareAuth` | `undefined` | Used to configure middleware auth options. See [middleware auth](#middleware-auth) for more details.                    |
-| `debug`          | `false`     | Enables debug logs.                                                                                                     |
-| `signUpPaths`    | `[]`        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                            |
-| `eagerAuth`      | `false`     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details. |
+The proxy/middleware can be configured with several options.
+
+| Option                 | Default                                                     | Description                                                                                                                                                     |
+| ---------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redirectUri`          | `undefined`                                                 | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                                                          |
+| `middlewareAuth`       | `undefined`                                                 | Used to configure proxy/middleware auth options. See [middleware auth](#middleware-auth) for more details.                                                      |
+| `debug`                | `false`                                                     | Enables debug logs.                                                                                                                                             |
+| `signUpPaths`          | `[]`                                                        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                                                                    |
+| `eagerAuth`            | `false`                                                     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details.                                         |
+| `refreshBufferSeconds` | `60` (`30` for tokens with a lifetime of 5 minutes or less) | Seconds before access token expiry at which the session is proactively refreshed. See [proactive session refresh](#proactive-session-refresh) for more details. |
 
 #### Custom redirect URI
 
@@ -183,11 +221,122 @@ export default authkitMiddleware({
 });
 
 // Match against pages that require auth
-// Leave this out if you want auth on every resource (including images, css etc.)
 export const config = { matcher: ['/', '/admin'] };
 ```
 
 Custom redirect URIs will be used over a redirect URI configured in the environment variables.
+
+#### Composable proxy/middleware
+
+If you need to combine AuthKit with other proxy logic (rate limiting, redirects, etc.), use the `authkit()` function with `handleAuthkitHeaders()` helper:
+
+```ts
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
+import { NextRequest } from 'next/server';
+import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs';
+
+export default async function proxy(request: NextRequest) {
+  // For Next.js ≤15, use: export default async function middleware(request: NextRequest) {
+  // Get session, headers, and the WorkOS authorization URL for sign-in redirects
+  const { session, headers, authorizationUrl } = await authkit(request);
+
+  const { pathname } = request.nextUrl;
+
+  // Redirect unauthenticated users on protected routes
+  if (pathname.startsWith('/app') && !session.user && authorizationUrl) {
+    return handleAuthkitHeaders(request, headers, { redirect: authorizationUrl });
+  }
+
+  // Custom redirects (relative URLs supported)
+  if (pathname === '/old-path') {
+    return handleAuthkitHeaders(request, headers, { redirect: '/new-path' });
+  }
+
+  // Continue request with properly merged headers
+  return handleAuthkitHeaders(request, headers);
+}
+
+export const config = { matcher: ['/', '/app/:path*'] };
+```
+
+> [!IMPORTANT]
+> Always use `handleAuthkitHeaders()` when returning a response. This helper ensures:
+>
+> - AuthKit headers are properly passed to your pages (so `withAuth()` works)
+> - Internal headers (session data, URLs) are never leaked to the browser
+> - Only safe response headers (`Set-Cookie`, `Cache-Control`, `Vary`) are forwarded
+> - `Cache-Control: no-store` is automatically set when cookies are present
+> - `Vary` headers are properly merged when multiple values exist
+> - Relative redirect URLs are automatically normalized to absolute URLs
+> - POST/PUT redirects use 303 status to prevent form resubmission
+
+> [!NOTE]
+> The `redirect` option should only be used with trusted values (e.g., `authorizationUrl` from `authkit()` or hardcoded paths). Never pass user-controlled input directly to `redirect` without validation, as this could enable open redirect attacks.
+
+##### Redirect options
+
+```ts
+handleAuthkitHeaders(request, headers, {
+  redirect: '/login', // URL to redirect to (string or URL object)
+  redirectStatus: 307, // 302 | 303 | 307 | 308 (default: 307 for GET, 303 for POST)
+});
+```
+
+##### Advanced: Composing with rewrites
+
+For advanced use cases like rewrites, use the lower-level `partitionAuthkitHeaders()` and `applyResponseHeaders()`:
+
+```ts
+// proxy.ts (Next.js 16+) or middleware.ts (Next.js ≤15)
+import { NextRequest, NextResponse } from 'next/server';
+import { authkit, partitionAuthkitHeaders, applyResponseHeaders } from '@workos-inc/authkit-nextjs';
+
+export default async function proxy(request: NextRequest) {
+  // For Next.js ≤15, use: export default async function middleware(request: NextRequest) {
+  const { headers } = await authkit(request);
+  const { requestHeaders, responseHeaders } = partitionAuthkitHeaders(request, headers);
+
+  // Create your own response (rewrite, etc.)
+  const response = NextResponse.rewrite(new URL('/app/dashboard', request.url), {
+    request: { headers: requestHeaders },
+  });
+
+  // Apply AuthKit response headers (Set-Cookie, etc.)
+  applyResponseHeaders(response, responseHeaders);
+
+  return response;
+}
+```
+
+##### Internal headers reference
+
+AuthKit uses internal headers to pass data between proxy/middleware and server components. These are automatically handled by the helpers above, but understanding them helps with debugging.
+
+**Request headers** (passed to server components, never sent to browser):
+
+| Header                | Purpose                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `x-workos-middleware` | Flag indicating AuthKit proxy/middleware is active. Required for `withAuth()` to function. |
+| `x-workos-session`    | Encrypted session data. Contains user info, access token, and refresh token.               |
+| `x-url`               | Current request URL. Used for redirect-after-login and generating sign-in URLs.            |
+| `x-redirect-uri`      | OAuth callback URI. Used by `getAuthorizationUrl()` for the OAuth flow.                    |
+| `x-sign-up-paths`     | Paths configured to trigger sign-up instead of sign-in flow.                               |
+
+> **Security:** These headers contain sensitive session data. The `handleAuthkitHeaders()` helper ensures they're forwarded to your pages (so `withAuth()` works) but never leaked to the browser. Client-injected `x-workos-*` headers are stripped and replaced with trusted values.
+
+**Response headers** (safe to send to browser):
+
+| Header               | Purpose                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `Set-Cookie`         | Session cookies (e.g., `wos-session`). Multiple cookies are properly appended.         |
+| `Cache-Control`      | Caching directives. Auto-set to `no-store` when cookies are present.                   |
+| `Vary`               | Cache variation keys. Values are deduplicated when merging.                            |
+| `WWW-Authenticate`   | Authentication challenge for 401 responses (API auth flows).                           |
+| `Proxy-Authenticate` | Authentication challenge for proxy auth.                                               |
+| `Link`               | Pagination, preload hints, etc.                                                        |
+| `x-middleware-cache` | Next.js proxy/middleware result caching. Set to `no-cache` to prevent stale responses. |
+
+Only these allowlisted headers are forwarded to the browser. Any other headers from `authkit()` (including future `x-workos-*` headers) are filtered out for security.
 
 ## Usage
 
@@ -203,6 +352,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AuthKitProvider>{children}</AuthKitProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+#### Optimizing with Server-Side Auth Data
+
+To avoid a server action call on mount, you can pass the initial auth data from the server to the `AuthKitProvider`.
+
+```jsx
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
+import { withAuth } from '@workos-inc/authkit-nextjs';
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Fetch auth data on the server
+  const auth = await withAuth();
+
+  // Remove the accessToken from the auth object as it is not needed on the client side
+  const { accessToken, ...initialAuth } = auth;
+
+  return (
+    <html lang="en">
+      <body>
+        <AuthKitProvider initialAuth={initialAuth}>{children}</AuthKitProvider>
       </body>
     </html>
   );
@@ -279,13 +453,51 @@ export default function MyComponent() {
 }
 ```
 
-### Get the enabled flags for the logged in user
+### Evaluate feature flags
 
-For situations where you need access to the authenticated user's currently active feature flags, use `withAuth` to retrieve the flags from the WorkOS session.
+There are two ways to evaluate feature flags with AuthKit Next.js:
+
+- Use the `feature_flags` access token claim when you want a simple session-scoped list of enabled flags for the signed-in user.
+- Use the Feature Flags runtime client when you want server-side evaluation without storing every active flag in the user's session cookie.
+
+#### Option 1: Use the `feature_flags` claim
+
+For situations where you need access to the authenticated user's currently active feature flags and your environment includes the `feature_flags` access token claim, use `withAuth` to retrieve the flags from the WorkOS session.
 
 ```jsx
 const { featureFlags } = await withAuth();
 ```
+
+This is convenient for small flag sets because the flags are available with the user's session. Flag changes appear the next time the user logs in or the session is refreshed.
+
+#### Option 2: Use the runtime client
+
+Use the runtime client when your application has many feature flags, when the `feature_flags` claim makes the access token too large, or when you need server-side flag evaluation that stays in sync independently of the user's session. The runtime client keeps flag configuration in memory and syncs changes in the background, so create one shared instance per server process rather than one client per request.
+
+```tsx
+import { getFeatureFlagsRuntimeClient, withAuth } from '@workos-inc/authkit-nextjs';
+
+const featureFlags = getFeatureFlagsRuntimeClient();
+
+export default async function DashboardPage() {
+  const { user, organizationId } = await withAuth({ ensureSignedIn: true });
+
+  try {
+    await featureFlags.waitUntilReady({ timeoutMs: 5000 });
+  } catch (error) {
+    console.error('Feature flags client failed to initialize:', error);
+  }
+
+  const enabled = featureFlags.isEnabled('advanced-analytics', {
+    userId: user.id,
+    organizationId,
+  });
+
+  return enabled ? <AdvancedAnalytics /> : <BasicAnalytics />;
+}
+```
+
+The `getFeatureFlagsRuntimeClient` helper returns the same runtime client for every call in the current server process. Options passed to `getFeatureFlagsRuntimeClient(options)` are only used when the client is created for the first time.
 
 ### Requiring auth
 
@@ -300,6 +512,51 @@ const { user, loading } = useAuth({ ensureSignedIn: true });
 ```
 
 Enabling `ensureSignedIn` will redirect users to AuthKit if they attempt to access the page without being authenticated.
+
+### Re-authentication
+
+For sensitive actions you may want to require that the user authenticated _recently_, not just that they have a session. Use `checkRecentAuth` to read the access token's `auth_time` claim and decide whether to force a re-authentication.
+
+`checkRecentAuth` returns data only and never redirects, so it's safe to call as the enforcement step inside a server action or server component. It **fails closed**: a session with no usable `auth_time` (or no signed-in user) is reported as `isStale: true`.
+
+```ts
+'use server';
+
+import { checkRecentAuth, getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { redirect } from 'next/navigation';
+
+export async function deleteAccount() {
+  // Require that the user authenticated within the last 5 minutes
+  const { isStale } = await checkRecentAuth({ maxAge: 300 });
+
+  if (isStale) {
+    // Send the user through re-authentication. Passing `maxAge` forwards the OIDC
+    // `max_age` parameter, so AuthKit forces a fresh login when the most recent
+    // authentication is older than `maxAge` seconds.
+    redirect(await getSignInUrl({ maxAge: 300 }));
+  }
+
+  // ...perform the sensitive action
+}
+```
+
+For client components, use the `useRecentAuth` hook to reflect recency in the UI. This is **presentation only** — always enforce recency on the server with `checkRecentAuth`.
+
+```tsx
+'use client';
+
+import { useRecentAuth } from '@workos-inc/authkit-nextjs/components';
+
+function SensitiveActionButton() {
+  const { loading, isStale } = useRecentAuth({ maxAge: 300 });
+
+  if (loading) {
+    return <button disabled>Loading…</button>;
+  }
+
+  return <button>{isStale ? 'Re-authenticate to continue' : 'Delete account'}</button>;
+}
+```
 
 ### Refreshing the session
 
@@ -478,16 +735,16 @@ const { session, headers } = await authkit(request, {
 });
 ```
 
-These callbacks provide a way to perform side effects when sessions are refreshed in the middleware. Common use cases include:
+These callbacks provide a way to perform side effects when sessions are refreshed in the proxy/middleware. Common use cases include:
 
 - Logging authentication events
 - Updating last activity timestamps
 - Triggering organization-specific data prefetching
 - Recording failed refresh attempts
 
-### Middleware auth
+### Proxy / Middleware auth
 
-The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use middleware auth instead:
+The default behavior of this library is to request authentication via the `withAuth` method on a per-page basis. There are some use cases where you don't want to call `withAuth` (e.g. you don't need user data for your page) or if you'd prefer a "secure by default" approach where every route defined in your proxy/middleware matcher is protected unless specified otherwise. In those cases you can opt-in to use `middlewareAuth` instead:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -514,7 +771,7 @@ The `eagerAuth` option enables synchronous access to authentication tokens on in
 
 #### How it works
 
-When `eagerAuth: true` is set, the middleware temporarily stores the access token in a short-lived cookie (30 seconds) that is:
+When `eagerAuth: true` is set, the proxy/middleware temporarily stores the access token in a short-lived cookie (30 seconds) that is:
 
 - Only set on initial page loads (not API or prefetch requests)
 - Immediately consumed and deleted by the client
@@ -522,7 +779,7 @@ When `eagerAuth: true` is set, the middleware temporarily stores the access toke
 
 #### Usage
 
-Enable eager auth in your middleware configuration:
+Enable eager auth in your proxy/middleware configuration:
 
 ```ts
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -542,16 +799,18 @@ import { useAccessToken } from '@workos-inc/authkit-nextjs/components';
 function MyComponent() {
   const { getAccessToken } = useAccessToken();
 
-  // Token is available immediately on initial page load
-  const token = getAccessToken();
+  async function handleClick() {
+    // Token is available immediately on initial page load
+    const token = await getAccessToken();
 
-  // Use with third-party services that need immediate token access
-  if (token) {
-    // Initialize your third-party client with the token
-    thirdPartyClient.authenticate(token);
+    // Use with third-party services that need immediate token access
+    if (token) {
+      // Initialize your third-party client with the token
+      thirdPartyClient.authenticate(token);
+    }
   }
 
-  return <div>...</div>;
+  return <button onClick={handleClick}>Authenticate</button>;
 }
 ```
 
@@ -576,61 +835,21 @@ Eager auth makes tokens briefly accessible via JavaScript (30-second window) to 
 - Most API calls where a brief loading state is acceptable
 - When you don't need immediate token access on page load
 
-### Composing middleware
+### Proactive session refresh
 
-> **Security note:** Always forward `request.headers` when returning `NextResponse.*` to mitigate SSRF issues in Next.js < 14.2.32 (14.x) or < 15.4.7 (15.x). This pattern is safe on all versions. We strongly recommend upgrading to the latest Next.js.
+The proxy/middleware proactively refreshes the session when the access token is within a buffer of its expiry, mirroring the buffer the client token store already uses: 60 seconds, or 30 seconds for tokens with a total lifetime of 5 minutes or less. This ensures a token handed to `withAuth()` and then to a server-side consumer (a Server Component fetch, an API call to a service that validates the token) cannot expire mid-request due to render latency, network round trips, or clock skew.
 
-If you don't want to use `authkitMiddleware` and instead want to compose your own middleware, you can use the `authkit` method. In this mode you are responsible to handling what to do when there's no session on a protected route.
-
-> **Note:** For Next.js 16+, name your file `proxy.ts` and the function `proxy` instead of `middleware`.
+Use the `refreshBufferSeconds` option to tune the buffer, or set it to `0` to disable proactive refresh and only refresh once the token has expired:
 
 ```ts
-export default async function middleware(request: NextRequest) {
-  // Perform logic before or after AuthKit
-
-  // Auth object contains the session, response headers and an authorization URL in the case that the session isn't valid
-  // This method will automatically handle setting the cookie and refreshing the session
-  const {
-    session,
-    headers: authkitHeaders,
-    authorizationUrl,
-  } = await authkit(request, {
-    debug: true,
-  });
-
-  const { pathname } = new URL(request.url);
-
-  // Control of what to do when there's no session on a protected route is left to the developer
-  if (pathname.startsWith('/account') && !session.user) {
-    console.log('No session on protected path');
-    return NextResponse.redirect(authorizationUrl);
-  }
-
-  // Forward the incoming request headers (mitigation) and pass AuthKit headers as request headers
-  const response = NextResponse.next({
-    request: { headers: authkitHeaders },
-  });
-
-  // Copy Set-Cookie and cache control headers to the response, but exclude the internal
-  // x-workos-session header which contains encrypted session data and should never appear
-  // in HTTP responses (it's only used to pass session data between middleware and page handlers)
-  for (const [key, value] of authkitHeaders) {
-    if (key.toLowerCase() === 'x-workos-session') {
-      continue; // Internal header - must not leak to response
-    }
-    if (key.toLowerCase() === 'set-cookie') {
-      response.headers.append(key, value);
-    } else {
-      response.headers.set(key, value);
-    }
-  }
-
-  return response;
-}
-
-// Match against the pages
-export const config = { matcher: ['/', '/account/:path*'] };
+export default authkitProxy({
+  refreshBufferSeconds: 120,
+});
 ```
+
+If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current access token, provided it is still valid at that point; the session is never destroyed while the access token remains valid. If the token expired during the failed refresh attempt, the session is cleared and the request is redirected to sign in, as with any expired session.
+
+Note that when several requests land inside the buffer window at the same time, only one wins the refresh; each of the others may pay a failed-refresh round trip to WorkOS before being served with the current token. This costs some added latency on those requests during the buffer window, but no user-visible failure.
 
 ### Signing out
 
@@ -646,6 +865,9 @@ await signOut({ returnTo: 'https://your-app.com/signed-out' });
 
 Render the `Impersonation` component in your app so that it is clear when someone is [impersonating a user](https://workos.com/docs/user-management/impersonation).
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
+
+> [!IMPORTANT]
+> Impersonation requires a configured **Sign-in URL** in your WorkOS dashboard. See the [Sign-in URL](#sign-in-url) setup instructions. Without it, impersonation from the WorkOS dashboard will fail with a `Missing required auth parameter` error.
 
 ```jsx
 import { Impersonation, AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
@@ -793,7 +1015,7 @@ The library automatically sets appropriate cache headers on all authenticated re
 - `Pragma: no-cache` - HTTP/1.0 compatibility
 - `Expires: 0` - HTTP/1.0 cache expiration
 - `Vary: Cookie` - Ensures CDNs differentiate between different users (defense-in-depth)
-- `x-middleware-cache: no-cache` - Prevents Next.js middleware result caching
+- `x-middleware-cache: no-cache` - Prevents Next.js proxy/middleware result caching
 
 These headers are applied automatically when:
 
@@ -809,7 +1031,7 @@ These headers are applied automatically when:
 
 ### Debugging
 
-To enable debug logs, initialize the middleware with the debug flag enabled.
+To enable debug logs, initialize the proxy/middleware with the debug flag enabled.
 
 ```js
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
@@ -817,7 +1039,34 @@ import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 export default authkitMiddleware({ debug: true });
 ```
 
+### Security
+
+#### PKCE and CSRF protection
+
+This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) and a sealed (encrypted) OAuth state parameter on every authorization request. The state contains a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/) and a code verifier for protection against authorization code interception. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
+
+> [!NOTE]
+> **Upgrading to v3:** PKCE is now always enabled. The `WORKOS_ENABLE_PKCE` environment variable is no longer needed and can be removed from your configuration.
+
+#### Cookie requirements
+
+The `wos-auth-verifier` cookie must survive the round-trip from sign-in initiation to the callback. On callback, the library verifies that the cookie is present and matches the URL `state` parameter — this two-channel check is what prevents CSRF attacks.
+
+If the cookie is missing or doesn't match, authentication will fail with one of:
+
+- `Sign-in session could not be verified` — the cookie was not sent back with the callback request. This typically happens when the session has expired or a reverse proxy or CDN strips `Set-Cookie` headers on redirects.
+- `OAuth state mismatch` — the cookie and URL `state` parameter don't match, indicating a possible CSRF attack or cookie corruption.
+
+> [!IMPORTANT]
+> **Upgrading to v3:** Previous versions would silently fall back to verifying only the URL `state` parameter when the cookie was missing. This fallback has been removed because it disabled CSRF protection. If you see `Sign-in session could not be verified` errors after upgrading, ensure that `Set-Cookie` headers are propagated on redirects between your application and the user's browser.
+
 ### Troubleshooting
+
+#### `Missing required auth parameter` when impersonating from the WorkOS dashboard
+
+This error occurs when WorkOS-initiated flows (like dashboard impersonation) redirect directly to your callback URL without going through your application's sign-in flow. Because this library enforces PKCE/CSRF verification on every callback, the request is rejected when the required `state` parameter is missing.
+
+**Fix:** Configure a [Sign-in URL](#sign-in-url) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
 
 #### NEXT_REDIRECT error when using try/catch blocks
 

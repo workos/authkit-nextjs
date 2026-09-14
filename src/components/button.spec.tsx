@@ -24,12 +24,10 @@ describe('Button', () => {
     const { getByRole } = render(<Button style={{ backgroundColor: 'red' }}>Click me</Button>);
     const button = getByRole('button');
 
-    expect(button).toHaveStyle({
-      backgroundColor: 'red',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    });
+    expect(button.style.backgroundColor).toBe('red');
+    expect(button.style.display).toBe('inline-flex');
+    expect(button.style.alignItems).toBe('center');
+    expect(button.style.justifyContent).toBe('center');
   });
 
   it('should pass through additional props', () => {
