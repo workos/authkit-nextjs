@@ -144,7 +144,7 @@ The `onSuccess` callback receives the following data:
 
 ### Initiate login URI
 
-Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Initiate login URI](https://workos.com/docs/authkit/nextjs#configure-initiate-login-url)** (`initiate_login_uri`) for your application in the WorkOS dashboard.
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Initiate login URI](https://workos.com/docs/authkit/nextjs#configure-initiate-login-uri)** (`initiate_login_uri`) for your application in the WorkOS dashboard.
 
 ```ts
 // app/sign-in/route.ts (or app/login/route.ts)
