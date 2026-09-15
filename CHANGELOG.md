@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.4.0](https://github.com/workos/authkit-nextjs/compare/v4.3.2...v4.4.0) (2026-09-15)
+
+
+### Features
+
+* Add optional WORKOS_ISSUER access token issuer validation ([#476](https://github.com/workos/authkit-nextjs/issues/476)) ([df58a23](https://github.com/workos/authkit-nextjs/commit/df58a23f556ca0f9a1bc88a698034bcc8e13b1d0))
+
 ## [4.3.2](https://github.com/workos/authkit-nextjs/compare/v4.3.1...v4.3.2) (2026-09-15)
 
 
