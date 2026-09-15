@@ -321,6 +321,95 @@ describe('session.ts', () => {
       expect(result.status).toBe(200);
     });
 
+    it('should not validate the issuer claim by default', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      (jwtVerify as Mock).mockImplementation(() => true);
+
+      await updateSessionMiddleware(
+        request,
+        true,
+        { enabled: false, unauthenticatedPaths: [] },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(jwtVerify).toHaveBeenCalledTimes(1);
+      expect((jwtVerify as Mock).mock.calls[0][0]).toBe(mockSession.accessToken);
+      expect((jwtVerify as Mock).mock.calls[0][2]).toBeUndefined();
+    });
+
+    it('should validate the issuer claim when WORKOS_ISSUER is set', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const originalIssuer = envVariables.WORKOS_ISSUER;
+      setEnvVar(envVariables, 'WORKOS_ISSUER', 'https://auth.example.com');
+
+      try {
+        const request = new NextRequest(new URL('http://example.com'));
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        (jwtVerify as Mock).mockImplementation(() => true);
+
+        await updateSessionMiddleware(
+          request,
+          true,
+          { enabled: false, unauthenticatedPaths: [] },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          [],
+        );
+
+        expect(jwtVerify).toHaveBeenCalledTimes(1);
+        expect((jwtVerify as Mock).mock.calls[0][0]).toBe(mockSession.accessToken);
+        expect((jwtVerify as Mock).mock.calls[0][2]).toEqual({ issuer: 'https://auth.example.com' });
+      } finally {
+        setEnvVar(envVariables, 'WORKOS_ISSUER', originalIssuer);
+      }
+    });
+
+    it('should accept a comma-separated list of issuers in WORKOS_ISSUER', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const originalIssuer = envVariables.WORKOS_ISSUER;
+      setEnvVar(
+        envVariables,
+        'WORKOS_ISSUER',
+        ' https://auth.example.com, https://api.workos.com/user_management/client_123 ,',
+      );
+
+      try {
+        const request = new NextRequest(new URL('http://example.com'));
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        (jwtVerify as Mock).mockImplementation(() => true);
+
+        await updateSessionMiddleware(
+          request,
+          true,
+          { enabled: false, unauthenticatedPaths: [] },
+          process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+          [],
+        );
+
+        expect(jwtVerify).toHaveBeenCalledTimes(1);
+        expect((jwtVerify as Mock).mock.calls[0][2]).toEqual({
+          issuer: ['https://auth.example.com', 'https://api.workos.com/user_management/client_123'],
+        });
+      } finally {
+        setEnvVar(envVariables, 'WORKOS_ISSUER', originalIssuer);
+      }
+    });
+
     it('should attempt to refresh the session when the access token is invalid', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 

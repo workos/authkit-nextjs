@@ -47,15 +47,16 @@ To use the `signOut` method, you'll need to set a default Sign-out URI in your W
 
 Certain environment variables are optional and can be used to debug or configure cookie settings.
 
-| Environment Variable     | Default Value         | Description                                                                               |
-| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------- |
-| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                                      |
-| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain        |
-| `WORKOS_COOKIE_NAME`     | `'wos-session'`       | Name of the session cookie                                                                |
-| `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                       |
-| `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
-| `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
-| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
+| Environment Variable     | Default Value         | Description                                                                                                                         |
+| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                                                                                |
+| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain                                                  |
+| `WORKOS_COOKIE_NAME`     | `'wos-session'`       | Name of the session cookie                                                                                                          |
+| `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                                                                 |
+| `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                                                                   |
+| `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP)                                           |
+| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                                                           |
+| `WORKOS_ISSUER`          | None                  | Expected `iss` claim of access tokens (comma-separated to accept multiple issuers). When not set, the issuer claim is not validated |
 
 Example usage:
 
