@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
-import { getPKCECookieOptions } from './cookie.js';
-import { WORKOS_CLIENT_ID } from './env-variables.js';
+import { cookies } from 'next/headers';
+import { getURLFromRedirectError } from 'next/dist/client/components/redirect.js';
+import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
+import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { CallbackError } from './errors.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
@@ -118,16 +120,28 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       await saveSession({ accessToken, refreshToken, user, impersonator, authenticationMethod }, request);
 
       if (onSuccess) {
-        await onSuccess({
-          accessToken,
-          refreshToken,
-          user,
-          impersonator,
-          oauthTokens,
-          authenticationMethod,
-          organizationId,
-          state: customState,
-        });
+        try {
+          await onSuccess({
+            accessToken,
+            refreshToken,
+            user,
+            impersonator,
+            oauthTokens,
+            authenticationMethod,
+            organizationId,
+            state: customState,
+          });
+        } catch (error) {
+          // Next redirects are control flow, not callback failures. Preserve the
+          // session when onError rethrows them for Next to handle.
+          // Next validates unknown errors at runtime, but its declaration requires a RedirectError.
+          const redirectUrl = getURLFromRedirectError(error as Parameters<typeof getURLFromRedirectError>[0]);
+          if (redirectUrl === null) {
+            const nextCookies = await cookies();
+            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(request.url, false, true));
+          }
+          throw error;
+        }
       }
 
       return response;
