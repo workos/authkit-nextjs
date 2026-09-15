@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.3.2](https://github.com/workos/authkit-nextjs/compare/v4.3.1...v4.3.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* clear session cookies when onSuccess fails ([#335](https://github.com/workos/authkit-nextjs/issues/335)) ([539c897](https://github.com/workos/authkit-nextjs/commit/539c897efdedb1a035d083143f830b45bf705490))
+* defer initial token refresh until first subscriber ([#467](https://github.com/workos/authkit-nextjs/issues/467)) ([587c5d7](https://github.com/workos/authkit-nextjs/commit/587c5d767e61902c08cd18933b8797f4517ef5ab))
+
 ## [4.3.1](https://github.com/workos/authkit-nextjs/compare/v4.3.0...v4.3.1) (2026-07-30)
 
 
