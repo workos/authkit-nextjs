@@ -9,7 +9,7 @@ export default async function HomePage() {
       <main>
         <h1>AuthKit Next.js Quickstart</h1>
         <p>You are not signed in.</p>
-        <Link href="/login">Sign in</Link>
+        <a href="/login">Sign in</a>
       </main>
     );
   }
