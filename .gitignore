@@ -4,11 +4,16 @@ dist
 coverage
 .idea
 package-lock.json
+!examples/quickstart/package-lock.json
 
 # Example apps
-examples/next/.next
 examples/next/.env.local
-examples/next/next-env.d.ts
+examples/showcase/.next
+examples/showcase/.env.local
+examples/showcase/next-env.d.ts
+examples/quickstart/.next
+examples/quickstart/.env.local
+examples/quickstart/next-env.d.ts
 *.tsbuildinfo
 examples/vinext/.env.local
 examples/vinext/.dev.vars

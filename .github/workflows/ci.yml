@@ -54,3 +54,15 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Build Quickstart Example
+        run: pnpm --filter authkit-nextjs-quickstart run build
+
+      - name: Typecheck Quickstart Example
+        run: pnpm --filter authkit-nextjs-quickstart run typecheck
+
+      - name: Build Showcase Example
+        run: pnpm --filter authkit-nextjs-showcase run build
+
+      - name: Typecheck Showcase Example
+        run: pnpm --filter authkit-nextjs-showcase run typecheck

@@ -81,7 +81,8 @@
   },
   "pnpm": {
     "overrides": {
-      "glob@>=10 <10.5.0": ">=10.5.0"
+      "glob@>=10 <10.5.0": ">=10.5.0",
+      "@workos-inc/authkit-nextjs": "workspace:*"
     }
   }
 }

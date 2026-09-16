@@ -1,6 +1,7 @@
 packages:
   - '.'
-  - 'examples/next/'
+  - 'examples/showcase/'
+  - 'examples/quickstart/'
   - 'examples/vinext/'
 
 approveBuilds: esbuild
