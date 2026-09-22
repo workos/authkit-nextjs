@@ -103,6 +103,7 @@ export class TokenStore {
 
     this.refreshTimeout = setTimeout(
       /* istanbul ignore next */ () => {
+        this.refreshTimeout = undefined;
         void this.getAccessTokenSilently().catch(/* istanbul ignore next */ () => {});
       },
       delay,
@@ -110,12 +111,9 @@ export class TokenStore {
   }
 
   private getRefreshDelay(timeUntilExpiry: number) {
-    if (timeUntilExpiry <= TOKEN_EXPIRY_BUFFER_SECONDS) {
-      return 0; // Immediate refresh
-    }
-
-    const idealDelay = (timeUntilExpiry - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000;
-
+    // Match parseToken's short-token buffer; never spin on an unchanged token.
+    const bufferSeconds = this.parseToken(this.state.token)?.bufferSeconds ?? TOKEN_EXPIRY_BUFFER_SECONDS;
+    const idealDelay = (timeUntilExpiry - bufferSeconds) * 1000;
     return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
   }
 
@@ -228,13 +226,14 @@ export class TokenStore {
         bufferSeconds = 30;
       }
 
-      const isExpiring = payload.exp < now + bufferSeconds;
+      const isExpiring = payload.exp <= now + bufferSeconds;
 
       return {
         payload,
         expiresAt: payload.exp,
         isExpiring,
         timeUntilExpiry,
+        bufferSeconds,
       };
     } catch {
       return null;
@@ -258,6 +257,8 @@ export class TokenStore {
 
     if (fastToken) {
       this.setState({ token: fastToken, loading: false, error: null });
+      const tokenData = this.parseToken(fastToken);
+      if (tokenData) this.scheduleRefresh(tokenData.timeUntilExpiry);
       return fastToken;
     }
 
@@ -296,7 +297,8 @@ export class TokenStore {
 
     // If we have a valid JWT that's not expiring, return it
     if (tokenData && !tokenData.isExpiring) {
-      // Valid non-expiring JWT - return cached token without server call
+      // Re-arm if an early/clamped timer checked a still-fresh token.
+      if (!this.refreshTimeout) this.scheduleRefresh(tokenData.timeUntilExpiry);
       return this.state.token;
     }
 
