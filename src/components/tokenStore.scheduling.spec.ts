@@ -89,6 +89,64 @@ describe('continuous token refresh scheduling', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  describe.each(['getAccessToken', 'getAccessTokenSilently'] as const)('%s', (getter) => {
+    it.each([10, 0, -10])(
+      'refreshes a fast cookie with %s seconds remaining before returning it',
+      async (remaining) => {
+        setup(300, false);
+        document.cookie = `workos-access-token=${makeToken(remaining)}`;
+        const freshToken = makeToken(300);
+        let complete!: (result: { accessToken: string }) => void;
+        refresh.mockReturnValue(
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+        );
+
+        const request = store[getter]();
+        expect(refresh).toHaveBeenCalledTimes(1);
+        const resolved = vi.fn();
+        void request.then(resolved);
+        await Promise.resolve();
+        expect(resolved).not.toHaveBeenCalled();
+
+        complete({ accessToken: freshToken });
+        expect(await request).toBe(freshToken);
+        expect(store.getSnapshot().token).toBe(freshToken);
+        expect(vi.getTimerCount()).toBe(1);
+      },
+    );
+  });
+
+  it('refreshes an expiring constructor cookie as soon as a subscriber attaches', async () => {
+    document.cookie = `workos-access-token=${makeToken(10)}`;
+    const freshToken = makeToken(300);
+    refresh.mockResolvedValue({ accessToken: freshToken });
+    store = new TokenStore();
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(refresh).not.toHaveBeenCalled();
+    store.subscribe(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().token).toBe(freshToken);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('keeps the retry floor when the immediate cookie refresh returns the same token', async () => {
+    const { initial } = setup(10);
+    refresh.mockResolvedValue({ accessToken: initial });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
   it('resumes continuous scheduling after a failed refresh', async () => {
     setup(60);
     refresh.mockRejectedValueOnce(new Error('Offline'));

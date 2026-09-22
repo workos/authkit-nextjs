@@ -857,11 +857,8 @@ describe('tokenStore', () => {
         store.subscribe(() => {});
         expect(vi.getTimerCount()).toBe(1);
 
-        // Scheduled refreshes respect the minimum delay, even for expiring tokens.
-        // The hook's mount effect can still request an immediate silent refresh.
-        await vi.advanceTimersByTimeAsync(14_999);
-        expect(mockRefreshAccessTokenAction).not.toHaveBeenCalled();
-        await vi.advanceTimersByTimeAsync(1);
+        // An initially expiring token refreshes immediately after subscription.
+        await vi.advanceTimersByTimeAsync(0);
 
         expect(mockRefreshAccessTokenAction).toHaveBeenCalledTimes(1);
         expect(store.getSnapshot().token).toBe(freshToken);

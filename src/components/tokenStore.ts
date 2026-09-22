@@ -67,7 +67,8 @@ export class TokenStore {
     if (this.listeners.size === 1 && !this.refreshTimeout) {
       const tokenData = this.parseToken(this.state.token);
       if (tokenData) {
-        this.scheduleRefresh(tokenData.timeUntilExpiry);
+        // An initially expiring token must not wait for the refresh retry floor.
+        this.scheduleRefresh(tokenData.timeUntilExpiry, 0);
       }
     }
     return () => {
@@ -92,14 +93,16 @@ export class TokenStore {
     this.notify();
   }
 
-  private scheduleRefresh(timeUntilExpiry?: number) {
+  private scheduleRefresh(timeUntilExpiry?: number, minimumDelaySeconds = MIN_REFRESH_DELAY_SECONDS) {
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
     }
 
     const delay =
-      typeof timeUntilExpiry === 'undefined' ? RETRY_DELAY_SECONDS * 1000 : this.getRefreshDelay(timeUntilExpiry);
+      typeof timeUntilExpiry === 'undefined'
+        ? RETRY_DELAY_SECONDS * 1000
+        : this.getRefreshDelay(timeUntilExpiry, minimumDelaySeconds);
 
     this.refreshTimeout = setTimeout(
       /* istanbul ignore next */ () => {
@@ -110,11 +113,11 @@ export class TokenStore {
     );
   }
 
-  private getRefreshDelay(timeUntilExpiry: number) {
+  private getRefreshDelay(timeUntilExpiry: number, minimumDelaySeconds: number) {
     // Match parseToken's short-token buffer; never spin on an unchanged token.
     const bufferSeconds = this.parseToken(this.state.token)?.bufferSeconds ?? TOKEN_EXPIRY_BUFFER_SECONDS;
     const idealDelay = (timeUntilExpiry - bufferSeconds) * 1000;
-    return Math.min(Math.max(idealDelay, MIN_REFRESH_DELAY_SECONDS * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
+    return Math.min(Math.max(idealDelay, minimumDelaySeconds * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
   }
 
   private deleteCookie() {
@@ -258,6 +261,7 @@ export class TokenStore {
     if (fastToken) {
       this.setState({ token: fastToken, loading: false, error: null });
       const tokenData = this.parseToken(fastToken);
+      if (tokenData?.isExpiring) return this.refreshTokenSilently();
       if (tokenData) this.scheduleRefresh(tokenData.timeUntilExpiry);
       return fastToken;
     }
@@ -286,6 +290,7 @@ export class TokenStore {
 
       // Schedule refresh based on token expiry
       const tokenData = this.parseToken(fastToken);
+      if (tokenData?.isExpiring) return this.refreshTokenSilently();
       if (tokenData) {
         this.scheduleRefresh(tokenData.timeUntilExpiry);
       }
