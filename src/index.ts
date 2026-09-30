@@ -1,5 +1,6 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
+import { handleGoogleOneTap } from './google-one-tap-route.js';
 import { AuthKitError, CallbackError, TokenRefreshError } from './errors.js';
 import { authkit, authkitMiddleware, authkitProxy } from './middleware.js';
 export {
@@ -37,6 +38,7 @@ export {
   getTokenClaims,
   getWorkOS,
   handleAuth,
+  handleGoogleOneTap,
   refreshSession,
   saveSession,
   signOut,

@@ -26,9 +26,13 @@ You will need a [WorkOS account](https://dashboard.workos.com/signup).
    WORKOS_COOKIE_PASSWORD=<YOUR_COOKIE_PASSWORD>
 
    NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/callback
+   NEXT_PUBLIC_APP_URL=https://your-app.example
+   NEXT_PUBLIC_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_CLIENT_ID>
    ```
 
-5. Run the following command and navigate to [http://localhost:3000](http://localhost:3000).
+5. To enable Google One Tap, configure Google OAuth with your own credentials in the WorkOS Dashboard. In Google Cloud, add your HTTPS application origin as an **Authorized JavaScript origin** and `<NEXT_PUBLIC_APP_URL>/auth/google-one-tap` as an **Authorized redirect URI**. Copy the same Google client ID into `NEXT_PUBLIC_GOOGLE_CLIENT_ID`. For local testing, expose the application through an HTTPS development tunnel and use that origin for `NEXT_PUBLIC_APP_URL`.
+
+6. Run the following command and navigate to [http://localhost:3000](http://localhost:3000).
 
    ```bash
    pnpm dev
