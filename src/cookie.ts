@@ -8,6 +8,35 @@ import { CookieOptions } from './interfaces.js';
 
 type ValidSameSite = CookieOptions['sameSite'];
 
+/**
+ * One or more URLs describing where the app is served from, e.g. the incoming
+ * request URL plus any configured browser-facing URL (`baseURL`, `redirectUri`).
+ */
+export type CookieUrlSource = string | null | undefined | ReadonlyArray<string | null | undefined>;
+
+/**
+ * Decide the `Secure` attribute from every available signal about the app's origin.
+ *
+ * Behind a TLS-terminating proxy the incoming request URL is the internal `http://`
+ * origin, so it can't be trusted on its own. The configured redirect URI (and any
+ * caller-supplied browser-facing URL) is the public origin. If any signal is HTTPS,
+ * the cookie is Secure. Missing or unparseable URLs fail closed to Secure.
+ */
+function isSecureOrigin(urls: CookieUrlSource): boolean {
+  const candidates = [urls, WORKOS_REDIRECT_URI].flat().filter((url): url is string => Boolean(url));
+  if (candidates.length === 0) {
+    return true;
+  }
+
+  return candidates.some((url) => {
+    try {
+      return new URL(url).protocol === 'https:';
+    } catch {
+      return true;
+    }
+  });
+}
+
 const JWT_COOKIE_MAX_AGE = 30; // seconds
 const JWT_COOKIE_NAME = 'workos-access-token';
 
@@ -18,43 +47,19 @@ function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite
 }
 
 export function getCookieOptions(): CookieOptions;
-export function getCookieOptions(redirectUri?: string | null): CookieOptions;
-export function getCookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
+export function getCookieOptions(urls?: CookieUrlSource): CookieOptions;
+export function getCookieOptions(urls: CookieUrlSource, asString: true, expired?: boolean): string;
+export function getCookieOptions(urls: CookieUrlSource, asString: false, expired?: boolean): CookieOptions;
+export function getCookieOptions(urls?: CookieUrlSource, asString?: boolean, expired?: boolean): CookieOptions | string;
 export function getCookieOptions(
-  redirectUri: string | null | undefined,
-  asString: false,
-  expired?: boolean,
-): CookieOptions;
-export function getCookieOptions(
-  redirectUri?: string | null,
-  asString?: boolean,
-  expired?: boolean,
-): CookieOptions | string;
-export function getCookieOptions(
-  redirectUri?: string | null,
+  urls?: CookieUrlSource,
   asString: boolean = false,
   expired: boolean = false,
 ): CookieOptions | string {
   const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
   assertValidSamSite(sameSite);
 
-  const urlString = redirectUri || WORKOS_REDIRECT_URI;
-  // Default to secure=true when no URL available (production default)
-  // Developers should set WORKOS_REDIRECT_URI for proper local dev
-  let secure: boolean;
-  if (sameSite.toLowerCase() === 'none') {
-    secure = true;
-  } else if (urlString) {
-    try {
-      const url = new URL(urlString);
-      secure = url.protocol === 'https:';
-    } catch {
-      // Invalid URL - default to secure
-      secure = true;
-    }
-  } else {
-    secure = true;
-  }
+  const secure = sameSite.toLowerCase() === 'none' || isSecureOrigin(urls);
 
   let maxAge: number;
   if (expired) {
@@ -101,25 +106,25 @@ const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
  * Max-age is always capped to 10 minutes — PKCE cookies are single-use and short-lived.
  */
 export function getPKCECookieOptions(): CookieOptions;
-export function getPKCECookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
+export function getPKCECookieOptions(urls: CookieUrlSource, asString: true, expired?: boolean): string;
 export function getPKCECookieOptions(
-  redirectUri?: string | null,
+  urls?: CookieUrlSource,
   asString?: boolean,
   expired?: boolean,
 ): CookieOptions | string;
 export function getPKCECookieOptions(
-  redirectUri?: string | null,
+  urls?: CookieUrlSource,
   asString: boolean = false,
   expired: boolean = false,
 ): CookieOptions | string {
   if (asString) {
-    const options = getCookieOptions(redirectUri, true, expired);
+    const options = getCookieOptions(urls, true, expired);
     return options
       .replace(/SameSite=Strict/i, 'SameSite=Lax')
       .replace(/Max-Age=\d+/, `Max-Age=${expired ? 0 : PKCE_COOKIE_MAX_AGE}`);
   }
 
-  const options = getCookieOptions(redirectUri);
+  const options = getCookieOptions(urls);
   return {
     ...options,
     sameSite: options.sameSite.toLowerCase() === 'strict' ? 'lax' : options.sameSite,
