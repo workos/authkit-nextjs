@@ -180,6 +180,35 @@ describe('cookie.ts', () => {
       );
     });
 
+    describe('in production', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      beforeEach(() => {
+        process.env.NODE_ENV = 'production';
+      });
+
+      afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
+      });
+
+      it('keeps Secure for a non-localhost origin even when every signal is http', async () => {
+        const { getJwtCookie, getCookieOptions } = await import('./cookie');
+
+        expect(getJwtCookie('token', ['http://example.com'])).toContain('Secure');
+        // The floor is specific to the access token cookie.
+        expect(getCookieOptions(['http://example.com']).secure).toBe(false);
+      });
+
+      it('omits Secure on localhost and 127.0.0.1', async () => {
+        await setEnv({ WORKOS_REDIRECT_URI: 'http://localhost:3000/callback' });
+
+        const { getJwtCookie } = await import('./cookie');
+
+        expect(getJwtCookie('token', ['http://localhost:3000'])).not.toContain('Secure');
+        expect(getJwtCookie('token', ['http://127.0.0.1:3000'])).not.toContain('Secure');
+      });
+    });
+
     it('should create expired JWT cookie for deletion', async () => {
       const { getJwtCookie } = await import('./cookie');
 
