@@ -41,6 +41,23 @@ function isHttpsOrUnparseable(url: string): boolean {
   }
 }
 
+function isLocalhost(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+interface SecurePolicyOptions {
+  /**
+   * Also force Secure in production builds unless every signal is localhost. Used by the
+   * script-readable eagerAuth access token cookie, which has always had this floor.
+   */
+  productionFloor?: boolean;
+}
+
 /**
  * The single policy for the `Secure` attribute on every AuthKit cookie.
  *
@@ -48,9 +65,13 @@ function isHttpsOrUnparseable(url: string): boolean {
  * origin, so it can't be trusted on its own. If any origin signal is HTTPS, the
  * cookie is Secure. With no signals at all, it fails closed to Secure.
  */
-function isSecureOrigin(urls: OriginUrls): boolean {
+function isSecureOrigin(urls: OriginUrls, { productionFloor = false }: SecurePolicyOptions = {}): boolean {
   const candidates = [...urls, WORKOS_REDIRECT_URI].filter((url): url is string => Boolean(url));
-  return candidates.length === 0 || candidates.some(isHttpsOrUnparseable);
+  if (candidates.length === 0 || candidates.some(isHttpsOrUnparseable)) {
+    return true;
+  }
+
+  return productionFloor && process.env.NODE_ENV === 'production' && !candidates.every(isLocalhost);
 }
 
 /**
@@ -125,7 +146,7 @@ export function serializeCookie(name: string, value: string, options: CookieOpti
 
 /**
  * The short-lived, script-readable access token cookie used by `eagerAuth`.
- * Uses the same `Secure` policy as every other AuthKit cookie.
+ * Uses the same `Secure` policy as every other AuthKit cookie, plus the production floor.
  */
 export function getJwtCookie(body: string | null, urls: OriginUrls, expired: boolean = false): string {
   const parts = [
@@ -133,7 +154,7 @@ export function getJwtCookie(body: string | null, urls: OriginUrls, expired: boo
     'SameSite=Lax',
     `Max-Age=${expired ? 0 : JWT_COOKIE_MAX_AGE}`,
   ];
-  if (isSecureOrigin(urls)) {
+  if (isSecureOrigin(urls, { productionFloor: true })) {
     parts.push('Secure');
   }
   if (expired) {
