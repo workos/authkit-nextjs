@@ -3,7 +3,7 @@ import { unsealData } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import * as v from 'valibot';
-import { getPKCECookieOptions } from './cookie.js';
+import { type CookieUrlSource, getPKCECookieOptions } from './cookie.js';
 import { WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { State, StateSchema } from './interfaces.js';
 
@@ -62,8 +62,16 @@ export function setPendingPKCERedirectHeaders(headers: Headers, authorizationUrl
  * Only set the PKCE cookie for initial document navigations that redirect to
  * AuthKit. Fetch/XHR/RSC/prefetch requests never follow cross-origin redirects
  * to complete OAuth, so they do not need verifier cookies.
+ *
+ * `cookieUrls` defaults to the request URL; pass any browser-facing URL too so a
+ * TLS-terminating proxy's internal http:// origin can't drop the Secure attribute.
  */
-export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers, sealedState: string): void {
+export function appendPKCESetCookieHeader(
+  request: NextRequest,
+  headers: Headers,
+  sealedState: string,
+  cookieUrls: CookieUrlSource = request.url,
+): void {
   if (!isInitialDocumentRequest(request)) {
     return;
   }
@@ -76,7 +84,7 @@ export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers
   // A small number of concurrent PKCE cookies is normal (multiple tabs each
   // starting an OAuth flow). Only purge when accumulation risks HTTP 431.
   if (pkceCookies.length >= MAX_PKCE_COOKIES) {
-    const expiredOptions = getPKCECookieOptions(request.url, true, true);
+    const expiredOptions = getPKCECookieOptions(cookieUrls, true, true);
     for (const { name } of pkceCookies) {
       if (name !== newCookieName) {
         headers.append('Set-Cookie', `${name}=; ${expiredOptions}`);
@@ -84,7 +92,7 @@ export function appendPKCESetCookieHeader(request: NextRequest, headers: Headers
     }
   }
 
-  headers.append('Set-Cookie', `${newCookieName}=${sealedState}; ${getPKCECookieOptions(request.url, true)}`);
+  headers.append('Set-Cookie', `${newCookieName}=${sealedState}; ${getPKCECookieOptions(cookieUrls, true)}`);
 }
 
 export function stripPKCESetCookieHeaders(headers: Headers): void {

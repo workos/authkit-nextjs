@@ -124,6 +124,48 @@ describe('cookie.ts', () => {
       expect(options).toEqual(expect.objectContaining({ secure: true }));
     });
 
+    describe('behind a TLS-terminating proxy (internal http:// request URL)', () => {
+      const internalUrl = 'http://web:3000/callback';
+
+      it('is Secure when WORKOS_REDIRECT_URI is https', async () => {
+        const envVars = await import('./env-variables');
+        Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://app.example.com/callback' });
+
+        const { getCookieOptions } = await import('./cookie');
+        expect(getCookieOptions(internalUrl)).toEqual(expect.objectContaining({ secure: true }));
+        expect(getCookieOptions(internalUrl, true)).toContain('Secure');
+      });
+
+      it('is Secure when any supplied browser-facing URL is https', async () => {
+        const { getCookieOptions } = await import('./cookie');
+        expect(getCookieOptions([internalUrl, 'https://app.example.com'])).toEqual(
+          expect.objectContaining({ secure: true }),
+        );
+      });
+
+      it('stays Secure for an https request even if the configured URL is http', async () => {
+        const { getCookieOptions } = await import('./cookie');
+        expect(getCookieOptions(['https://app.example.com/callback', 'http://localhost:3000'])).toEqual(
+          expect.objectContaining({ secure: true }),
+        );
+      });
+
+      it('is not Secure only when every signal is http', async () => {
+        const { getCookieOptions } = await import('./cookie');
+        expect(getCookieOptions([internalUrl, 'http://localhost:3000', undefined])).toEqual(
+          expect.objectContaining({ secure: false }),
+        );
+      });
+
+      it('applies the same decision to PKCE verifier cookies', async () => {
+        const envVars = await import('./env-variables');
+        Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://app.example.com/callback' });
+
+        const { getPKCECookieOptions } = await import('./cookie');
+        expect(getPKCECookieOptions(internalUrl, true)).toContain('Secure');
+      });
+    });
+
     it('handles invalid WORKOS_COOKIE_MAX_AGE gracefully', async () => {
       const envVars = await import('./env-variables');
       Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: 'invalid-number' });

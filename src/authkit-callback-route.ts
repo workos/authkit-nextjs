@@ -6,7 +6,7 @@ import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { CallbackError } from './errors.js';
 import { HandleAuthOptions } from './interfaces.js';
 import { PKCE_COOKIE_NAME, getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
-import { saveSession } from './session.js';
+import { setSessionCookie } from './session.js';
 import { errorResponseWithFallback, redirectWithFallback, setCachePreventionHeaders } from './utils.js';
 import { getWorkOS } from './workos.js';
 
@@ -30,6 +30,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
   return async function GET(request: NextRequest) {
     // Fall back to standard URL parsing when nextUrl is not available (e.g., vinext)
     const requestUrl = request.nextUrl ?? new URL(request.url);
+
+    // Behind a TLS-terminating proxy request.url is the internal http:// origin;
+    // baseURL is the browser-facing origin, so it also counts toward Secure.
+    const cookieUrls = [request.url, baseURL];
 
     // Gather mandatory information
     const code = requestUrl.searchParams.get('code');
@@ -115,9 +119,9 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // Always delete the PKCE cookie after handling the callback, regardless of success or error
       // to avoid stale cookies affecting future auth attempts & prevent replays
-      response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(request.url, true, true)}`);
+      response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(cookieUrls, true, true)}`);
 
-      await saveSession({ accessToken, refreshToken, user, impersonator, authenticationMethod }, request);
+      await setSessionCookie({ accessToken, refreshToken, user, impersonator, authenticationMethod }, cookieUrls);
 
       if (onSuccess) {
         try {
@@ -138,7 +142,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           const redirectUrl = getURLFromRedirectError(error as Parameters<typeof getURLFromRedirectError>[0]);
           if (redirectUrl === null) {
             const nextCookies = await cookies();
-            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(request.url, false, true));
+            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(cookieUrls, false, true));
           }
           throw error;
         }
@@ -154,7 +158,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       if (state) {
         response.headers.append(
           'Set-Cookie',
-          `${getPKCECookieNameForState(state)}=; ${getPKCECookieOptions(request.url, true, true)}`,
+          `${getPKCECookieNameForState(state)}=; ${getPKCECookieOptions(cookieUrls, true, true)}`,
         );
       }
 

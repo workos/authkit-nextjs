@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
-import { getCookieOptions, getJwtCookie } from './cookie.js';
+import { type CookieUrlSource, getCookieOptions, getJwtCookie } from './cookie.js';
 import {
   WORKOS_CLIENT_ID,
   WORKOS_COOKIE_NAME,
@@ -196,6 +196,10 @@ async function updateSession(
 
   newRequestHeaders.delete(sessionHeaderName);
 
+  // Behind a TLS-terminating proxy request.url is the internal http:// origin, so
+  // the browser-facing redirect URI must also count toward the Secure attribute.
+  const cookieUrls = [request.url, options.redirectUri];
+
   if (!session) {
     if (options.debug) {
       console.log('No session found from cookie');
@@ -208,7 +212,7 @@ async function updateSession(
     });
 
     setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
-    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, cookieUrls);
 
     return {
       session: { user: null },
@@ -299,7 +303,7 @@ async function updateSession(
       authenticationMethod,
     });
 
-    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
+    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(cookieUrls, true)}`);
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
@@ -374,7 +378,7 @@ async function updateSession(
 
     if (!isTransient) {
       // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(cookieUrls, true, true)}`;
       newRequestHeaders.append('Set-Cookie', deleteCookie);
 
       // Delete JWT cookie if eagerAuth is enabled
@@ -392,7 +396,7 @@ async function updateSession(
     });
 
     setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
-    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, cookieUrls);
 
     return {
       session: { user: null },
@@ -758,6 +762,8 @@ function getScreenHint(signUpPaths: string[] | undefined, pathname: string) {
  *
  * @param sessionOrResponse The WorkOS session or AuthenticationResponse containing access token, refresh token, and user information.
  * @param request Either a NextRequest object or a URL string, used to determine cookie settings.
+ * The cookie is marked `Secure` if this URL or `NEXT_PUBLIC_WORKOS_REDIRECT_URI` is HTTPS, so a
+ * TLS-terminating proxy that forwards plain HTTP to the app still yields a Secure cookie.
  *
  * @example
  * // With a NextRequest object
@@ -781,11 +787,21 @@ export async function saveSession(
   sessionOrResponse: Session | AuthenticationResponse,
   request: NextRequest | string,
 ): Promise<void> {
+  await setSessionCookie(sessionOrResponse, typeof request === 'string' ? request : request.url);
+}
+
+/**
+ * Internal variant of `saveSession` that accepts every known origin signal
+ * (e.g. the request URL plus the callback's `baseURL`).
+ */
+export async function setSessionCookie(
+  sessionOrResponse: Session | AuthenticationResponse,
+  cookieUrls: CookieUrlSource,
+): Promise<void> {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   const encryptedSession = await encryptSession(sessionOrResponse);
   const nextCookies = await cookies();
-  const url = typeof request === 'string' ? request : request.url;
-  nextCookies.set(cookieName, encryptedSession, getCookieOptions(url));
+  nextCookies.set(cookieName, encryptedSession, getCookieOptions(cookieUrls));
 }
 
 export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };

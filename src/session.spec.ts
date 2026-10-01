@@ -924,6 +924,60 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
 
+    // Behind a TLS-terminating proxy, NextRequest.url is the internal
+    // http:// origin. The browser-facing origin must decide the Secure attribute.
+    describe('behind a TLS-terminating proxy', () => {
+      const originalRedirectUri = envVariables.WORKOS_REDIRECT_URI;
+
+      afterEach(() => {
+        setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalRedirectUri);
+      });
+
+      async function refreshBehindProxy(options: Parameters<typeof updateSession>[1] = {}) {
+        mockSession.accessToken = await generateTestToken({}, true);
+        (jwtVerify as Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = new NextRequest(new URL('http://web:3000/account'));
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const response = await updateSession(request, options);
+        return response.headers.getSetCookie().find((c) => c.startsWith('wos-session='));
+      }
+
+      it('sets Secure on the refreshed session cookie when WORKOS_REDIRECT_URI is https', async () => {
+        setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', 'https://app.example.com/callback');
+
+        expect(await refreshBehindProxy()).toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the refreshed session cookie when the redirectUri option is https', async () => {
+        expect(await refreshBehindProxy({ redirectUri: 'https://app.example.com/callback' })).toMatch(/; Secure/);
+      });
+
+      it('omits Secure only when every origin signal is http', async () => {
+        expect(await refreshBehindProxy()).not.toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the PKCE verifier cookie when the redirectUri option is https', async () => {
+        const request = new NextRequest(new URL('http://web:3000/account'), { headers: { accept: 'text/html' } });
+
+        const response = await updateSession(request, { redirectUri: 'https://app.example.com/callback' });
+
+        const pkceCookie = response.headers.getSetCookie().find((c) => c.startsWith('wos-auth-verifier'));
+        expect(pkceCookie).toMatch(/; Secure/);
+      });
+    });
+
     describe('PKCE cookie cleanup', () => {
       function documentRequest(url = 'http://example.com/protected'): NextRequest {
         return new NextRequest(new URL(url), {
