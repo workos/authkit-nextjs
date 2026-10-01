@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getURLFromRedirectError } from 'next/dist/client/components/redirect.js';
-import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
+import { getCookieOptions, getPKCECookieOptions, serializeCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME } from './env-variables.js';
 import { CallbackError } from './errors.js';
 import { HandleAuthOptions } from './interfaces.js';
@@ -31,9 +31,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     // Fall back to standard URL parsing when nextUrl is not available (e.g., vinext)
     const requestUrl = request.nextUrl ?? new URL(request.url);
 
-    // Behind a TLS-terminating proxy request.url is the internal http:// origin;
-    // baseURL is the browser-facing origin, so it also counts toward Secure.
-    const cookieUrls = [request.url, baseURL];
+    // Origin signals known so far. Behind a TLS-terminating proxy request.url is the
+    // internal http:// origin; baseURL is the browser-facing origin, so it also counts
+    // toward Secure. The redirect URI sealed into the PKCE state is added once unsealed.
+    const originUrls: Array<string | undefined> = [request.url, baseURL];
 
     // Gather mandatory information
     const code = requestUrl.searchParams.get('code');
@@ -84,9 +85,9 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         redirectUri: stateRedirectUri,
       } = await getStateFromPKCECookieValue(pkceCookie);
 
-      // The redirect URI sealed into the state is the browser-facing callback URL for
-      // this flow, so it covers redirect URIs configured only on the middleware.
-      const sessionCookieUrls = [...cookieUrls, stateRedirectUri];
+      // The sealed redirect URI is the browser-facing callback URL for this flow, so it
+      // covers redirect URIs configured only on the middleware.
+      originUrls.push(stateRedirectUri);
 
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
@@ -126,13 +127,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       // to avoid stale cookies affecting future auth attempts & prevent replays
       response.headers.append(
         'Set-Cookie',
-        `${pkceCookieName}=; ${getPKCECookieOptions(sessionCookieUrls, true, true)}`,
+        serializeCookie(pkceCookieName, '', getPKCECookieOptions(originUrls, { expired: true })),
       );
 
-      await setSessionCookie(
-        { accessToken, refreshToken, user, impersonator, authenticationMethod },
-        sessionCookieUrls,
-      );
+      await setSessionCookie({ accessToken, refreshToken, user, impersonator, authenticationMethod }, originUrls);
 
       if (onSuccess) {
         try {
@@ -153,7 +151,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           const redirectUrl = getURLFromRedirectError(error as Parameters<typeof getURLFromRedirectError>[0]);
           if (redirectUrl === null) {
             const nextCookies = await cookies();
-            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(sessionCookieUrls, false, true));
+            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(originUrls, { expired: true }));
           }
           throw error;
         }
@@ -169,7 +167,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
       if (state) {
         response.headers.append(
           'Set-Cookie',
-          `${getPKCECookieNameForState(state)}=; ${getPKCECookieOptions(cookieUrls, true, true)}`,
+          serializeCookie(getPKCECookieNameForState(state), '', getPKCECookieOptions(originUrls, { expired: true })),
         );
       }
 

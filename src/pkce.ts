@@ -3,7 +3,7 @@ import { unsealData } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import * as v from 'valibot';
-import { type CookieUrlSource, getPKCECookieOptions } from './cookie.js';
+import { type OriginUrls, getPKCECookieOptions, serializeCookie } from './cookie.js';
 import { WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { State, StateSchema } from './interfaces.js';
 
@@ -38,14 +38,9 @@ export function getPKCECookieNameForState(state: string): string {
  * Set the PKCE verifier cookie in server action context.
  * In middleware context, callers must set the cookie via Set-Cookie headers instead.
  */
-export async function setPKCECookie(sealedState: string): Promise<void> {
+export async function setPKCECookie(sealedState: string, originUrls: OriginUrls): Promise<void> {
   const nextCookies = await cookies();
-  const options = getPKCECookieOptions();
-
-  nextCookies.set(getPKCECookieNameForState(sealedState), sealedState, {
-    ...options,
-    httpOnly: true,
-  });
+  nextCookies.set(getPKCECookieNameForState(sealedState), sealedState, getPKCECookieOptions(originUrls));
 }
 
 /**
@@ -63,14 +58,14 @@ export function setPendingPKCERedirectHeaders(headers: Headers, authorizationUrl
  * AuthKit. Fetch/XHR/RSC/prefetch requests never follow cross-origin redirects
  * to complete OAuth, so they do not need verifier cookies.
  *
- * `cookieUrls` defaults to the request URL; pass any browser-facing URL too so a
+ * `originUrls` must include any browser-facing URL alongside the request URL so a
  * TLS-terminating proxy's internal http:// origin can't drop the Secure attribute.
  */
 export function appendPKCESetCookieHeader(
   request: NextRequest,
   headers: Headers,
   sealedState: string,
-  cookieUrls: CookieUrlSource = request.url,
+  originUrls: OriginUrls,
 ): void {
   if (!isInitialDocumentRequest(request)) {
     return;
@@ -84,15 +79,15 @@ export function appendPKCESetCookieHeader(
   // A small number of concurrent PKCE cookies is normal (multiple tabs each
   // starting an OAuth flow). Only purge when accumulation risks HTTP 431.
   if (pkceCookies.length >= MAX_PKCE_COOKIES) {
-    const expiredOptions = getPKCECookieOptions(cookieUrls, true, true);
+    const expiredOptions = getPKCECookieOptions(originUrls, { expired: true });
     for (const { name } of pkceCookies) {
       if (name !== newCookieName) {
-        headers.append('Set-Cookie', `${name}=; ${expiredOptions}`);
+        headers.append('Set-Cookie', serializeCookie(name, '', expiredOptions));
       }
     }
   }
 
-  headers.append('Set-Cookie', `${newCookieName}=${sealedState}; ${getPKCECookieOptions(cookieUrls, true)}`);
+  headers.append('Set-Cookie', serializeCookie(newCookieName, sealedState, getPKCECookieOptions(originUrls)));
 }
 
 export function stripPKCESetCookieHeaders(headers: Headers): void {

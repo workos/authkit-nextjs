@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
-import { getCookieOptions, getPKCECookieOptions } from './cookie.js';
+import { getCookieOptions, getPKCECookieOptions, originUrlsFromHeaders } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { AccessToken, GetAuthURLOptions, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
 import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
@@ -23,7 +23,7 @@ function revalidateTagCompat(tag: string): void {
 
 async function getAuthURLAndSetPKCECookie(options: GetAuthURLOptions): Promise<string> {
   const { url, sealedState } = await getAuthorizationUrl(options);
-  await setPKCECookie(sealedState);
+  await setPKCECookie(sealedState, [...originUrlsFromHeaders(await headers()), options.redirectUri]);
 
   return url;
 }
@@ -72,7 +72,7 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   } finally {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-    const { domain, path, sameSite, secure } = getCookieOptions();
+    const { domain, path, sameSite, secure } = getCookieOptions([]);
     try {
       nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
     } catch {
@@ -82,7 +82,7 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
 
     // Clear any lingering PKCE verifier cookies so orphans from abandoned
     // flows don't accumulate toward HTTP 431 or confuse future sign-ins.
-    const pkceOptions = getPKCECookieOptions();
+    const pkceOptions = getPKCECookieOptions([]);
     for (const { name } of nextCookies.getAll()) {
       if (!name.startsWith(PKCE_COOKIE_NAME)) continue;
       try {

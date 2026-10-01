@@ -5,7 +5,7 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
-import { type CookieUrlSource, getCookieOptions, getJwtCookie } from './cookie.js';
+import { type OriginUrls, getCookieOptions, getJwtCookie, originUrlsFromHeaders, serializeCookie } from './cookie.js';
 import {
   WORKOS_CLIENT_ID,
   WORKOS_COOKIE_NAME,
@@ -198,7 +198,7 @@ async function updateSession(
 
   // Behind a TLS-terminating proxy request.url is the internal http:// origin, so
   // the browser-facing redirect URI must also count toward the Secure attribute.
-  const cookieUrls = [request.url, options.redirectUri];
+  const originUrls = [request.url, options.redirectUri];
 
   if (!session) {
     if (options.debug) {
@@ -212,7 +212,7 @@ async function updateSession(
     });
 
     setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
-    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, cookieUrls);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, originUrls);
 
     return {
       session: { user: null },
@@ -247,7 +247,7 @@ async function updateSession(
       const existingJwtCookie = request.cookies.get(jwtCookieName);
       // Only set if cookie doesn't exist or has different value
       if (!existingJwtCookie || existingJwtCookie.value !== session.accessToken) {
-        newRequestHeaders.append('Set-Cookie', getJwtCookie(session.accessToken, request.url));
+        newRequestHeaders.append('Set-Cookie', getJwtCookie(session.accessToken, originUrls));
       }
     }
 
@@ -303,13 +303,13 @@ async function updateSession(
       authenticationMethod,
     });
 
-    newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(cookieUrls, true)}`);
+    newRequestHeaders.append('Set-Cookie', serializeCookie(cookieName, encryptedSession, getCookieOptions(originUrls)));
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
     // Only set on document requests (initial page loads), not on API/RSC requests
     if (options.eagerAuth && isInitialDocumentRequest(request)) {
-      newRequestHeaders.append('Set-Cookie', getJwtCookie(accessToken, request.url));
+      newRequestHeaders.append('Set-Cookie', getJwtCookie(accessToken, originUrls));
     }
 
     const {
@@ -378,12 +378,12 @@ async function updateSession(
 
     if (!isTransient) {
       // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(cookieUrls, true, true)}`;
+      const deleteCookie = serializeCookie(cookieName, '', getCookieOptions(originUrls, { expired: true }));
       newRequestHeaders.append('Set-Cookie', deleteCookie);
 
       // Delete JWT cookie if eagerAuth is enabled
       if (options.eagerAuth) {
-        const deleteJwtCookie = getJwtCookie(null, request.url, true);
+        const deleteJwtCookie = getJwtCookie(null, originUrls, true);
         newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
       }
     }
@@ -396,7 +396,7 @@ async function updateSession(
     });
 
     setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
-    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, cookieUrls);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState, originUrls);
 
     return {
       session: { user: null },
@@ -444,10 +444,7 @@ async function refreshSession({
     );
   }
 
-  const headersList = await headers();
-  const url = headersList.get('x-url');
-
-  await saveSession(refreshResult, url || WORKOS_REDIRECT_URI);
+  await setSessionCookie(refreshResult, originUrlsFromHeaders(await headers()));
 
   const { accessToken, user, impersonator } = refreshResult;
 
@@ -509,7 +506,7 @@ async function redirectToSignIn() {
   const returnPathname = getReturnPathname(url);
 
   const { url: authkitUrl, sealedState } = await getAuthorizationUrl({ returnPathname, screenHint });
-  await setPKCECookie(sealedState);
+  await setPKCECookie(sealedState, originUrlsFromHeaders(headersList));
   redirect(authkitUrl);
 }
 
@@ -787,21 +784,23 @@ export async function saveSession(
   sessionOrResponse: Session | AuthenticationResponse,
   request: NextRequest | string,
 ): Promise<void> {
-  await setSessionCookie(sessionOrResponse, typeof request === 'string' ? request : request.url);
+  await setSessionCookie(sessionOrResponse, [typeof request === 'string' ? request : request.url]);
 }
 
 /**
- * Internal variant of `saveSession` that accepts every known origin signal
- * (e.g. the request URL plus the callback's `baseURL`).
+ * Variant of `saveSession` that accepts every known origin signal (e.g. the request
+ * URL plus the callback's `baseURL`).
+ *
+ * @internal Not exported from the package entry point.
  */
 export async function setSessionCookie(
   sessionOrResponse: Session | AuthenticationResponse,
-  cookieUrls: CookieUrlSource,
+  originUrls: OriginUrls,
 ): Promise<void> {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
   const encryptedSession = await encryptSession(sessionOrResponse);
   const nextCookies = await cookies();
-  nextCookies.set(cookieName, encryptedSession, getCookieOptions(cookieUrls));
+  nextCookies.set(cookieName, encryptedSession, getCookieOptions(originUrls));
 }
 
 export { encryptSession, refreshSession, updateSession, updateSessionMiddleware, withAuth };
