@@ -81,7 +81,12 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         codeVerifier,
         customState,
         returnPathname: returnPathnameState,
+        redirectUri: stateRedirectUri,
       } = await getStateFromPKCECookieValue(pkceCookie);
+
+      // The redirect URI sealed into the state is the browser-facing callback URL for
+      // this flow, so it covers redirect URIs configured only on the middleware.
+      const sessionCookieUrls = [...cookieUrls, stateRedirectUri];
 
       // Use the code returned to us by AuthKit and authenticate the user with WorkOS
       const { accessToken, refreshToken, user, impersonator, oauthTokens, authenticationMethod, organizationId } =
@@ -119,9 +124,15 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       // Always delete the PKCE cookie after handling the callback, regardless of success or error
       // to avoid stale cookies affecting future auth attempts & prevent replays
-      response.headers.append('Set-Cookie', `${pkceCookieName}=; ${getPKCECookieOptions(cookieUrls, true, true)}`);
+      response.headers.append(
+        'Set-Cookie',
+        `${pkceCookieName}=; ${getPKCECookieOptions(sessionCookieUrls, true, true)}`,
+      );
 
-      await setSessionCookie({ accessToken, refreshToken, user, impersonator, authenticationMethod }, cookieUrls);
+      await setSessionCookie(
+        { accessToken, refreshToken, user, impersonator, authenticationMethod },
+        sessionCookieUrls,
+      );
 
       if (onSuccess) {
         try {
@@ -142,7 +153,7 @@ export function handleAuth(options: HandleAuthOptions = {}) {
           const redirectUrl = getURLFromRedirectError(error as Parameters<typeof getURLFromRedirectError>[0]);
           if (redirectUrl === null) {
             const nextCookies = await cookies();
-            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(cookieUrls, false, true));
+            nextCookies.set(WORKOS_COOKIE_NAME || 'wos-session', '', getCookieOptions(sessionCookieUrls, false, true));
           }
           throw error;
         }

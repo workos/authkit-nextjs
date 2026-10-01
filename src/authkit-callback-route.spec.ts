@@ -648,8 +648,8 @@ describe('authkit-callback-route', () => {
         cookieConfig.redirectUri = undefined;
       });
 
-      async function completeCallback(options: Parameters<typeof handleAuth>[0]) {
-        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      async function completeCallback(options: Parameters<typeof handleAuth>[0], redirectUri?: string) {
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier', redirectUri });
         request.nextUrl.searchParams.set('code', 'test-code');
         request.nextUrl.searchParams.set('state', sealedState);
         const response = await handleAuth(options)(request);
@@ -673,10 +673,22 @@ describe('authkit-callback-route', () => {
         expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
       });
 
+      it('sets Secure when the https redirect URI was only configured on the middleware', async () => {
+        // Middleware-only redirectUri: no baseURL, and the env redirect URI is http.
+        // The redirect URI sealed into the PKCE state carries the browser-facing origin.
+        cookieConfig.redirectUri = 'http://localhost:3000/callback';
+
+        const { response, pkceCookieName } = await completeCallback({}, 'https://app.example.com/callback');
+
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+        const pkceDelete = response.headers.getSetCookie().find((c) => c.startsWith(`${pkceCookieName}=`));
+        expect(pkceDelete).toMatch(/; Secure/);
+      });
+
       it('omits Secure only when every origin signal is http', async () => {
         cookieConfig.redirectUri = 'http://localhost:3000/callback';
 
-        await completeCallback({ baseURL: 'http://localhost:3000' });
+        await completeCallback({ baseURL: 'http://localhost:3000' }, 'http://localhost:3000/callback');
 
         expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
       });
