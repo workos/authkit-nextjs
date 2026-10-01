@@ -245,5 +245,38 @@ describe('getAuthorizationUrl', () => {
       expect(nonce).toBeDefined();
       expect(typeof nonce).toBe('string');
     });
+
+    it('seals the redirect URI used for the flow into state', async () => {
+      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+      const result = await getAuthorizationUrl({ redirectUri: 'https://app.example.com/callback' });
+
+      const { redirectUri } = await getStateFromPKCECookieValue(result.sealedState);
+      expect(redirectUri).toBe('https://app.example.com/callback');
+      expect(workos.userManagement.getAuthorizationUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ redirectUri: 'https://app.example.com/callback' }),
+      );
+    });
+
+    it('seals the middleware x-redirect-uri into state', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.set('x-redirect-uri', 'https://middleware.example.com/callback');
+      vi.mocked(workos.userManagement.getAuthorizationUrl).mockReturnValue('mock-url');
+
+      const result = await getAuthorizationUrl({});
+
+      const { redirectUri } = await getStateFromPKCECookieValue(result.sealedState);
+      expect(redirectUri).toBe('https://middleware.example.com/callback');
+    });
+
+    it('parses states sealed without a redirect URI', async () => {
+      const { sealData } = await import('iron-session');
+      const legacy = await sealData(
+        { nonce: 'n', codeVerifier: 'v' },
+        { password: process.env.WORKOS_COOKIE_PASSWORD as string },
+      );
+
+      await expect(getStateFromPKCECookieValue(legacy)).resolves.toEqual({ nonce: 'n', codeVerifier: 'v' });
+    });
   });
 });
