@@ -5,6 +5,8 @@ import * as workosModule from './workos.js';
 
 // These are mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
+import * as nextHeadersModule from 'next/headers';
+import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import { generateSession, generateTestToken } from './test-helpers.js';
 import { sealData } from 'iron-session';
@@ -91,6 +93,26 @@ describe('auth.ts', () => {
       const decoded = await getStateFromPKCECookieValue(state!);
       expect(decoded.returnPathname).toBe('/dashboard');
     });
+  });
+
+  // Behind a TLS-terminating proxy x-url is the internal http:// origin; an explicit
+  // https redirectUri is the browser-facing origin and must decide Secure.
+  it('getSignInUrl sets Secure on the PKCE cookie for an https redirectUri behind a TLS-terminating proxy', async () => {
+    const cookieResponse = new NextResponse();
+    const spy = vi
+      .spyOn(nextHeadersModule, 'cookies')
+      .mockImplementation(async () => cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>);
+    try {
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://web:3000/login');
+
+      await getSignInUrl({ redirectUri: 'https://app.example.com/callback' });
+
+      const pkceCookie = cookieResponse.cookies.getAll().find((c) => c.name.startsWith('wos-auth-verifier-'));
+      expect(pkceCookie).toMatchObject({ secure: true });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('should not include prompt when not specified for getSignInUrl', async () => {

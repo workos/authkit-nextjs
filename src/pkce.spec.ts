@@ -44,7 +44,7 @@ describe('setPKCECookie SameSite override', () => {
     Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
 
     const { setPKCECookie } = await import('./pkce');
-    await setPKCECookie('sealed-state');
+    await setPKCECookie('sealed-state', []);
 
     expect(mockSet).toHaveBeenCalledWith(
       getPKCECookieNameForState('sealed-state'),
@@ -58,7 +58,7 @@ describe('setPKCECookie SameSite override', () => {
     Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
 
     const { setPKCECookie } = await import('./pkce');
-    await setPKCECookie('sealed-state');
+    await setPKCECookie('sealed-state', []);
 
     expect(mockSet).toHaveBeenCalledWith(
       getPKCECookieNameForState('sealed-state'),
@@ -72,7 +72,7 @@ describe('setPKCECookie SameSite override', () => {
     Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'Strict' });
 
     const { setPKCECookie } = await import('./pkce');
-    await setPKCECookie('sealed-state');
+    await setPKCECookie('sealed-state', []);
 
     expect(mockSet).toHaveBeenCalledWith(
       getPKCECookieNameForState('sealed-state'),
@@ -81,9 +81,20 @@ describe('setPKCECookie SameSite override', () => {
     );
   });
 
+  it('should set Secure when an origin URL is https, even if the request URL is internal http', async () => {
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state', ['http://web:3000/login', 'https://app.example.com/callback']);
+
+    expect(mockSet).toHaveBeenCalledWith(
+      getPKCECookieNameForState('sealed-state'),
+      'sealed-state',
+      expect.objectContaining({ secure: true }),
+    );
+  });
+
   it('should default to lax when no SameSite configured', async () => {
     const { setPKCECookie } = await import('./pkce');
-    await setPKCECookie('sealed-state');
+    await setPKCECookie('sealed-state', []);
 
     expect(mockSet).toHaveBeenCalledWith(
       getPKCECookieNameForState('sealed-state'),

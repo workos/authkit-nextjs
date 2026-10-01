@@ -1,6 +1,7 @@
 import type { Mock, MockInstance } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
+import * as nextHeadersModule from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
 import {
@@ -1554,6 +1555,43 @@ describe('session.ts', () => {
         expect(refreshSpy).toHaveBeenCalledTimes(1);
         expect(result.status).toBe(200);
       });
+    });
+  });
+
+  // Behind a TLS-terminating proxy x-url is the internal http:// origin. Server-side
+  // cookie writes must also honor the middleware's browser-facing x-redirect-uri.
+  describe('server-side cookie writes behind a TLS-terminating proxy', () => {
+    let cookieResponse: NextResponse;
+    let restoreCookies: () => void;
+
+    beforeEach(async () => {
+      cookieResponse = new NextResponse();
+      const spy = vi
+        .spyOn(nextHeadersModule, 'cookies')
+        .mockImplementation(async () => cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>);
+      restoreCookies = () => spy.mockRestore();
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://web:3000/protected');
+      nextHeaders.set('x-redirect-uri', 'https://app.example.com/callback');
+    });
+
+    afterEach(() => restoreCookies());
+
+    it('refreshSession sets Secure on the session cookie', async () => {
+      cookieResponse.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      await refreshSession({ ensureSignedIn: false });
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
     });
   });
 
