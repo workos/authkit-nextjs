@@ -10,250 +10,209 @@ describe('cookie.ts', () => {
     });
   });
 
+  async function setEnv(values: Record<string, string | undefined>) {
+    const envVars = await import('./env-variables');
+    for (const [key, value] of Object.entries(values)) {
+      Object.defineProperty(envVars, key, { value });
+    }
+  }
+
   describe('getCookieOptions', () => {
     it('should return the default cookie options', async () => {
       const { getCookieOptions } = await import('./cookie');
 
-      const options = getCookieOptions();
-      expect(options).toEqual(
-        expect.objectContaining({
-          path: '/',
-          httpOnly: true,
-          secure: false,
-          sameSite: 'lax',
-          maxAge: 400 * 24 * 60 * 60,
-          domain: 'example.com',
-        }),
-      );
+      expect(getCookieOptions([])).toEqual({
+        path: '/',
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 400 * 24 * 60 * 60,
+        domain: 'example.com',
+      });
     });
 
     it('should return the cookie options with custom values', async () => {
-      // Import the mocked module
-      const envVars = await import('./env-variables');
-
-      // Set the mock values
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: '1000' });
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: 'foobar.com' });
+      await setEnv({ WORKOS_COOKIE_MAX_AGE: '1000', WORKOS_COOKIE_DOMAIN: 'foobar.com' });
 
       const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions('http://example.com');
-
-      expect(options).toEqual(
-        expect.objectContaining({
-          secure: false,
-          maxAge: 1000,
-          domain: 'foobar.com',
-        }),
+      expect(getCookieOptions(['http://example.com'])).toEqual(
+        expect.objectContaining({ secure: false, maxAge: 1000, domain: 'foobar.com' }),
       );
 
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+      await setEnv({ WORKOS_COOKIE_DOMAIN: '' });
+      expect(getCookieOptions(['http://example.com'])).toEqual(expect.objectContaining({ domain: '' }));
+    });
 
-      const options2 = getCookieOptions('http://example.com');
-      expect(options2).toEqual(
-        expect.objectContaining({
-          secure: false,
-          maxAge: 1000,
-          domain: '',
-        }),
+    it('should return max-age 0 when expired', async () => {
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions(['http://example.com'], { expired: true })).toEqual(
+        expect.objectContaining({ maxAge: 0 }),
       );
-
-      const options3 = getCookieOptions('https://example.com', true);
-      // Domain should not be included when WORKOS_COOKIE_DOMAIN is empty
-      expect(options3).toEqual(expect.not.stringContaining('Domain='));
-    });
-
-    it('should return the cookie options with expired set to true', async () => {
-      const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions('http://example.com', false, true);
-      expect(options).toEqual(expect.objectContaining({ maxAge: 0 }));
-    });
-
-    it('should return the cookie options as a string', async () => {
-      const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions('http://example.com', true, false);
-      expect(options).toEqual(expect.stringContaining('HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com'));
-      expect(options).toEqual(expect.not.stringContaining('Secure'));
-
-      const options2 = getCookieOptions('https://example.com', true, true);
-      expect(options2).toEqual(expect.stringContaining('HttpOnly'));
-      expect(options2).toEqual(expect.stringContaining('Secure'));
-      expect(options2).toEqual(expect.stringContaining('SameSite=Lax'));
-      expect(options2).toEqual(expect.stringContaining('Max-Age=0'));
-      expect(options2).toEqual(expect.stringContaining('Domain=example.com'));
     });
 
     it('allows the sameSite config to be set by the WORKOS_COOKIE_SAMESITE env variable', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'none' });
+      await setEnv({ WORKOS_COOKIE_SAMESITE: 'none' });
 
       const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions('http://example.com');
-      expect(options).toEqual(expect.objectContaining({ sameSite: 'none' }));
+      expect(getCookieOptions(['http://example.com'])).toEqual(
+        expect.objectContaining({ sameSite: 'none', secure: true }),
+      );
     });
 
     it('throws an error if the sameSite value is invalid', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'invalid' });
+      await setEnv({ WORKOS_COOKIE_SAMESITE: 'invalid' });
 
       const { getCookieOptions } = await import('./cookie');
-      expect(() => getCookieOptions('http://example.com')).toThrow('Invalid SameSite value: invalid');
-    });
-
-    it('defaults to secure=true when no URL is available', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
-
-      const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions();
-      expect(options).toEqual(expect.objectContaining({ secure: true }));
-    });
-
-    it('defaults to secure=true when no URL is available with lax sameSite', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: undefined });
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'lax' });
-
-      const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions();
-      expect(options).toEqual(expect.objectContaining({ secure: true, sameSite: 'lax' }));
-    });
-
-    it('handles invalid URLs gracefully by defaulting to secure=true', async () => {
-      const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions('not-a-valid-url');
-      expect(options).toEqual(expect.objectContaining({ secure: true }));
+      expect(() => getCookieOptions(['http://example.com'])).toThrow('Invalid SameSite value: invalid');
     });
 
     it('handles invalid WORKOS_COOKIE_MAX_AGE gracefully', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_MAX_AGE', { value: 'invalid-number' });
+      await setEnv({ WORKOS_COOKIE_MAX_AGE: 'invalid-number' });
 
       const { getCookieOptions } = await import('./cookie');
-      const options = getCookieOptions();
-      expect(options).toEqual(expect.objectContaining({ maxAge: 34560000 })); // Falls back to default
+      expect(getCookieOptions([])).toEqual(expect.objectContaining({ maxAge: 34560000 }));
+    });
+  });
+
+  // One policy decides `Secure` for every AuthKit cookie. Behind a TLS-terminating
+  // proxy the request URL is the internal http:// origin, so any HTTPS signal wins.
+  describe('Secure policy', () => {
+    const internalUrl = 'http://web:3000/callback';
+
+    it('is Secure when NEXT_PUBLIC_WORKOS_REDIRECT_URI is https', async () => {
+      await setEnv({ WORKOS_REDIRECT_URI: 'https://app.example.com/callback' });
+
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions([internalUrl]).secure).toBe(true);
     });
 
-    it('properly formats cookie string without Domain when not set', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_DOMAIN', { value: '' });
+    it('is Secure when any supplied origin URL is https', async () => {
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions([internalUrl, 'https://app.example.com']).secure).toBe(true);
+    });
+
+    it('stays Secure for an https request even if the configured URL is http', async () => {
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions(['https://app.example.com/callback', 'http://localhost:3000']).secure).toBe(true);
+    });
+
+    it('is not Secure only when every signal is http', async () => {
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions([internalUrl, 'http://localhost:3000', undefined, null]).secure).toBe(false);
+    });
+
+    it('fails closed to Secure when no signal is available', async () => {
+      await setEnv({ WORKOS_REDIRECT_URI: undefined });
 
       const { getCookieOptions } = await import('./cookie');
-      const cookieString = getCookieOptions('https://example.com', true);
-      expect(cookieString).not.toContain('Domain=');
-      expect(cookieString).toContain('Secure');
-      expect(cookieString).toContain('SameSite=Lax'); // Capitalized
+      expect(getCookieOptions([]).secure).toBe(true);
+    });
+
+    it('fails closed to Secure when a signal is unparseable', async () => {
+      const { getCookieOptions } = await import('./cookie');
+      expect(getCookieOptions(['not-a-valid-url']).secure).toBe(true);
+    });
+
+    it('applies to PKCE and JWT cookies too', async () => {
+      await setEnv({ WORKOS_REDIRECT_URI: 'https://app.example.com/callback' });
+
+      const { getPKCECookieOptions, getJwtCookie } = await import('./cookie');
+      expect(getPKCECookieOptions([internalUrl]).secure).toBe(true);
+      expect(getJwtCookie('token', [internalUrl])).toContain('Secure');
+    });
+  });
+
+  describe('originUrlsFromHeaders', () => {
+    it('reads the request URL and redirect URI recorded by the middleware', async () => {
+      const { originUrlsFromHeaders } = await import('./cookie');
+      const headers = new Headers({ 'x-url': 'http://web:3000/page', 'x-redirect-uri': 'https://app.example.com/cb' });
+
+      expect(originUrlsFromHeaders(headers)).toEqual(['http://web:3000/page', 'https://app.example.com/cb']);
+      expect(originUrlsFromHeaders(new Headers())).toEqual([null, null]);
+    });
+  });
+
+  describe('serializeCookie', () => {
+    it('serializes options in Set-Cookie format', async () => {
+      const { getCookieOptions, serializeCookie } = await import('./cookie');
+
+      expect(serializeCookie('wos-session', 'abc', getCookieOptions(['http://example.com']))).toBe(
+        'wos-session=abc; Path=/; HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com',
+      );
+      expect(serializeCookie('wos-session', 'abc', getCookieOptions(['https://example.com']))).toBe(
+        'wos-session=abc; Path=/; HttpOnly; SameSite=Lax; Max-Age=34560000; Domain=example.com; Secure',
+      );
+    });
+
+    it('adds an epoch Expires when deleting', async () => {
+      const { getCookieOptions, serializeCookie } = await import('./cookie');
+
+      expect(serializeCookie('wos-session', '', getCookieOptions(['https://example.com'], { expired: true }))).toBe(
+        'wos-session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Domain=example.com; Secure',
+      );
+    });
+
+    it('omits Domain when not set and capitalizes SameSite', async () => {
+      await setEnv({ WORKOS_COOKIE_DOMAIN: '', WORKOS_COOKIE_SAMESITE: 'STRICT' });
+
+      const { getCookieOptions, serializeCookie } = await import('./cookie');
+      const cookie = serializeCookie('wos-session', 'abc', getCookieOptions(['https://example.com']));
+
+      expect(cookie).not.toContain('Domain=');
+      expect(cookie).toContain('SameSite=Strict');
     });
   });
 
   describe('getJwtCookie', () => {
-    const originalEnv = process.env;
-
-    beforeEach(() => {
-      process.env = { ...originalEnv };
-      delete process.env.NODE_ENV;
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
-    });
-
     it('should create JWT cookie with Secure flag for HTTPS URLs', async () => {
       const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie('test-token', 'https://example.com');
-
-      expect(cookie).toBe('workos-access-token=test-token; SameSite=Lax; Max-Age=30; Secure');
+      expect(getJwtCookie('test-token', ['https://example.com'])).toBe(
+        'workos-access-token=test-token; SameSite=Lax; Max-Age=30; Secure',
+      );
     });
 
-    it('should create JWT cookie without Secure flag for HTTP URLs', async () => {
+    it('should create JWT cookie without Secure flag when every signal is http', async () => {
       const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie('test-token', 'http://localhost:3000');
-
-      expect(cookie).toBe('workos-access-token=test-token; SameSite=Lax; Max-Age=30');
+      expect(getJwtCookie('test-token', ['http://localhost:3000'])).toBe(
+        'workos-access-token=test-token; SameSite=Lax; Max-Age=30',
+      );
     });
 
-    it('should force Secure in production except for localhost', async () => {
-      process.env.NODE_ENV = 'production';
+    describe('in production', () => {
+      const originalNodeEnv = process.env.NODE_ENV;
 
-      const { getJwtCookie } = await import('./cookie');
+      beforeEach(() => {
+        process.env.NODE_ENV = 'production';
+      });
 
-      // Production with regular domain should be secure
-      const prodCookie = getJwtCookie('prod-token', 'http://example.com');
-      expect(prodCookie).toContain('Secure');
+      afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
+      });
 
-      // Production with localhost should not be secure
-      const localhostCookie = getJwtCookie('local-token', 'http://localhost:3000');
-      expect(localhostCookie).not.toContain('Secure');
-    });
+      it('keeps Secure for a non-localhost origin even when every signal is http', async () => {
+        const { getJwtCookie, getCookieOptions } = await import('./cookie');
 
-    it('should handle invalid URLs with no fallback URL', async () => {
-      process.env.NODE_ENV = 'production';
+        expect(getJwtCookie('token', ['http://example.com'])).toContain('Secure');
+        // The floor is specific to the access token cookie.
+        expect(getCookieOptions(['http://example.com']).secure).toBe(false);
+      });
 
-      // Mock no WORKOS_REDIRECT_URI
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: '' });
+      it('omits Secure on localhost and 127.0.0.1', async () => {
+        await setEnv({ WORKOS_REDIRECT_URI: 'http://localhost:3000/callback' });
 
-      const { getJwtCookie } = await import('./cookie');
+        const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie('token', 'invalid-url');
-
-      expect(cookie).toContain('Secure'); // Should default to secure in production when no fallback
-    });
-
-    it('should fall back to WORKOS_REDIRECT_URI when invalid URL provided', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://app.workos.com/callback' });
-
-      const { getJwtCookie } = await import('./cookie');
-
-      const cookie = getJwtCookie('token', 'invalid-url');
-
-      expect(cookie).toContain('Secure'); // Should use HTTPS from fallback URL
-    });
-
-    it('should set secure to false when WORKOS_REDIRECT_URI parsing fails', async () => {
-      process.env.NODE_ENV = 'development'; // Not production
-
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'also-invalid-url' });
-
-      const { getJwtCookie } = await import('./cookie');
-
-      const cookie = getJwtCookie('token', null); // This triggers the WORKOS_REDIRECT_URI path
-
-      expect(cookie).not.toContain('Secure'); // Should be false when URL parsing fails (line 128)
-    });
-
-    it('should handle both main URL and fallback URL parsing failures', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'invalid-fallback-url' });
-
-      const { getJwtCookie } = await import('./cookie');
-
-      // Invalid main URL with invalid fallback URL - should hit line 118
-      const cookie = getJwtCookie('token', 'invalid-main-url');
-
-      expect(cookie).not.toContain('Secure'); // Line 118: secure = false when fallback parsing fails
-    });
-
-    it('should use WORKOS_REDIRECT_URI when no URL provided', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_REDIRECT_URI', { value: 'https://secure.example.com' });
-
-      const { getJwtCookie } = await import('./cookie');
-
-      const cookie = getJwtCookie('token', null);
-
-      expect(cookie).toContain('Secure'); // Should use HTTPS from WORKOS_REDIRECT_URI
+        expect(getJwtCookie('token', ['http://localhost:3000'])).not.toContain('Secure');
+        expect(getJwtCookie('token', ['http://127.0.0.1:3000'])).not.toContain('Secure');
+      });
     });
 
     it('should create expired JWT cookie for deletion', async () => {
       const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie('token', 'https://example.com', true);
-
-      expect(cookie).toBe(
+      expect(getJwtCookie('token', ['https://example.com'], true)).toBe(
         'workos-access-token=; SameSite=Lax; Max-Age=0; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
       );
     });
@@ -261,21 +220,9 @@ describe('cookie.ts', () => {
     it('should handle null token body', async () => {
       const { getJwtCookie } = await import('./cookie');
 
-      const cookie = getJwtCookie(null, 'https://example.com');
-
-      expect(cookie).toBe('workos-access-token=; SameSite=Lax; Max-Age=30; Secure');
-    });
-
-    it('should handle localhost vs 127.0.0.1 in production', async () => {
-      process.env.NODE_ENV = 'production';
-
-      const { getJwtCookie } = await import('./cookie');
-
-      const localhostCookie = getJwtCookie('token', 'http://localhost:3000');
-      const ipCookie = getJwtCookie('token', 'http://127.0.0.1:3000');
-
-      expect(localhostCookie).not.toContain('Secure');
-      expect(ipCookie).not.toContain('Secure');
+      expect(getJwtCookie(null, ['https://example.com'])).toBe(
+        'workos-access-token=; SameSite=Lax; Max-Age=30; Secure',
+      );
     });
   });
 
@@ -283,48 +230,30 @@ describe('cookie.ts', () => {
     it('should use 10-minute max-age, not the session cookie max-age', async () => {
       const { getPKCECookieOptions } = await import('./cookie');
 
-      const options = getPKCECookieOptions();
-
-      expect(options).toEqual(expect.objectContaining({ maxAge: 600 }));
+      expect(getPKCECookieOptions([])).toEqual(expect.objectContaining({ maxAge: 600 }));
     });
 
-    it('should use 10-minute max-age in string format', async () => {
+    it('should use max-age 0 when expired', async () => {
       const { getPKCECookieOptions } = await import('./cookie');
 
-      const options = getPKCECookieOptions('http://localhost:3000', true);
-
-      expect(options).toContain('Max-Age=600');
-      expect(options).not.toContain('Max-Age=34560000');
-    });
-
-    it('should use max-age 0 when expired in object format', async () => {
-      const { getPKCECookieOptions } = await import('./cookie');
-
-      const options = getPKCECookieOptions(undefined, false, true);
-
-      expect(options).toEqual(expect.objectContaining({ maxAge: 0 }));
-    });
-
-    it('should use max-age 0 when expired in string format', async () => {
-      const { getPKCECookieOptions } = await import('./cookie');
-
-      const options = getPKCECookieOptions('http://localhost:3000', true, true);
-
-      expect(options).toContain('Max-Age=0');
+      expect(getPKCECookieOptions([], { expired: true })).toEqual(expect.objectContaining({ maxAge: 0 }));
     });
 
     it('should downgrade SameSite=Strict to Lax', async () => {
-      const envVars = await import('./env-variables');
-      Object.defineProperty(envVars, 'WORKOS_COOKIE_SAMESITE', { value: 'strict' });
+      await setEnv({ WORKOS_COOKIE_SAMESITE: 'strict' });
+
+      const { getPKCECookieOptions, serializeCookie } = await import('./cookie');
+      const options = getPKCECookieOptions(['http://localhost:3000']);
+
+      expect(options).toEqual(expect.objectContaining({ sameSite: 'lax' }));
+      expect(serializeCookie('v', 's', options)).toContain('SameSite=Lax');
+    });
+
+    it('should preserve SameSite=None', async () => {
+      await setEnv({ WORKOS_COOKIE_SAMESITE: 'none' });
 
       const { getPKCECookieOptions } = await import('./cookie');
-
-      const objectOptions = getPKCECookieOptions();
-      expect(objectOptions).toEqual(expect.objectContaining({ sameSite: 'lax' }));
-
-      const stringOptions = getPKCECookieOptions('http://localhost:3000', true);
-      expect(stringOptions).toContain('SameSite=Lax');
-      expect(stringOptions).not.toContain('SameSite=Strict');
+      expect(getPKCECookieOptions([])).toEqual(expect.objectContaining({ sameSite: 'none', secure: true }));
     });
   });
 });

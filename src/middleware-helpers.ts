@@ -136,7 +136,8 @@ export function handleAuthkitProxy(
     }
 
     if (pkceAuthorizationUrl && sealedState && redirectUrl.toString() === new URL(pkceAuthorizationUrl).toString()) {
-      appendPKCESetCookieHeader(request, headers, sealedState);
+      // x-redirect-uri carries the middleware's browser-facing redirectUri, if configured.
+      appendPKCESetCookieHeader(request, headers, sealedState, [request.url, headers.get('x-redirect-uri')]);
     }
   }
 

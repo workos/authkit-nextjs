@@ -13,17 +13,24 @@ import * as nextHeaders from 'next/headers';
 const cookieConfig = vi.hoisted(() => ({
   name: undefined as string | undefined,
   sameSite: undefined as 'lax' | 'strict' | 'none' | undefined,
+  redirectUri: undefined as string | undefined,
 }));
 
-vi.mock('./env-variables.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./env-variables.js')>()),
-  get WORKOS_COOKIE_NAME() {
-    return cookieConfig.name;
-  },
-  get WORKOS_COOKIE_SAMESITE() {
-    return cookieConfig.sameSite;
-  },
-}));
+vi.mock('./env-variables.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./env-variables.js')>();
+  return {
+    ...actual,
+    get WORKOS_REDIRECT_URI() {
+      return cookieConfig.redirectUri ?? actual.WORKOS_REDIRECT_URI;
+    },
+    get WORKOS_COOKIE_NAME() {
+      return cookieConfig.name;
+    },
+    get WORKOS_COOKIE_SAMESITE() {
+      return cookieConfig.sameSite;
+    },
+  };
+});
 import { State } from './interfaces.js';
 
 // Mock dependencies
@@ -618,6 +625,73 @@ describe('authkit-callback-route', () => {
       await handler(request);
 
       expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ state: undefined }));
+    });
+
+    // Behind a TLS-terminating proxy, NextRequest.url is the internal
+    // http:// origin. The browser-facing origin must decide the Secure attribute.
+    describe('behind a TLS-terminating proxy', () => {
+      let cookieResponse: NextResponse;
+      let restoreCookies: () => void;
+
+      beforeEach(() => {
+        cookieResponse = new NextResponse();
+        const spy = vi
+          .spyOn(nextHeaders, 'cookies')
+          .mockImplementation(async () => cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>);
+        restoreCookies = () => spy.mockRestore();
+        request = new NextRequest('http://web:3000/callback');
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      });
+
+      afterEach(() => {
+        restoreCookies();
+        cookieConfig.redirectUri = undefined;
+      });
+
+      async function completeCallback(options: Parameters<typeof handleAuth>[0], redirectUri?: string) {
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier', redirectUri });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+        const response = await handleAuth(options)(request);
+        return { response, pkceCookieName: getPKCECookieNameForState(sealedState) };
+      }
+
+      it('sets Secure on the session cookie when baseURL is https', async () => {
+        const { response, pkceCookieName } = await completeCallback({ baseURL: 'https://app.example.com' });
+
+        expect(response.headers.get('Location')).toBe('https://app.example.com/');
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+        const pkceDelete = response.headers.getSetCookie().find((c) => c.startsWith(`${pkceCookieName}=`));
+        expect(pkceDelete).toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the session cookie when the configured redirect URI is https', async () => {
+        cookieConfig.redirectUri = 'https://app.example.com/callback';
+
+        await completeCallback({});
+
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+      });
+
+      it('sets Secure when the https redirect URI was only configured on the middleware', async () => {
+        // Middleware-only redirectUri: no baseURL, and the env redirect URI is http.
+        // The redirect URI sealed into the PKCE state carries the browser-facing origin.
+        cookieConfig.redirectUri = 'http://localhost:3000/callback';
+
+        const { response, pkceCookieName } = await completeCallback({}, 'https://app.example.com/callback');
+
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+        const pkceDelete = response.headers.getSetCookie().find((c) => c.startsWith(`${pkceCookieName}=`));
+        expect(pkceDelete).toMatch(/; Secure/);
+      });
+
+      it('omits Secure only when every origin signal is http', async () => {
+        cookieConfig.redirectUri = 'http://localhost:3000/callback';
+
+        await completeCallback({ baseURL: 'http://localhost:3000' }, 'http://localhost:3000/callback');
+
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
+      });
     });
 
     describe('state verification', () => {

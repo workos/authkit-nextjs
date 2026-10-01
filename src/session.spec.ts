@@ -1,6 +1,7 @@
 import type { Mock, MockInstance } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
+import * as nextHeadersModule from 'next/headers';
 import { redirect } from 'next/navigation';
 import { generateTestToken } from './test-helpers.js';
 import {
@@ -924,6 +925,60 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledWith('Failed to refresh. Deleting cookie.', expect.any(Error));
     });
 
+    // Behind a TLS-terminating proxy, NextRequest.url is the internal
+    // http:// origin. The browser-facing origin must decide the Secure attribute.
+    describe('behind a TLS-terminating proxy', () => {
+      const originalRedirectUri = envVariables.WORKOS_REDIRECT_URI;
+
+      afterEach(() => {
+        setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalRedirectUri);
+      });
+
+      async function refreshBehindProxy(options: Parameters<typeof updateSession>[1] = {}) {
+        mockSession.accessToken = await generateTestToken({}, true);
+        (jwtVerify as Mock).mockImplementation(() => {
+          throw new Error('Invalid token');
+        });
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+
+        const request = new NextRequest(new URL('http://web:3000/account'));
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const response = await updateSession(request, options);
+        return response.headers.getSetCookie().find((c) => c.startsWith('wos-session='));
+      }
+
+      it('sets Secure on the refreshed session cookie when WORKOS_REDIRECT_URI is https', async () => {
+        setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', 'https://app.example.com/callback');
+
+        expect(await refreshBehindProxy()).toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the refreshed session cookie when the redirectUri option is https', async () => {
+        expect(await refreshBehindProxy({ redirectUri: 'https://app.example.com/callback' })).toMatch(/; Secure/);
+      });
+
+      it('omits Secure only when every origin signal is http', async () => {
+        expect(await refreshBehindProxy()).not.toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the PKCE verifier cookie when the redirectUri option is https', async () => {
+        const request = new NextRequest(new URL('http://web:3000/account'), { headers: { accept: 'text/html' } });
+
+        const response = await updateSession(request, { redirectUri: 'https://app.example.com/callback' });
+
+        const pkceCookie = response.headers.getSetCookie().find((c) => c.startsWith('wos-auth-verifier'));
+        expect(pkceCookie).toMatch(/; Secure/);
+      });
+    });
+
     describe('PKCE cookie cleanup', () => {
       function documentRequest(url = 'http://example.com/protected'): NextRequest {
         return new NextRequest(new URL(url), {
@@ -1309,6 +1364,51 @@ describe('session.ts', () => {
         expect(refreshSpy).toHaveBeenCalledTimes(1);
         expect(result.status).toBe(200);
       });
+    });
+  });
+
+  // Behind a TLS-terminating proxy x-url is the internal http:// origin. Server-side
+  // cookie writes must also honor the middleware's browser-facing x-redirect-uri.
+  describe('server-side cookie writes behind a TLS-terminating proxy', () => {
+    let cookieResponse: NextResponse;
+    let restoreCookies: () => void;
+
+    beforeEach(async () => {
+      cookieResponse = new NextResponse();
+      const spy = vi
+        .spyOn(nextHeadersModule, 'cookies')
+        .mockImplementation(async () => cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>);
+      restoreCookies = () => spy.mockRestore();
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'http://web:3000/protected');
+      nextHeaders.set('x-redirect-uri', 'https://app.example.com/callback');
+    });
+
+    afterEach(() => restoreCookies());
+
+    it('refreshSession sets Secure on the session cookie', async () => {
+      cookieResponse.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      await refreshSession({ ensureSignedIn: false });
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
+    it('withAuth({ ensureSignedIn }) sets Secure on the PKCE verifier cookie', async () => {
+      await withAuth({ ensureSignedIn: true });
+
+      const pkceCookie = cookieResponse.cookies.getAll().find((c) => c.name.startsWith('wos-auth-verifier-'));
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(pkceCookie).toMatchObject({ secure: true });
     });
   });
 
