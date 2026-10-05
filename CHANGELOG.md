@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.4.1](https://github.com/workos/authkit-nextjs/compare/v4.4.0...v4.4.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* start page authentication in the callback route ([#482](https://github.com/workos/authkit-nextjs/issues/482)) ([13938be](https://github.com/workos/authkit-nextjs/commit/13938bea1f7bb15e48e637dfee140b4a54f3c9fb))
+
 ## [4.4.0](https://github.com/workos/authkit-nextjs/compare/v4.3.2...v4.4.0) (2026-09-30)
 
 
