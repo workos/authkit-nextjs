@@ -13,6 +13,7 @@ import {
   appendPKCESetCookieHeader,
   getPKCECookieNameForState,
   getStateFromPKCECookieValue,
+  isBrowserPrefetchRequest,
   isInitialDocumentRequest,
 } from './pkce.js';
 import { saveSession } from './session.js';
@@ -83,9 +84,9 @@ export function handleAuth(options: HandleAuthOptions = {}) {
         const responseHeaders = new Headers();
         preventCaching(responseHeaders);
         if (!isInitialDocumentRequest(request)) {
-          // Next ignores non-Flight prefetches and uses a full navigation when the user follows the redirect.
+          // Browser preloads must not reuse an empty successful page. Next uses non-Flight HTML for full navigation.
           responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
-          return new Response('', { headers: responseHeaders });
+          return new Response('', { status: isBrowserPrefetchRequest(request) ? 503 : 200, headers: responseHeaders });
         }
 
         // Use the configured URI, not Next's normalized request URL. Never reuse routing data as OAuth state.

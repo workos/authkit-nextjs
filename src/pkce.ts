@@ -107,13 +107,15 @@ export function stripPKCESetCookieHeaders(headers: Headers): void {
   }
 }
 
+export function isBrowserPrefetchRequest(request: NextRequest): boolean {
+  return ['Purpose', 'Sec-Purpose'].some((name) => request.headers.get(name)?.split(';', 1)[0].trim() === 'prefetch');
+}
+
 export function isInitialDocumentRequest(request: NextRequest): boolean {
   const accept = request.headers.get('accept') || '';
   const isDocumentRequest = accept.includes('text/html');
   const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
-  const isPrefetch =
-    ['Purpose', 'Sec-Purpose'].some((name) => request.headers.get(name)?.split(';', 1)[0].trim() === 'prefetch') ||
-    request.headers.has('Next-Router-Prefetch');
+  const isPrefetch = isBrowserPrefetchRequest(request) || request.headers.has('Next-Router-Prefetch');
 
   return isDocumentRequest && !isRSCRequest && !isPrefetch;
 }

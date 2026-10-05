@@ -114,19 +114,21 @@ describe('page authentication start', () => {
     expect(flow.data.returnPathname).toBe('/dashboard?tab=details');
   });
 
-  it.each<Record<string, string>>([
-    { accept: '*/*', RSC: '1', 'Next-Router-State-Tree': '["",{}]' },
-    { accept: '*/*', RSC: '1', 'Next-Router-Prefetch': '1' },
-    { accept: 'text/html', Purpose: 'prefetch' },
-    { accept: 'text/html', 'Sec-Purpose': 'prefetch' },
-    { accept: 'text/html', 'Sec-Purpose': 'prefetch;prerender' },
-    { accept: 'text/html', 'Sec-Purpose': 'prefetch; prerender' },
-    { accept: 'text/html', Purpose: 'prefetch; prerender' },
-  ])('does not start a flow for a passive request with %j', async (headers) => {
+  it.each<[Record<string, string>, number]>([
+    [{ accept: '*/*', RSC: '1', 'Next-Router-State-Tree': '["",{}]' }, 200],
+    [{ accept: '*/*', RSC: '1', 'Next-Router-Prefetch': '1' }, 200],
+    [{ accept: 'text/html', 'Next-Router-Prefetch': '1' }, 200],
+    [{ accept: 'text/html', Purpose: 'prefetch' }, 503],
+    [{ accept: 'text/html', 'Sec-Purpose': 'prefetch' }, 503],
+    [{ accept: 'text/html', 'Sec-Purpose': 'prefetch;prerender' }, 503],
+    [{ accept: 'text/html', 'Sec-Purpose': 'prefetch; prerender' }, 503],
+    [{ accept: 'text/html', Purpose: 'prefetch; prerender' }, 503],
+    [{ accept: 'text/html', 'Sec-Purpose': 'prefetch;anonymous-client-ip' }, 503],
+  ])('does not start a flow for a passive request with %j (status %i)', async (headers, status) => {
     const generate = vi.spyOn(getWorkOS().pkce, 'generate');
     const handler = handleAuth();
     const response = await handler(new NextRequest(startUrl, { headers }));
-    expect.soft(response.status).toBe(200);
+    expect.soft(response.status).toBe(status);
     expect.soft(response.headers.getSetCookie().length).toBe(0);
     expect.soft(generate).not.toHaveBeenCalled();
     expect(response.headers.get('Content-Type')).toContain('text/html');
