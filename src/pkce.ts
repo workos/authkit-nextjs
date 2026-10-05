@@ -112,8 +112,7 @@ export function isInitialDocumentRequest(request: NextRequest): boolean {
   const isDocumentRequest = accept.includes('text/html');
   const isRSCRequest = request.headers.has('RSC') || request.headers.has('Next-Router-State-Tree');
   const isPrefetch =
-    request.headers.get('Purpose') === 'prefetch' ||
-    request.headers.get('Sec-Purpose') === 'prefetch' ||
+    ['Purpose', 'Sec-Purpose'].some((name) => request.headers.get(name)?.split(';', 1)[0].trim() === 'prefetch') ||
     request.headers.has('Next-Router-Prefetch');
 
   return isDocumentRequest && !isRSCRequest && !isPrefetch;

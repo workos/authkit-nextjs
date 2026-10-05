@@ -119,17 +119,20 @@ describe('page authentication start', () => {
     { accept: '*/*', RSC: '1', 'Next-Router-Prefetch': '1' },
     { accept: 'text/html', Purpose: 'prefetch' },
     { accept: 'text/html', 'Sec-Purpose': 'prefetch' },
+    { accept: 'text/html', 'Sec-Purpose': 'prefetch;prerender' },
+    { accept: 'text/html', 'Sec-Purpose': 'prefetch; prerender' },
+    { accept: 'text/html', Purpose: 'prefetch; prerender' },
   ])('does not start a flow for a passive request with %j', async (headers) => {
     const generate = vi.spyOn(getWorkOS().pkce, 'generate');
     const handler = handleAuth();
     const response = await handler(new NextRequest(startUrl, { headers }));
-    expect(response.status).toBe(200);
+    expect.soft(response.status).toBe(200);
+    expect.soft(response.headers.getSetCookie().length).toBe(0);
+    expect.soft(generate).not.toHaveBeenCalled();
     expect(response.headers.get('Content-Type')).toContain('text/html');
     expect(response.headers.get('Cache-Control')).toContain('no-store');
     expect(response.headers.get('Location')).toBeNull();
-    expect(response.headers.getSetCookie()).toEqual([]);
     expect(await response.text()).toBe('');
-    expect(generate).not.toHaveBeenCalled();
 
     // The same URL still starts authentication when Next falls back to a document navigation.
     await readFlow(await handler(new NextRequest(startUrl, { headers: documentHeaders })));
