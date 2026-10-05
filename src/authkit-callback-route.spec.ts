@@ -8,6 +8,22 @@ import { sealData } from 'iron-session';
 
 // Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
+import * as nextHeaders from 'next/headers';
+
+const cookieConfig = vi.hoisted(() => ({
+  name: undefined as string | undefined,
+  sameSite: undefined as 'lax' | 'strict' | 'none' | undefined,
+}));
+
+vi.mock('./env-variables.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./env-variables.js')>()),
+  get WORKOS_COOKIE_NAME() {
+    return cookieConfig.name;
+  },
+  get WORKOS_COOKIE_SAMESITE() {
+    return cookieConfig.sameSite;
+  },
+}));
 import { State } from './interfaces.js';
 
 // Mock dependencies
@@ -400,6 +416,120 @@ describe('authkit-callback-route', () => {
 
       const session = await getSessionFromCookie();
       expect(session?.accessToken).toBe(newAccessToken);
+    });
+
+    describe('onSuccess session cleanup', () => {
+      let cookieResponse: NextResponse;
+      let restoreCookies: () => void;
+
+      beforeEach(() => {
+        cookieResponse = new NextResponse();
+        const spy = vi.spyOn(nextHeaders, 'cookies').mockImplementation(async () => {
+          // Model asynchronous request-cookie access rather than the option-dropping Map mock.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          return cookieResponse.cookies as unknown as Awaited<ReturnType<typeof cookies>>;
+        });
+        restoreCookies = () => spy.mockRestore();
+      });
+
+      afterEach(() => {
+        restoreCookies();
+        cookieConfig.name = undefined;
+        cookieConfig.sameSite = undefined;
+      });
+
+      it.each([
+        { name: undefined, sameSite: undefined, protocol: 'http', secure: false },
+        { name: 'custom-session', sameSite: 'strict' as const, protocol: 'https', secure: true },
+        { name: 'custom-session', sameSite: 'none' as const, protocol: 'http', secure: true },
+      ])('clears the scoped session before onError: %j', async ({ name, sameSite, protocol, secure }) => {
+        cookieConfig.name = name;
+        cookieConfig.sameSite = sameSite;
+        request = new NextRequest(`${protocol}://app.example.com/callback`);
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+
+        const failure = new Error('onSuccess failed');
+        let sessionDuringSuccess: Awaited<ReturnType<typeof getSessionFromCookie>>;
+        let cookieDuringError: ReturnType<typeof cookieResponse.cookies.get>;
+        let headerDuringError: string | null | undefined;
+        const onError = vi.fn(({ error }) => {
+          cookieDuringError = cookieResponse.cookies.get(name || 'wos-session');
+          headerDuringError = cookieResponse.headers.get('set-cookie');
+          return new Response(String(error), { status: 403 });
+        });
+        const response = await handleAuth({
+          onSuccess: async (data) => {
+            sessionDuringSuccess = await getSessionFromCookie();
+            await saveSession({ ...data, accessToken: 'updated-token' }, request);
+            throw failure;
+          },
+          onError,
+        })(request);
+
+        expect(sessionDuringSuccess?.accessToken).toBe(mockAuthResponse.accessToken);
+        expect(onError).toHaveBeenCalledWith({ error: failure, request });
+        expect(response.status).toBe(403);
+        expect(cookieDuringError).toMatchObject({
+          name: name || 'wos-session',
+          value: '',
+          domain: 'example.com',
+          path: '/',
+          sameSite: sameSite || 'lax',
+        });
+        expect(Boolean(cookieDuringError?.secure)).toBe(secure);
+        expect(headerDuringError).toContain(`${name || 'wos-session'}=;`);
+        expect(headerDuringError).toContain('Domain=example.com');
+        expect(headerDuringError).toContain('Path=/');
+        expect(headerDuringError).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+        expect(headerDuringError?.toLowerCase()).toContain(`samesite=${sameSite || 'lax'}`);
+        expect(/; secure/i.test(headerDuringError!)).toBe(secure);
+      });
+
+      it('clears the session on a synchronous failure with the default error response', async () => {
+        vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+        const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+        request.nextUrl.searchParams.set('code', 'test-code');
+        request.nextUrl.searchParams.set('state', sealedState);
+        const onSuccess = vi.fn(() => {
+          throw 'callback rejected';
+        });
+
+        const response = await handleAuth({ onSuccess })(request);
+
+        expect(onSuccess).toHaveBeenCalledOnce();
+        expect(response.status).toBe(500);
+        expect(cookieResponse.cookies.get('wos-session')?.value).toBe('');
+      });
+
+      it.each(['redirect', 'permanentRedirect'] as const)(
+        'preserves callback session updates when onError rethrows %s',
+        async (method) => {
+          const navigation = await vi.importActual<typeof import('next/navigation')>('next/navigation');
+          vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+          const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+          request.nextUrl.searchParams.set('code', 'test-code');
+          request.nextUrl.searchParams.set('state', sealedState);
+          const onError = vi.fn(({ error }) => {
+            throw error;
+          });
+
+          await expect(
+            handleAuth({
+              onSuccess: async (data) => {
+                await saveSession({ ...data, accessToken: 'updated-token' }, request);
+                navigation[method]('/dashboard');
+              },
+              onError,
+            })(request),
+          ).rejects.toMatchObject({ message: 'NEXT_REDIRECT' });
+
+          expect(onError).toHaveBeenCalledOnce();
+          expect((await getSessionFromCookie())?.accessToken).toBe('updated-token');
+        },
+      );
     });
 
     it('should pass custom state data to onSuccess callback', async () => {

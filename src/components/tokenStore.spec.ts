@@ -857,9 +857,8 @@ describe('tokenStore', () => {
         store.subscribe(() => {});
         expect(vi.getTimerCount()).toBe(1);
 
-        // Expiring token schedules an immediate refresh
-        await vi.runOnlyPendingTimersAsync();
-        await Promise.resolve();
+        // An initially expiring token refreshes immediately after subscription.
+        await vi.advanceTimersByTimeAsync(0);
 
         expect(mockRefreshAccessTokenAction).toHaveBeenCalledTimes(1);
         expect(store.getSnapshot().token).toBe(freshToken);

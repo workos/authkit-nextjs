@@ -6,7 +6,13 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
 import { getCookieOptions, getJwtCookie } from './cookie.js';
-import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD, WORKOS_REDIRECT_URI } from './env-variables.js';
+import {
+  WORKOS_CLIENT_ID,
+  WORKOS_COOKIE_NAME,
+  WORKOS_COOKIE_PASSWORD,
+  WORKOS_ISSUER,
+  WORKOS_REDIRECT_URI,
+} from './env-variables.js';
 import { TokenRefreshError, getSessionErrorContext } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import {
@@ -595,9 +601,20 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
   };
 }
 
+function getExpectedIssuer(): string | string[] | undefined {
+  if (!WORKOS_ISSUER) {
+    return undefined;
+  }
+  const issuers = WORKOS_ISSUER.split(',')
+    .map((issuer) => issuer.trim())
+    .filter(Boolean);
+  return issuers.length <= 1 ? issuers[0] : issuers;
+}
+
 async function verifyAccessToken(accessToken: string) {
   try {
-    await jwtVerify(accessToken, JWKS());
+    const issuer = getExpectedIssuer();
+    await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
     return true;
   } catch {
     return false;

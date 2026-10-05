@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.4.0](https://github.com/workos/authkit-nextjs/compare/v4.3.2...v4.4.0) (2026-09-30)
+
+
+### Features
+
+* Add optional WORKOS_ISSUER access token issuer validation ([#476](https://github.com/workos/authkit-nextjs/issues/476)) ([df58a23](https://github.com/workos/authkit-nextjs/commit/df58a23f556ca0f9a1bc88a698034bcc8e13b1d0))
+
+
+### Bug Fixes
+
+* keep access token refresh scheduling active ([#489](https://github.com/workos/authkit-nextjs/issues/489)) ([93f7b3b](https://github.com/workos/authkit-nextjs/commit/93f7b3b973de02c47893d87d2c945e6cedcec780))
+
+## [4.3.2](https://github.com/workos/authkit-nextjs/compare/v4.3.1...v4.3.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* clear session cookies when onSuccess fails ([#335](https://github.com/workos/authkit-nextjs/issues/335)) ([539c897](https://github.com/workos/authkit-nextjs/commit/539c897efdedb1a035d083143f830b45bf705490))
+* defer initial token refresh until first subscriber ([#467](https://github.com/workos/authkit-nextjs/issues/467)) ([587c5d7](https://github.com/workos/authkit-nextjs/commit/587c5d767e61902c08cd18933b8797f4517ef5ab))
+
 ## [4.3.1](https://github.com/workos/authkit-nextjs/compare/v4.3.0...v4.3.1) (2026-07-30)
 
 

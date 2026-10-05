@@ -41,21 +41,22 @@ NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in
 openssl rand -base64 24
 ```
 
-To use the `signOut` method, you'll need to set a default Logout URI in your WorkOS dashboard settings under "Redirects".
+To use the `signOut` method, you'll need to set a default Sign-out URI in your WorkOS dashboard under your application's "Redirects" tab.
 
 ### Optional configuration
 
 Certain environment variables are optional and can be used to debug or configure cookie settings.
 
-| Environment Variable     | Default Value         | Description                                                                               |
-| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------- |
-| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                                      |
-| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain        |
-| `WORKOS_COOKIE_NAME`     | `'wos-session'`       | Name of the session cookie                                                                |
-| `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                       |
-| `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                         |
-| `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP) |
-| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                 |
+| Environment Variable     | Default Value         | Description                                                                                                                         |
+| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `WORKOS_COOKIE_MAX_AGE`  | `34560000` (400 days) | Maximum age of the cookie in seconds                                                                                                |
+| `WORKOS_COOKIE_DOMAIN`   | None                  | Domain for the cookie. When empty, the cookie is only valid for the current domain                                                  |
+| `WORKOS_COOKIE_NAME`     | `'wos-session'`       | Name of the session cookie                                                                                                          |
+| `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                                                                 |
+| `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                                                                   |
+| `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP)                                           |
+| `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                                                           |
+| `WORKOS_ISSUER`          | None                  | Expected `iss` claim of access tokens (comma-separated to accept multiple issuers). When not set, the issuer claim is not validated |
 
 Example usage:
 
@@ -142,9 +143,9 @@ The `onSuccess` callback receives the following data:
 
 **Note**: `authenticationMethod` is only provided during the initial authentication callback. It will not be available in subsequent requests or session refreshes.
 
-### Sign-in URL
+### Initiate login URI
 
-Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Sign-in URL](https://workos.com/docs/authkit/nextjs/2-configure-your-project/configure-a-redirect-uri#sign-in-url)** (also known as `initiate_login_uri`) in your WorkOS dashboard settings.
+Create a route that initiates the AuthKit sign-in flow. This route is used as the **[Initiate login URI](https://workos.com/docs/authkit/nextjs#configure-initiate-login-uri)** (`initiate_login_uri`) for your application in the WorkOS dashboard.
 
 ```ts
 // app/sign-in/route.ts (or app/login/route.ts)
@@ -157,10 +158,10 @@ export const GET = async () => {
 };
 ```
 
-In the [WorkOS dashboard](https://dashboard.workos.com), go to **Redirects** and set the **Sign-in URL** to match this route (e.g., `http://localhost:3000/sign-in`). Use a normal `<a>` link to this route so navigation, not prefetching, starts sign-in.
+In the [WorkOS dashboard](https://dashboard.workos.com), open **Applications**, select your application, go to the **Redirects** tab, and set the **Initiate login URI** to match this route (e.g., `http://localhost:3000/sign-in`). Use a normal `<a>` link to this route so navigation, not prefetching, starts sign-in.
 
 > [!IMPORTANT]
-> The Sign-in URL is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
+> The Initiate login URI is required for features like [impersonation](https://workos.com/docs/user-management/impersonation) to work correctly. Without it, WorkOS-initiated flows (such as impersonating a user from the dashboard) will fail because they cannot complete the PKCE/CSRF verification that this library enforces on every callback.
 
 ### Proxy / Middleware
 
@@ -417,7 +418,7 @@ export default async function HomePage() {
 }
 ```
 
-`getSignInUrl()` and `getSignUpUrl()` set a PKCE cookie, so call them in a Route Handler or Server Action, not while rendering a Server Component. Use the [sign-in route](#sign-in-url) above and an equivalent sign-up route:
+`getSignInUrl()` and `getSignUpUrl()` set a PKCE cookie, so call them in a Route Handler or Server Action, not while rendering a Server Component. Use the [sign-in route](#initiate-login-uri) above and an equivalent sign-up route:
 
 ```ts
 // app/sign-up/route.ts
@@ -862,9 +863,9 @@ Note that when several requests land inside the buffer window at the same time, 
 
 ### Signing out
 
-Use the `signOut` method to sign out the current logged in user and redirect to your app's default Logout URI. The Logout URI is set in your WorkOS dashboard settings under "Redirect".
+Use the `signOut` method to sign out the current logged in user and redirect to your app's default Sign-out URI. Sign-out URIs are set in your WorkOS dashboard under your application's "Redirects" tab.
 
-To use a non-default Logout URI, you can use the `returnTo` parameter.
+To use a non-default Sign-out URI, you can use the `returnTo` parameter.
 
 ```tsx
 await signOut({ returnTo: 'https://your-app.com/signed-out' });
@@ -876,7 +877,7 @@ Render the `Impersonation` component in your app so that it is clear when someon
 The component will display a frame with some information about the impersonated user, as well as a button to stop impersonating.
 
 > [!IMPORTANT]
-> Impersonation requires a configured **Sign-in URL** in your WorkOS dashboard. See the [Sign-in URL](#sign-in-url) setup instructions. Without it, impersonation from the WorkOS dashboard will fail with a `Missing required auth parameter` error.
+> Impersonation requires a configured **Initiate login URI** in your WorkOS dashboard. See the [Initiate login URI](#initiate-login-uri) setup instructions. Without it, impersonation from the WorkOS dashboard will fail with a `Missing required auth parameter` error.
 
 ```jsx
 import { Impersonation, AuthKitProvider } from '@workos-inc/authkit-nextjs/components';
@@ -1075,7 +1076,7 @@ If the cookie is missing or doesn't match, authentication will fail with one of:
 
 This error occurs when WorkOS-initiated flows (like dashboard impersonation) redirect directly to your callback URL without going through your application's sign-in flow. Because this library enforces PKCE/CSRF verification on every callback, the request is rejected when the required `state` parameter is missing.
 
-**Fix:** Configure a [Sign-in URL](#sign-in-url) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
+**Fix:** Configure an [Initiate login URI](#initiate-login-uri) in your WorkOS dashboard so that impersonation flows route through your app first, allowing PKCE/state to be set up before redirecting to WorkOS.
 
 #### NEXT_REDIRECT error when using try/catch blocks
 
