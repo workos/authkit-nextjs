@@ -278,4 +278,34 @@ describe('Impersonation', () => {
     expect(getOrganizationAction).toHaveBeenCalledTimes(2);
     expect(getOrganizationAction).toHaveBeenCalledWith('org_456');
   });
+
+  it('keeps the current organization name when an earlier lookup rejects after it', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectFirst!: (error: Error) => void;
+    (getOrganizationAction as Mock)
+      .mockReturnValueOnce(new Promise((_resolve, reject) => (rejectFirst = reject)))
+      .mockResolvedValueOnce({ id: 'org_456', name: 'Second Org' });
+    const auth = (organizationId: string) => ({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId,
+    });
+
+    try {
+      (useAuth as Mock).mockReturnValue(auth('org_123'));
+      const { container, rerender } = await act(async () => render(<Impersonation />));
+
+      // Switch organizations while the first lookup is still pending; the second one succeeds.
+      (useAuth as Mock).mockReturnValue(auth('org_456'));
+      await act(async () => rerender(<Impersonation />));
+      expect(container).toHaveTextContent('Second Org');
+
+      // The first lookup fails afterwards and must not erase the current name.
+      await act(async () => rejectFirst(new Error('stale failure')));
+      expect(container).toHaveTextContent('Second Org');
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });
