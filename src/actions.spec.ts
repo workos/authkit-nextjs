@@ -27,6 +27,7 @@ const { fakeWorkosInstance } = vi.hoisted(() => ({
 }));
 vi.mock('../src/workos.js', () => ({
   getWorkOS: vi.fn(() => fakeWorkosInstance),
+  getWorkOSWithApiKey: vi.fn(() => fakeWorkosInstance),
 }));
 
 vi.mock('../src/session.js', () => ({

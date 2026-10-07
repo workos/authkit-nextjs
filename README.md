@@ -30,10 +30,12 @@ Make sure the following values are present in your `.env.local` environment vari
 
 ```sh
 WORKOS_CLIENT_ID="client_..." # retrieved from the WorkOS dashboard
-WORKOS_API_KEY="sk_test_..." # retrieved from the WorkOS dashboard
 WORKOS_COOKIE_PASSWORD="<your password>" # generate a secure password here
 NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback" # configured in the WorkOS dashboard
+WORKOS_API_KEY="sk_test_..." # optional: retrieved from the WorkOS dashboard; needed for feature flags, validateApiKey and WorkOS management APIs
 ```
+
+Without `WORKOS_API_KEY`, AuthKit runs as a PKCE public client. See [Public client (keyless) mode](#public-client-keyless-mode).
 
 `WORKOS_COOKIE_PASSWORD` is the private key used to encrypt the session cookie. It has to be at least 32 characters long. You can use the [1Password generator](https://1password.com/password-generator/) or the `openssl` library to generate a strong password via the command line:
 
@@ -42,6 +44,32 @@ openssl rand -base64 24
 ```
 
 To use the `signOut` method, you'll need to set a default Sign-out URI in your WorkOS dashboard under your application's "Redirects" tab.
+
+### Public client (keyless) mode
+
+If your app only signs users in and shouldn't hold a WorkOS secret key, leave `WORKOS_API_KEY` unset. AuthKit then runs as an OAuth public client and needs only three variables:
+
+```sh
+WORKOS_CLIENT_ID="client_..."
+WORKOS_COOKIE_PASSWORD="<your password>"
+NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/callback"
+```
+
+Every sign-in already uses [PKCE](#pkce-and-csrf-protection): the code verifier stays in an HttpOnly cookie on the browser that started the flow, so only that browser can exchange the authorization code, without a client secret. Session refresh sends the refresh token with your client ID and no secret.
+
+What works without a key: sign-in and sign-up URLs, the callback route (`handleAuth`), the proxy/middleware (including automatic session refresh), `withAuth`, `refreshSession`, `switchToOrganization`, `signOut`, `useAuth` and `useAccessToken`.
+
+What needs a key. These throw `<name> requires a WorkOS API key; set WORKOS_API_KEY. Public-client (keyless) mode supports sign-in only.` before making any request:
+
+- `getFeatureFlagsRuntimeClient()` (the `feature_flags` access token claim still works).
+- `validateApiKey()`.
+- `getOrganizationAction`, which the `Impersonation` component uses to show the organization name. Without a key the banner still renders, without the organization name, and logs the error to the browser console.
+
+Direct WorkOS management calls through `getWorkOS()`, such as `organizations.*` or `userManagement.getUser`, also need a key. The WorkOS SDK rejects them with an `ApiKeyRequiredException`.
+
+An empty `WORKOS_API_KEY` counts as unset. The WorkOS SDK also reads `process.env.WORKOS_API_KEY` itself, so a non-empty key in the server's environment always wins: to run keyless, make sure the variable is absent from every env source Next.js loads (`.env*` files and the host environment).
+
+Keyless mode works with every `@workos-inc/node` version this package supports as a peer dependency (v9 and v10).
 
 ### Optional configuration
 
@@ -469,6 +497,9 @@ const { featureFlags } = await withAuth();
 This is convenient for small flag sets because the flags are available with the user's session. Flag changes appear the next time the user logs in or the session is refreshed.
 
 #### Option 2: Use the runtime client
+
+> [!NOTE]
+> The runtime client requires `WORKOS_API_KEY`. It isn't available in [public client mode](#public-client-keyless-mode).
 
 Use the runtime client when your application has many feature flags, when the `feature_flags` claim makes the access token too large, or when you need server-side flag evaluation that stays in sync independently of the user's session. The runtime client keeps flag configuration in memory and syncs changes in the background, so create one shared instance per server process rather than one client per request.
 
@@ -932,7 +963,7 @@ export default authkitMiddleware({
 
 ### Validate an API key
 
-Use the `validateApiKey` function in your application's public API endpoints to parse a [Bearer Authentication](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) header and validate the [API key](https://workos.com/docs/authkit/api-keys) with WorkOS.
+Use the `validateApiKey` function in your application's public API endpoints to parse a [Bearer Authentication](https://swagger.io/docs/specification/v3_0/authentication/bearer-authentication/) header and validate the [API key](https://workos.com/docs/authkit/api-keys) with WorkOS. It requires `WORKOS_API_KEY` and isn't available in [public client mode](#public-client-keyless-mode).
 
 ```ts
 import { NextResponse } from 'next/server';
@@ -951,7 +982,7 @@ export async function GET() {
 
 ### Advanced: Direct access to the WorkOS client
 
-For advanced use cases or functionality not covered by the helper methods, you can access the underlying WorkOS client directly:
+For advanced use cases or functionality not covered by the helper methods, you can access the underlying WorkOS client directly. WorkOS management APIs need an API key; in [public client mode](#public-client-keyless-mode) they throw an `ApiKeyRequiredException`.
 
 ```typescript
 import { getWorkOS } from '@workos-inc/authkit-nextjs';
