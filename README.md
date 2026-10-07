@@ -63,7 +63,7 @@ What needs a key. These throw `<name> requires a WorkOS API key; set WORKOS_API_
 
 - `getFeatureFlagsRuntimeClient()` (the `feature_flags` access token claim still works).
 - `validateApiKey()`.
-- `getOrganizationAction`, which the `Impersonation` component uses to show the organization name.
+- `getOrganizationAction`, which the `Impersonation` component uses to show the organization name. Without a key the banner still renders, without the organization name, and logs the error to the browser console.
 
 Direct WorkOS management calls through `getWorkOS()`, such as `organizations.*` or `userManagement.getUser`, also need a key. The WorkOS SDK rejects them with an `ApiKeyRequiredException`.
 

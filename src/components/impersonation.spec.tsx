@@ -64,6 +64,36 @@ describe('Impersonation', () => {
     expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
   });
 
+  it('shows no organization name and leaves no unhandled rejection when the action rejects', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error(
+      'getOrganizationAction requires a WorkOS API key; set WORKOS_API_KEY. Public-client (keyless) mode supports sign-in only.',
+    );
+    (useAuth as Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: 'org_123',
+    });
+    (getOrganizationAction as Mock).mockRejectedValue(error);
+
+    try {
+      const { container } = await act(async () => render(<Impersonation />));
+      // Let any unhandled rejection surface before asserting.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(getOrganizationAction).toHaveBeenCalledWith('org_123');
+      expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
+      expect(container).not.toHaveTextContent('organization');
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('impersonated organization'), error);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+      consoleError.mockRestore();
+    }
+  });
+
   it('should render at the bottom by default', () => {
     (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },

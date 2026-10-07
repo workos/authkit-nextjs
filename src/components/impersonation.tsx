@@ -19,7 +19,12 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
   React.useEffect(() => {
     if (!organizationId || !impersonator || !user) return;
     if (organization && organization.id === organizationId) return;
-    getOrganizationAction(organizationId).then(setOrganization);
+    getOrganizationAction(organizationId).then(setOrganization, (error) => {
+      // Show no organization name, like an unknown organization. Log rather than swallow: in
+      // public-client (keyless) mode this is the API-key error, otherwise a real failure.
+      setOrganization(null);
+      console.error('[authkit-nextjs] Failed to load the impersonated organization:', error);
+    });
   }, [organizationId, impersonator, user]);
 
   if (!impersonator || !user) return null;
