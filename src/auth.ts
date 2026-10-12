@@ -49,6 +49,19 @@ export async function getSignUpUrl(authUrlOptions: GetSignUrlOptions = {}) {
 }
 
 /**
+ * Reads the session id from the sealed session cookie. `withAuth` cannot always
+ * provide one (middleware missing, or the session header was not set), but the
+ * cookie still carries it so the WorkOS logout redirect stays reachable.
+ */
+async function getSessionIdFromCookie(): Promise<string | undefined> {
+  const session = await getSessionFromCookie();
+  if (session && session.accessToken) {
+    const { sid } = decodeJwt<AccessToken>(session.accessToken);
+    return sid;
+  }
+}
+
+/**
  * Sign out the user and delete the session cookie.
  * @param options Options for signing out.
  * @param options.returnTo The URL to redirect to after signing out.
@@ -58,14 +71,13 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
 
   try {
     const { sessionId: sid } = await withAuth();
-    sessionId = sid;
+    // `withAuth` can resolve without a session when middleware ran but did not
+    // set a session header, so recover the session id from the cookie too.
+    sessionId = sid ?? (await getSessionIdFromCookie());
   } catch (error) {
     // Fall back to reading session directly from cookie when middleware isn't available
-    const session = await getSessionFromCookie();
-    if (session && session.accessToken) {
-      const { sid } = decodeJwt<AccessToken>(session.accessToken);
-      sessionId = sid;
-    } else {
+    sessionId = await getSessionIdFromCookie();
+    if (!sessionId) {
       // can't recover - throw the original error.
       throw error;
     }
