@@ -418,7 +418,9 @@ describe('session.ts', () => {
     it('should reject an invalid access token without attempting to refresh it', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
-      const verificationError = new Error('Invalid token');
+      const verificationError = Object.assign(new Error('No applicable key found in the JSON Web Key Set'), {
+        code: 'ERR_JWKS_NO_MATCHING_KEY',
+      });
       (jwtVerify as Mock).mockRejectedValue(verificationError);
 
       const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
@@ -447,6 +449,27 @@ describe('session.ts', () => {
         'Session access token failed verification. Deleting cookie without attempting refresh.',
         verificationError,
       );
+    });
+
+    it.each([
+      ['a network failure', new TypeError('fetch failed')],
+      ['a JWKS timeout', Object.assign(new Error('JWKS request timed out'), { code: 'ERR_JWKS_TIMEOUT' })],
+      ['an unsuccessful JWKS response', Object.assign(new Error('JWKS request failed'), { code: 'ERR_JOSE_GENERIC' })],
+    ])('should preserve the session when verification fails because of %s', async (_description, verificationError) => {
+      mockSession.accessToken = await generateTestToken();
+      (jwtVerify as Mock).mockRejectedValue(verificationError);
+
+      const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+      const sealedSession = await sealData(mockSession, {
+        password: process.env.WORKOS_COOKIE_PASSWORD as string,
+      });
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set('wos-session', sealedSession);
+
+      await expect(updateSession(request, { debug: true })).rejects.toBe(verificationError);
+
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(request.cookies.get('wos-session')?.value).toBe(sealedSession);
     });
 
     it('should refresh the session when the access token is expired', async () => {
@@ -521,6 +544,37 @@ describe('session.ts', () => {
           cause: refreshedTokenError,
         }),
       );
+    });
+
+    it('should preserve the session when a refreshed token cannot be verified due to a JWKS outage', async () => {
+      mockSession.accessToken = await generateTestToken({}, true);
+      const jwksError = Object.assign(new Error('JWKS request timed out'), { code: 'ERR_JWKS_TIMEOUT' });
+      (jwtVerify as Mock)
+        .mockRejectedValueOnce(Object.assign(new Error('Access token expired'), { code: 'ERR_JWT_EXPIRED' }))
+        .mockRejectedValueOnce(jwksError);
+
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      const onSessionRefreshError = vi.fn();
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSession(request, { debug: true, onSessionRefreshError });
+
+      expect(result.session.user).toBeNull();
+      expect(result.headers.getSetCookie().some((cookie) => cookie.startsWith('wos-session=;'))).toBe(false);
+      expect(onSessionRefreshError).toHaveBeenCalledWith({
+        error: jwksError,
+        request,
+        isTransient: true,
+      });
     });
 
     it('should delete the cookie when refreshing fails', async () => {

@@ -663,6 +663,10 @@ async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerifi
       return { status: 'expired', cause };
     }
 
+    // An unavailable JWKS does not prove the token is invalid. Propagate the
+    // error so the request is rejected without deleting the session cookie.
+    if (isJwksUnavailableError(cause)) throw cause;
+
     return { status: 'invalid', cause };
   }
 }
@@ -711,6 +715,13 @@ const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 // "Failed to fetch"). Match its message so an unrelated programming TypeError
 // isn't misclassified as a transient (and therefore session-preserving) error.
 const NETWORK_ERROR_MESSAGE = /fetch failed|failed to fetch|network|load failed|terminated/i;
+// jose uses its generic error for non-200 and non-JSON JWKS responses.
+const JWKS_UNAVAILABLE_ERROR_CODES = new Set(['ERR_JOSE_GENERIC', 'ERR_JWKS_INVALID', 'ERR_JWKS_TIMEOUT']);
+
+function isJwksUnavailableError(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  return isNetworkError(error) || (typeof code === 'string' && JWKS_UNAVAILABLE_ERROR_CODES.has(code));
+}
 
 // A raw network TypeError is not an HttpClientError, so the WorkOS SDK re-wraps
 // it in a plain Error whose `cause` is the original TypeError. Follow the cause
@@ -736,8 +747,9 @@ function isNetworkError(error: unknown): boolean {
  * (request timeout normalized to `408`, `429`, and `5xx`) surface as an
  * exception carrying a retryable numeric `status`, and a network-level failure
  * surfaces as a `TypeError` (wrapped by the SDK in an `Error` with the
- * `TypeError` as its `cause`). Anything else (a terminal `invalid_grant` at
- * 400, a 401, or an unrecognized error) is treated as terminal.
+ * `TypeError` as its `cause`). JWKS availability failures are also transient.
+ * Anything else (a terminal `invalid_grant` at 400, a 401, or an unrecognized
+ * error) is treated as terminal.
  */
 export function isTransientRefreshError(error: unknown): boolean {
   if (typeof error === 'object' && error !== null && 'status' in error) {
@@ -747,7 +759,7 @@ export function isTransientRefreshError(error: unknown): boolean {
     }
   }
 
-  return isNetworkError(error);
+  return isJwksUnavailableError(error);
 }
 
 export async function getSessionFromCookie(request?: NextRequest) {
