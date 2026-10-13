@@ -39,6 +39,18 @@ const jwtCookieName = 'workos-access-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 
+type AccessTokenVerification = { status: 'valid' } | { status: 'expired' | 'invalid'; cause: unknown };
+
+class AccessTokenVerificationError extends Error {
+  readonly status: 'expired' | 'invalid';
+
+  constructor(status: 'expired' | 'invalid', cause: unknown) {
+    super(`Access token verification failed: ${status}`, { cause });
+    this.name = 'AccessTokenVerificationError';
+    this.status = status;
+  }
+}
+
 /**
  * Applies cache security headers with Vary header deduplication.
  * Only applies headers if the request is authenticated (has session, cookie, or Authorization header).
@@ -83,6 +95,8 @@ function applyCacheSecurityHeaders(
 }
 
 async function encryptSession(session: Session) {
+  await assertValidAccessToken(session.accessToken);
+
   return sealData(session, {
     password: WORKOS_COOKIE_PASSWORD,
     ttl: 0,
@@ -212,12 +226,22 @@ async function updateSession(
     };
   }
 
-  const hasValidSession = await verifyAccessToken(session.accessToken);
+  const accessTokenVerification = await verifyAccessToken(session.accessToken);
+  const hasValidSession = accessTokenVerification.status === 'valid';
   const isExpiring = hasValidSession && isTokenExpiring(session.accessToken, options.refreshBufferSeconds);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
   applyCacheSecurityHeaders(newRequestHeaders, request, session);
+
+  const clearSessionCookies = () => {
+    const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+    newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    if (options.eagerAuth) {
+      newRequestHeaders.append('Set-Cookie', getJwtCookie(null, request.url, true));
+    }
+  };
 
   const respondWithCurrentToken = (): AuthkitResponse => {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
@@ -263,13 +287,38 @@ async function updateSession(
     return respondWithCurrentToken();
   }
 
+  if (accessTokenVerification.status === 'invalid') {
+    if (options.debug) {
+      console.log(
+        'Session access token failed verification. Deleting cookie without attempting refresh.',
+        accessTokenVerification.cause,
+      );
+    }
+
+    clearSessionCookies();
+
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+    });
+
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
+
+    return {
+      session: { user: null },
+      headers: newRequestHeaders,
+      authorizationUrl,
+    };
+  }
+
   try {
     if (options.debug) {
       // istanbul ignore next
       console.log(
         isExpiring
           ? `Session expiring soon. Proactively refreshing access token that ends in ${session.accessToken.slice(-10)}`
-          : `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
+          : `Session expired. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
       );
     }
 
@@ -331,7 +380,7 @@ async function updateSession(
       headers: newRequestHeaders,
     };
   } catch (e) {
-    if (isExpiring) {
+    if (isExpiring && !(e instanceof AccessTokenVerificationError)) {
       // A failed proactive refresh is not fatal while the current token is still
       // valid. Refresh tokens are single-use, so a concurrent request in the same
       // buffer window may have already rotated this one; that request has persisted
@@ -368,15 +417,8 @@ async function updateSession(
     }
 
     if (!isTransient) {
-      // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
-      newRequestHeaders.append('Set-Cookie', deleteCookie);
-
-      // Delete JWT cookie if eagerAuth is enabled
-      if (options.eagerAuth) {
-        const deleteJwtCookie = getJwtCookie(null, request.url, true);
-        newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
-      }
+      // Cookie deletion must be returned as a header because edge middleware cannot mutate cookies directly.
+      clearSessionCookies();
     }
 
     options.onSessionRefreshError?.({ error: e, request, isTransient });
@@ -611,13 +653,24 @@ function getExpectedIssuer(): string | string[] | undefined {
   return issuers.length <= 1 ? issuers[0] : issuers;
 }
 
-async function verifyAccessToken(accessToken: string) {
+async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerification> {
   try {
     const issuer = getExpectedIssuer();
     await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
-    return true;
-  } catch {
-    return false;
+    return { status: 'valid' };
+  } catch (cause) {
+    if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ERR_JWT_EXPIRED') {
+      return { status: 'expired', cause };
+    }
+
+    return { status: 'invalid', cause };
+  }
+}
+
+async function assertValidAccessToken(accessToken: string): Promise<void> {
+  const verification = await verifyAccessToken(accessToken);
+  if (verification.status !== 'valid') {
+    throw new AccessTokenVerificationError(verification.status, verification.cause);
   }
 }
 

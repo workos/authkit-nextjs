@@ -20,6 +20,12 @@ import { SignJWT, jwtVerify } from 'jose';
 function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
   Object.defineProperty(mod, key, { value, configurable: true });
 }
+
+function mockExpiredAccessToken() {
+  const error = Object.assign(new Error('Access token expired'), { code: 'ERR_JWT_EXPIRED' });
+  (jwtVerify as Mock).mockRejectedValueOnce(error).mockResolvedValue(undefined);
+  return error;
+}
 import { sealData, unsealData } from 'iron-session';
 import { User } from '@workos-inc/node';
 import { handleAuthkitHeaders } from './middleware-helpers.js';
@@ -409,12 +415,43 @@ describe('session.ts', () => {
       }
     });
 
-    it('should attempt to refresh the session when the access token is invalid', async () => {
+    it('should reject an invalid access token without attempting to refresh it', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      const verificationError = new Error('Invalid token');
+      (jwtVerify as Mock).mockRejectedValue(verificationError);
+
+      const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSessionMiddleware(
+        request,
+        true,
+        {
+          enabled: false,
+          unauthenticatedPaths: [],
+        },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(result.status).toBe(200);
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(result.headers.get('Set-Cookie')).toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith(
+        'Session access token failed verification. Deleting cookie without attempting refresh.',
+        verificationError,
+      );
+    });
+
+    it('should refresh the session when the access token is expired', async () => {
+      mockSession.accessToken = await generateTestToken({}, true);
+      mockExpiredAccessToken();
 
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
         accessToken: await generateTestToken(),
@@ -423,7 +460,6 @@ describe('session.ts', () => {
       });
 
       const request = new NextRequest(new URL('http://example.com'));
-
       request.cookies.set(
         'wos-session',
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
@@ -442,9 +478,49 @@ describe('session.ts', () => {
 
       expect(result.status).toBe(200);
       expect(console.log).toHaveBeenCalledWith(
-        `Session invalid. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
+        `Session expired. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
       );
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Session successfully refreshed'));
+    });
+
+    it('should reject a refreshed access token that fails verification', async () => {
+      mockSession.accessToken = await generateTestToken({}, true);
+      const refreshedTokenError = new Error('Unexpected issuer');
+      (jwtVerify as Mock)
+        .mockRejectedValueOnce(Object.assign(new Error('Access token expired'), { code: 'ERR_JWT_EXPIRED' }))
+        .mockRejectedValueOnce(refreshedTokenError);
+
+      const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSessionMiddleware(
+        request,
+        true,
+        { enabled: false, unauthenticatedPaths: [] },
+        process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI as string,
+        [],
+      );
+
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+      expect(jwtVerify).toHaveBeenCalledTimes(2);
+      expect(result.headers.get('Set-Cookie')).toContain('wos-session=;');
+      expect(console.log).toHaveBeenCalledWith(
+        'Failed to refresh. Deleting cookie.',
+        expect.objectContaining({
+          name: 'AccessTokenVerificationError',
+          status: 'invalid',
+          cause: refreshedTokenError,
+        }),
+      );
     });
 
     it('should delete the cookie when refreshing fails', async () => {
@@ -452,9 +528,7 @@ describe('session.ts', () => {
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Failed to refresh'));
 
@@ -481,7 +555,7 @@ describe('session.ts', () => {
       expect(console.log).toHaveBeenCalledTimes(2);
       expect(console.log).toHaveBeenNthCalledWith(
         1,
-        `Session invalid. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
+        `Session expired. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
       );
       expect(console.log).toHaveBeenNthCalledWith(
         2,
@@ -506,9 +580,7 @@ describe('session.ts', () => {
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(transientError);
 
@@ -544,9 +616,7 @@ describe('session.ts', () => {
 
       mockSession.accessToken = await generateTestToken({}, true);
 
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       const terminalError = Object.assign(new Error('invalid_grant'), { status: 400 });
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(terminalError);
@@ -752,9 +822,7 @@ describe('session.ts', () => {
 
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
+        mockExpiredAccessToken();
 
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(
           new Error('Failed to refresh'),
@@ -783,7 +851,7 @@ describe('session.ts', () => {
         expect(console.log).toHaveBeenCalledTimes(3);
         expect(console.log).toHaveBeenNthCalledWith(
           1,
-          `Session invalid. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
+          `Session expired. Refreshing access token that ends in ${mockSession.accessToken.slice(-10)}`,
         );
         expect(console.log).toHaveBeenNthCalledWith(
           2,
@@ -868,14 +936,11 @@ describe('session.ts', () => {
       expect(result.session).toBeDefined();
     });
 
-    it('should attempt to refresh an invalid session', async () => {
-      // Setup invalid session
+    it('should attempt to refresh an expired session', async () => {
+      // Setup expired session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       // Mock successful refresh
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
@@ -897,18 +962,15 @@ describe('session.ts', () => {
       expect(response.session).toBeDefined();
       expect(response.session.user).toBeDefined();
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Session invalid. Refreshing access token that ends in'),
+        expect.stringContaining('Session expired. Refreshing access token that ends in'),
       );
     });
 
     it('should handle refresh failure by returning auth URL', async () => {
-      // Setup invalid session
+      // Setup expired session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       // Mock refresh failure
       vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
@@ -991,9 +1053,7 @@ describe('session.ts', () => {
       it('should expire stale PKCE cookies when refresh fails and threshold exceeded', async () => {
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
+        mockExpiredAccessToken();
 
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
@@ -1057,13 +1117,10 @@ describe('session.ts', () => {
     });
 
     it('should call onSessionRefreshSuccess when refresh succeeds', async () => {
-      // Setup invalid session
+      // Setup expired session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       const newAccessToken = await generateTestToken();
       const mockSuccessCallback = vi.fn();
@@ -1096,13 +1153,10 @@ describe('session.ts', () => {
     });
 
     it('should call onSessionRefreshError when refresh fails', async () => {
-      // Setup invalid session
+      // Setup expired session
       mockSession.accessToken = await generateTestToken({}, true);
 
-      // Mock token verification to fail
-      (jwtVerify as Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      mockExpiredAccessToken();
 
       const mockError = new Error('Refresh failed');
       const mockErrorCallback = vi.fn();
@@ -1637,12 +1691,10 @@ describe('session.ts', () => {
 
     describe('JWT cookie management during session refresh', () => {
       it('should set JWT cookie after successful session refresh', async () => {
-        // Setup invalid session that needs refresh
+        // Setup expired session that needs refresh
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
+        mockExpiredAccessToken();
 
         const newAccessToken = await generateTestToken();
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
@@ -1668,12 +1720,10 @@ describe('session.ts', () => {
       });
 
       it('should delete JWT cookie when session refresh fails', async () => {
-        // Setup invalid session
+        // Setup expired session
         mockSession.accessToken = await generateTestToken({}, true);
 
-        (jwtVerify as Mock).mockImplementation(() => {
-          throw new Error('Invalid token');
-        });
+        mockExpiredAccessToken();
 
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockRejectedValue(new Error('Refresh failed'));
 
