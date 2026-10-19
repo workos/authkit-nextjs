@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { getWorkOS } from './workos.js';
+import { getWorkOSWithApiKey } from './workos.js';
 import { headers } from 'next/headers';
 
 export async function validateApiKey() {
+  const workos = getWorkOSWithApiKey('validateApiKey');
   const headersList = await headers();
   const authorizationHeader = headersList.get('authorization');
   if (!authorizationHeader) {
@@ -15,5 +16,5 @@ export async function validateApiKey() {
     return { apiKey: null };
   }
 
-  return getWorkOS().apiKeys.createValidation({ value });
+  return workos.apiKeys.createValidation({ value });
 }

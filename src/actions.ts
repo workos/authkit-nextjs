@@ -3,7 +3,7 @@
 import { getSignInUrl, signOut, switchToOrganization } from './auth.js';
 import { NoUserInfo, UserInfo, SwitchToOrganizationOptions } from './interfaces.js';
 import { refreshSession, withAuth } from './session.js';
-import { getWorkOS } from './workos.js';
+import { getWorkOSWithApiKey } from './workos.js';
 
 export interface RefreshAccessTokenActionResult {
   accessToken: string | undefined;
@@ -36,6 +36,8 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
 };
 
 export const getOrganizationAction = async (organizationId: string) => {
+  const workos = getWorkOSWithApiKey('getOrganizationAction');
+
   // Authorization: only resolve the organization the caller is currently
   // authenticated within. The WorkOS client uses the app's API key, which can
   // read any organization in the environment, so without this check any caller
@@ -47,7 +49,7 @@ export const getOrganizationAction = async (organizationId: string) => {
 
   // Return only the fields the client needs. Avoids disclosing the full
   // organization object (metadata, externalId, stripeCustomerId, domains).
-  const { id, name } = await getWorkOS().organizations.getOrganization(organizationId);
+  const { id, name } = await workos.organizations.getOrganization(organizationId);
   return { id, name };
 };
 

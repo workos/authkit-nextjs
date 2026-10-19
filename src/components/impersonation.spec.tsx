@@ -64,6 +64,36 @@ describe('Impersonation', () => {
     expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
   });
 
+  it('shows no organization name and leaves no unhandled rejection when the action rejects', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error(
+      'getOrganizationAction requires a WorkOS API key; set WORKOS_API_KEY. Public-client (keyless) mode supports sign-in only.',
+    );
+    (useAuth as Mock).mockReturnValue({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId: 'org_123',
+    });
+    (getOrganizationAction as Mock).mockRejectedValue(error);
+
+    try {
+      const { container } = await act(async () => render(<Impersonation />));
+      // Let any unhandled rejection surface before asserting.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(getOrganizationAction).toHaveBeenCalledWith('org_123');
+      expect(container.querySelector('[data-workos-impersonation-root]')).toBeInTheDocument();
+      expect(container).not.toHaveTextContent('organization');
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('impersonated organization'), error);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+      consoleError.mockRestore();
+    }
+  });
+
   it('should render at the bottom by default', () => {
     (useAuth as Mock).mockReturnValue({
       impersonator: { email: 'admin@example.com' },
@@ -247,5 +277,35 @@ describe('Impersonation', () => {
     // Should be called again with the new ID
     expect(getOrganizationAction).toHaveBeenCalledTimes(2);
     expect(getOrganizationAction).toHaveBeenCalledWith('org_456');
+  });
+
+  it('keeps the current organization name when an earlier lookup rejects after it', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectFirst!: (error: Error) => void;
+    (getOrganizationAction as Mock)
+      .mockReturnValueOnce(new Promise((_resolve, reject) => (rejectFirst = reject)))
+      .mockResolvedValueOnce({ id: 'org_456', name: 'Second Org' });
+    const auth = (organizationId: string) => ({
+      impersonator: { email: 'admin@example.com' },
+      user: { id: '123', email: 'user@example.com' },
+      organizationId,
+    });
+
+    try {
+      (useAuth as Mock).mockReturnValue(auth('org_123'));
+      const { container, rerender } = await act(async () => render(<Impersonation />));
+
+      // Switch organizations while the first lookup is still pending; the second one succeeds.
+      (useAuth as Mock).mockReturnValue(auth('org_456'));
+      await act(async () => rerender(<Impersonation />));
+      expect(container).toHaveTextContent('Second Org');
+
+      // The first lookup fails afterwards and must not erase the current name.
+      await act(async () => rejectFirst(new Error('stale failure')));
+      expect(container).toHaveTextContent('Second Org');
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
