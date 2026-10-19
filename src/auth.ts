@@ -84,7 +84,8 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   } finally {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-    const { domain, path, sameSite, secure } = getCookieOptions([]);
+    const originUrls = originUrlsFromHeaders(await headers());
+    const { domain, path, sameSite, secure } = getCookieOptions(originUrls);
     try {
       nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
     } catch {
@@ -94,7 +95,7 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
 
     // Clear any lingering PKCE verifier cookies so orphans from abandoned
     // flows don't accumulate toward HTTP 431 or confuse future sign-ins.
-    const pkceOptions = getPKCECookieOptions([]);
+    const pkceOptions = getPKCECookieOptions(originUrls);
     for (const { name } of nextCookies.getAll()) {
       if (!name.startsWith(PKCE_COOKIE_NAME)) continue;
       try {
