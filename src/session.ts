@@ -104,6 +104,31 @@ async function encryptSession(session: Session) {
   });
 }
 
+/**
+ * Seals a refreshed session. The previous refresh token is already spent, so when the new access token cannot be
+ * verified because the JWKS is unavailable, keep the replacement refresh token next to the previous access token
+ * (already in the cookie, and verified on every use) instead of dropping it. The unverified new access token is
+ * never stored. Callers persist `sealed`, then treat `error` as a transient refresh failure.
+ */
+async function encryptRefreshedSession(
+  previous: Session,
+  refreshed: Session,
+): Promise<{ sealed: string; error?: AccessTokenVerificationError }> {
+  try {
+    return { sealed: await encryptSession(refreshed) };
+  } catch (error) {
+    if (!(error instanceof AccessTokenVerificationError) || error.status !== 'unavailable') {
+      throw error;
+    }
+
+    const sealed = await sealData(
+      { ...previous, refreshToken: refreshed.refreshToken },
+      { password: WORKOS_COOKIE_PASSWORD, ttl: 0 },
+    );
+    return { sealed, error };
+  }
+}
+
 async function updateSessionMiddleware(
   request: NextRequest,
   debug: boolean,
@@ -343,7 +368,7 @@ async function updateSession(
       console.log('Session successfully refreshed');
     }
     // Encrypt session with new access and refresh tokens
-    const encryptedSession = await encryptSession({
+    const { sealed: encryptedSession, error: verificationError } = await encryptRefreshedSession(session, {
       accessToken,
       refreshToken,
       user,
@@ -352,6 +377,9 @@ async function updateSession(
     });
 
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
+    if (verificationError) {
+      throw verificationError;
+    }
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
@@ -489,7 +517,14 @@ async function refreshSession({
   const headersList = await headers();
   const url = headersList.get('x-url');
 
-  await saveSession(refreshResult, url || WORKOS_REDIRECT_URI);
+  const { sealed, error } = await encryptRefreshedSession(session, refreshResult);
+  (await cookies()).set(WORKOS_COOKIE_NAME || 'wos-session', sealed, getCookieOptions(url || WORKOS_REDIRECT_URI));
+  if (error) {
+    throw new TokenRefreshError(`Failed to refresh session: ${error.message}`, error, {
+      ...getSessionErrorContext(session),
+      isTransient: true,
+    });
+  }
 
   const { accessToken, user, impersonator } = refreshResult;
 

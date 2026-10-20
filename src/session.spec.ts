@@ -608,7 +608,15 @@ describe('session.ts', () => {
       const result = await updateSession(request, { debug: true, onSessionRefreshError });
 
       expect(result.session.user).toBeNull();
-      expect(result.headers.getSetCookie().some((cookie) => cookie.startsWith('wos-session=;'))).toBe(false);
+      // The old refresh token is spent: the cookie keeps the replacement, never the unverified access token.
+      const sessionCookies = result.headers.getSetCookie().filter((cookie) => cookie.startsWith('wos-session='));
+      expect(sessionCookies).toHaveLength(1);
+      const stored = await unsealData<typeof mockSession & { refreshToken: string }>(
+        sessionCookies[0].slice('wos-session='.length).split(';')[0],
+        { password: process.env.WORKOS_COOKIE_PASSWORD as string },
+      );
+      expect(stored.refreshToken).toBe('new-refresh-token');
+      expect(stored.accessToken).toBe(mockSession.accessToken);
       expect(onSessionRefreshError).toHaveBeenCalledWith({
         error: expect.objectContaining({
           name: 'AccessTokenVerificationError',
@@ -1542,6 +1550,33 @@ describe('session.ts', () => {
 
       expect(result).toHaveProperty('user');
       expect(result.organizationId).toBe('org_456');
+    });
+
+    it('keeps the replacement refresh token when the refreshed token cannot be verified due to a JWKS outage', async () => {
+      const previousAccessToken = await generateTestToken();
+      const nextCookies = await cookies();
+      nextCookies.set(
+        'wos-session',
+        await sealData(
+          { ...mockSession, accessToken: previousAccessToken, refreshToken: 'old-refresh-token' },
+          { password: process.env.WORKOS_COOKIE_PASSWORD as string },
+        ),
+      );
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken({ org_id: 'org_456' }),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+      (jwtVerify as Mock).mockRejectedValue(new TypeError('fetch failed'));
+
+      await expect(refreshSession()).rejects.toMatchObject({ name: 'TokenRefreshError', isTransient: true });
+
+      const stored = await unsealData<{ accessToken: string; refreshToken: string }>(
+        nextCookies.get('wos-session')!.value,
+        { password: process.env.WORKOS_COOKIE_PASSWORD as string },
+      );
+      expect(stored.refreshToken).toBe('new-refresh-token');
+      expect(stored.accessToken).toBe(previousAccessToken);
     });
 
     it('throws if authenticateWithRefreshToken fails with string', async () => {
