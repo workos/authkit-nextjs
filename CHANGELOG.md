@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.5.0](https://github.com/workos/authkit-nextjs/compare/v4.4.0...v4.5.0) (2026-10-20)
+
+
+### Features
+
+* support keyless PKCE public clients ([#495](https://github.com/workos/authkit-nextjs/issues/495)) ([fbaf4b2](https://github.com/workos/authkit-nextjs/commit/fbaf4b28d7cf2fd73cf30cb879395b665a94c723))
+
+
+### Bug Fixes
+
+* enforce WORKOS_ISSUER across all session flows ([#498](https://github.com/workos/authkit-nextjs/issues/498)) ([f96398e](https://github.com/workos/authkit-nextjs/commit/f96398e52f0011cfd302c59b57600cb61c01fbe2))
+* recover session id from cookie in signOut when withAuth resolves without a session ([#496](https://github.com/workos/authkit-nextjs/issues/496)) ([b0de210](https://github.com/workos/authkit-nextjs/commit/b0de210e9a4841f313cd39870b8dd31aec86f3ac))
+* start page authentication in the callback route ([#482](https://github.com/workos/authkit-nextjs/issues/482)) ([13938be](https://github.com/workos/authkit-nextjs/commit/13938bea1f7bb15e48e637dfee140b4a54f3c9fb))
+
 ## [4.4.0](https://github.com/workos/authkit-nextjs/compare/v4.3.2...v4.4.0) (2026-09-30)
 
 
