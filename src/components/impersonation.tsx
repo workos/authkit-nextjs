@@ -19,7 +19,22 @@ export function Impersonation({ side = 'bottom', returnTo, ...props }: Impersona
   React.useEffect(() => {
     if (!organizationId || !impersonator || !user) return;
     if (organization && organization.id === organizationId) return;
-    getOrganizationAction(organizationId).then(setOrganization);
+    // Ignore lookups that settle after the organization changed, so a stale result can't overwrite the current one.
+    let stale = false;
+    getOrganizationAction(organizationId).then(
+      (result) => {
+        if (!stale) setOrganization(result);
+      },
+      (error) => {
+        // Show no organization name, like an unknown organization. Log rather than swallow: in
+        // public-client (keyless) mode this is the API-key error, otherwise a real failure.
+        if (!stale) setOrganization(null);
+        console.error('[authkit-nextjs] Failed to load the impersonated organization:', error);
+      },
+    );
+    return () => {
+      stale = true;
+    };
   }, [organizationId, impersonator, user]);
 
   if (!impersonator || !user) return null;

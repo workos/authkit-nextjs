@@ -14,9 +14,10 @@ const WORKOS_COOKIE_NAME = getEnvVariable('WORKOS_COOKIE_NAME');
 const WORKOS_COOKIE_SAMESITE = getEnvVariable('WORKOS_COOKIE_SAMESITE') as 'lax' | 'strict' | 'none' | undefined;
 const WORKOS_CLAIM_TOKEN = getEnvVariable('WORKOS_CLAIM_TOKEN');
 const WORKOS_ISSUER = getEnvVariable('WORKOS_ISSUER');
+// Absent or empty means public-client (keyless) mode: sign-in only, no management APIs.
+const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY') || undefined;
 
 // Required env variables
-const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY') ?? '';
 const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID') ?? '';
 const WORKOS_COOKIE_PASSWORD = getEnvVariable('WORKOS_COOKIE_PASSWORD') ?? '';
 const WORKOS_REDIRECT_URI = process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI ?? '';

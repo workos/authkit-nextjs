@@ -293,6 +293,50 @@ describe('auth.ts', () => {
       expect(nextCookies.get('unrelated-cookie')?.value).toBe('keep-me');
     });
 
+    describe('when middleware ran without setting a session header', () => {
+      it('should fall back to the session cookie and redirect to the logout URL', async () => {
+        const nextCookies = await cookies();
+        const nextHeaders = await headers();
+
+        // x-workos-middleware is set but x-workos-session is not, so withAuth
+        // resolves { user: null } instead of throwing.
+        nextHeaders.set('x-workos-middleware', 'true');
+
+        const mockSession = {
+          accessToken: await generateTestToken(),
+          refreshToken: 'refresh_token',
+          user: { id: 'user_123' },
+        };
+
+        const encryptedSession = await sealData(mockSession, {
+          password: process.env.WORKOS_COOKIE_PASSWORD as string,
+        });
+
+        nextCookies.set('wos-session', encryptedSession);
+
+        vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123',
+        );
+
+        await signOut();
+
+        // Cookie should be deleted
+        const sessionCookie = nextCookies.get('wos-session');
+        expect(sessionCookie).toBeUndefined();
+
+        // Should redirect to WorkOS logout URL with the session id from the cookie
+        expect(redirect).toHaveBeenCalledTimes(1);
+        expect(redirect).toHaveBeenCalledWith(
+          'https://api.workos.com/user_management/sessions/logout?session_id=session_123',
+        );
+        expect(workos.userManagement.getLogoutUrl).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sessionId: 'session_123',
+          }),
+        );
+      });
+    });
+
     describe('when given a `returnTo` parameter', () => {
       it('passes the `returnTo` through to the `getLogoutUrl` call', async () => {
         vi.spyOn(workos.userManagement, 'getLogoutUrl').mockReturnValue(
