@@ -1,10 +1,13 @@
 import NextLink from 'next/link';
 import { withAuth } from '@workos-inc/authkit-nextjs';
 import { Button, Flex, Heading, Text } from '@radix-ui/themes';
+import { GoogleOneTap } from '@workos-inc/authkit-nextjs/components';
 import { SignInButton } from './components/sign-in-button';
 
 export default async function HomePage() {
   const { user } = await withAuth();
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   return (
     <Flex direction="column" align="center" gap="2">
       {user ? (
@@ -27,6 +30,7 @@ export default async function HomePage() {
             Sign in to view your account details
           </Text>
           <SignInButton large />
+          {googleClientId && <GoogleOneTap clientId={googleClientId} loginUri={`${appUrl}/auth/google-one-tap`} />}
         </>
       )}
     </Flex>
