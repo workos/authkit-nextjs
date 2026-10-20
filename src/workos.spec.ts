@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { WorkOS } from '@workos-inc/node';
 import { getWorkOS, VERSION } from './workos.js';
 
@@ -5,6 +6,12 @@ describe('workos', () => {
   const workos = getWorkOS();
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('reports the package version in the user agent', () => {
+    const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
+    expect(VERSION).toEqual(version);
   });
 
   it('initializes WorkOS with the correct configuration', () => {

@@ -8,7 +8,7 @@ import {
 } from './env-variables.js';
 import { lazy } from './utils.js';
 
-export const VERSION = '2.14.0';
+export const VERSION = '4.3.0'; // x-release-please-version
 
 const options = {
   apiHostname: WORKOS_API_HOSTNAME,

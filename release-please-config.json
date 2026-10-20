@@ -5,7 +5,8 @@
     ".": {
       "release-type": "node",
       "changelog-path": "CHANGELOG.md",
-      "versioning": "default"
+      "versioning": "default",
+      "extra-files": ["src/workos.ts"]
     }
   }
 }
