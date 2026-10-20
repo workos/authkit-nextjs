@@ -5,6 +5,7 @@ import { getPKCECookieNameForState } from './pkce.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
 import { sealData } from 'iron-session';
+import { errors, jwtVerify } from 'jose';
 
 // Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
@@ -13,6 +14,7 @@ import * as nextHeaders from 'next/headers';
 const cookieConfig = vi.hoisted(() => ({
   name: undefined as string | undefined,
   sameSite: undefined as 'lax' | 'strict' | 'none' | undefined,
+  issuer: undefined as string | undefined,
 }));
 
 vi.mock('./env-variables.js', async (importOriginal) => ({
@@ -23,7 +25,19 @@ vi.mock('./env-variables.js', async (importOriginal) => ({
   get WORKOS_COOKIE_SAMESITE() {
     return cookieConfig.sameSite;
   },
+  get WORKOS_ISSUER() {
+    return cookieConfig.issuer;
+  },
 }));
+
+vi.mock('jose', async () => {
+  const actual = await vi.importActual<typeof import('jose')>('jose');
+  return {
+    ...actual,
+    createRemoteJWKSet: vi.fn(() => vi.fn()),
+    jwtVerify: vi.fn(),
+  };
+});
 import { State } from './interfaces.js';
 
 // Mock dependencies
@@ -89,6 +103,10 @@ describe('authkit-callback-route', () => {
     beforeEach(async () => {
       // Reset all mocks
       vi.clearAllMocks();
+      vi.mocked(jwtVerify)
+        .mockReset()
+        .mockResolvedValue({} as Awaited<ReturnType<typeof jwtVerify>>);
+      cookieConfig.issuer = undefined;
 
       // Create a new request with searchParams
       request = new NextRequest(new URL('http://example.com/callback'));
@@ -120,6 +138,26 @@ describe('authkit-callback-route', () => {
         codeVerifier: 'test-verifier',
       });
       expect(response).toBeInstanceOf(NextResponse);
+    });
+
+    it('should reject an access token that fails verification', async () => {
+      cookieConfig.issuer = 'https://auth.example.com';
+      vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
+      vi.mocked(jwtVerify).mockRejectedValueOnce(
+        new errors.JWTClaimValidationFailed('unexpected "iss" claim value', {}, 'iss'),
+      );
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'test-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      const response = await handleAuth()(request);
+
+      expect(response.status).toBe(500);
+      expect(jwtVerify).toHaveBeenCalledWith('access123', expect.any(Function), {
+        issuer: 'https://auth.example.com',
+      });
+      expect((await cookies()).get('wos-session')).toBeUndefined();
     });
 
     it('should handle authentication failure', async () => {

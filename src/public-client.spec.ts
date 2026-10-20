@@ -8,12 +8,14 @@
  */
 import type { Mock } from 'vitest';
 import { NextRequest } from 'next/server';
+import { errors } from 'jose';
 
-// Never fetch a JWKS: the key lookup fails, so the middleware treats the access
-// token as invalid and refreshes it.
+// The test token is unsigned, so accept it here; signature and issuer checks are covered in session.spec.ts.
+// Hoisted so the same mock survives the per-test module reset.
+const jwtVerify = vi.hoisted(() => vi.fn());
 vi.mock('jose', async () => ({
   ...(await vi.importActual<typeof import('jose')>('jose')),
-  createRemoteJWKSet: vi.fn(() => () => Promise.reject(new Error('no JWKS in tests'))),
+  jwtVerify,
 }));
 
 const API_KEY = 'sk_test_confidential';
@@ -25,7 +27,7 @@ function base64url(value: object) {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
 }
 
-// Decoded, never verified, by the refresh paths.
+// Unsigned; jwtVerify is mocked above.
 const accessToken = `${base64url({ alg: 'none' })}.${base64url({
   sid: 'session_123',
   exp: Math.floor(Date.now() / 1000) + 300,
@@ -67,6 +69,7 @@ function setApiKey(apiKey: string | undefined) {
 
 beforeEach(() => {
   vi.resetModules();
+  jwtVerify.mockReset().mockResolvedValue({});
   savedApiKey = process.env.WORKOS_API_KEY;
   // The SDK binds fetch when the client is constructed, so stub it before importing.
   fetchMock = vi.fn<typeof fetch>();
@@ -145,6 +148,8 @@ describe.each([
       headers: { cookie: `wos-session=${await sealedSession('refresh_1')}` },
     });
 
+    // The middleware only refreshes an expired (or expiring) token.
+    jwtVerify.mockRejectedValueOnce(new errors.JWTExpired('"exp" claim timestamp check failed', {}, 'exp'));
     fetchMock.mockResolvedValueOnce(authenticateResponse('refresh_2'));
     const { session } = await updateSession(request);
     expect(session.user?.id).toBe('user_123');

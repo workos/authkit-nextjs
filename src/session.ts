@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sealData, unsealData } from 'iron-session';
-import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
+import { JWTPayload, createRemoteJWKSet, decodeJwt, errors, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
@@ -38,6 +38,19 @@ const signUpPathsHeaderName = 'x-sign-up-paths';
 const jwtCookieName = 'workos-access-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
+
+type AccessTokenVerificationFailure = 'expired' | 'invalid' | 'unavailable';
+type AccessTokenVerification = { status: 'valid' } | { status: AccessTokenVerificationFailure; cause: unknown };
+
+class AccessTokenVerificationError extends Error {
+  readonly status: AccessTokenVerificationFailure;
+
+  constructor(status: AccessTokenVerificationFailure, cause: unknown) {
+    super(`Access token verification failed: ${status}`, { cause });
+    this.name = 'AccessTokenVerificationError';
+    this.status = status;
+  }
+}
 
 /**
  * Applies cache security headers with Vary header deduplication.
@@ -83,10 +96,37 @@ function applyCacheSecurityHeaders(
 }
 
 async function encryptSession(session: Session) {
+  await assertValidAccessToken(session.accessToken);
+
   return sealData(session, {
     password: WORKOS_COOKIE_PASSWORD,
     ttl: 0,
   });
+}
+
+/**
+ * Seals a refreshed session. The previous refresh token is already spent, so when the new access token cannot be
+ * verified because the JWKS is unavailable, keep the replacement refresh token next to the previous access token
+ * (already in the cookie, and verified on every use) instead of dropping it. The unverified new access token is
+ * never stored. Callers persist `sealed`, then treat `error` as a transient refresh failure.
+ */
+async function encryptRefreshedSession(
+  previous: Session,
+  refreshed: Session,
+): Promise<{ sealed: string; error?: AccessTokenVerificationError }> {
+  try {
+    return { sealed: await encryptSession(refreshed) };
+  } catch (error) {
+    if (!(error instanceof AccessTokenVerificationError) || error.status !== 'unavailable') {
+      throw error;
+    }
+
+    const sealed = await sealData(
+      { ...previous, refreshToken: refreshed.refreshToken },
+      { password: WORKOS_COOKIE_PASSWORD, ttl: 0 },
+    );
+    return { sealed, error };
+  }
 }
 
 async function updateSessionMiddleware(
@@ -212,12 +252,22 @@ async function updateSession(
     };
   }
 
-  const hasValidSession = await verifyAccessToken(session.accessToken);
+  const accessTokenVerification = await verifyAccessToken(session.accessToken);
+  const hasValidSession = accessTokenVerification.status === 'valid';
   const isExpiring = hasValidSession && isTokenExpiring(session.accessToken, options.refreshBufferSeconds);
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
   applyCacheSecurityHeaders(newRequestHeaders, request, session);
+
+  const clearSessionCookies = () => {
+    const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
+    newRequestHeaders.append('Set-Cookie', deleteCookie);
+
+    if (options.eagerAuth) {
+      newRequestHeaders.append('Set-Cookie', getJwtCookie(null, request.url, true));
+    }
+  };
 
   const respondWithCurrentToken = (): AuthkitResponse => {
     newRequestHeaders.set(sessionHeaderName, request.cookies.get(cookieName)!.value);
@@ -263,13 +313,45 @@ async function updateSession(
     return respondWithCurrentToken();
   }
 
+  if (accessTokenVerification.status === 'invalid' || accessTokenVerification.status === 'unavailable') {
+    const isInvalid = accessTokenVerification.status === 'invalid';
+
+    if (options.debug) {
+      console.log(
+        isInvalid
+          ? 'Session access token failed verification. Deleting cookie without attempting refresh.'
+          : 'Session access token could not be verified because the JWKS is unavailable. Preserving the session cookie.',
+        accessTokenVerification.cause,
+      );
+    }
+
+    // An unavailable JWKS says nothing about the token, so keep the cookie for a later request.
+    if (isInvalid) {
+      clearSessionCookies();
+    }
+
+    const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
+      returnPathname: getReturnPathname(request.url),
+      redirectUri: options.redirectUri || WORKOS_REDIRECT_URI,
+    });
+
+    setPendingPKCERedirectHeaders(newRequestHeaders, authorizationUrl, sealedState);
+    appendPKCESetCookieHeader(request, newRequestHeaders, sealedState);
+
+    return {
+      session: { user: null },
+      headers: newRequestHeaders,
+      authorizationUrl,
+    };
+  }
+
   try {
     if (options.debug) {
       // istanbul ignore next
       console.log(
         isExpiring
           ? `Session expiring soon. Proactively refreshing access token that ends in ${session.accessToken.slice(-10)}`
-          : `Session invalid. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
+          : `Session expired. ${session.accessToken ? `Refreshing access token that ends in ${session.accessToken.slice(-10)}` : 'Access token missing.'}`,
       );
     }
 
@@ -286,7 +368,7 @@ async function updateSession(
       console.log('Session successfully refreshed');
     }
     // Encrypt session with new access and refresh tokens
-    const encryptedSession = await encryptSession({
+    const { sealed: encryptedSession, error: verificationError } = await encryptRefreshedSession(session, {
       accessToken,
       refreshToken,
       user,
@@ -295,6 +377,9 @@ async function updateSession(
     });
 
     newRequestHeaders.append('Set-Cookie', `${cookieName}=${encryptedSession}; ${getCookieOptions(request.url, true)}`);
+    if (verificationError) {
+      throw verificationError;
+    }
     newRequestHeaders.set(sessionHeaderName, encryptedSession);
 
     // Set JWT cookie if eagerAuth is enabled
@@ -331,7 +416,8 @@ async function updateSession(
       headers: newRequestHeaders,
     };
   } catch (e) {
-    if (isExpiring) {
+    const refreshedTokenRejected = e instanceof AccessTokenVerificationError && e.status !== 'unavailable';
+    if (isExpiring && !refreshedTokenRejected) {
       // A failed proactive refresh is not fatal while the current token is still
       // valid. Refresh tokens are single-use, so a concurrent request in the same
       // buffer window may have already rotated this one; that request has persisted
@@ -368,15 +454,8 @@ async function updateSession(
     }
 
     if (!isTransient) {
-      // When we need to delete a cookie, return it as a header as you can't delete cookies from edge middleware
-      const deleteCookie = `${cookieName}=; Expires=${new Date(0).toUTCString()}; ${getCookieOptions(request.url, true, true)}`;
-      newRequestHeaders.append('Set-Cookie', deleteCookie);
-
-      // Delete JWT cookie if eagerAuth is enabled
-      if (options.eagerAuth) {
-        const deleteJwtCookie = getJwtCookie(null, request.url, true);
-        newRequestHeaders.append('Set-Cookie', deleteJwtCookie);
-      }
+      // Cookie deletion must be returned as a header because edge middleware cannot mutate cookies directly.
+      clearSessionCookies();
     }
 
     options.onSessionRefreshError?.({ error: e, request, isTransient });
@@ -438,7 +517,14 @@ async function refreshSession({
   const headersList = await headers();
   const url = headersList.get('x-url');
 
-  await saveSession(refreshResult, url || WORKOS_REDIRECT_URI);
+  const { sealed, error } = await encryptRefreshedSession(session, refreshResult);
+  (await cookies()).set(WORKOS_COOKIE_NAME || 'wos-session', sealed, getCookieOptions(url || WORKOS_REDIRECT_URI));
+  if (error) {
+    throw new TokenRefreshError(`Failed to refresh session: ${error.message}`, error, {
+      ...getSessionErrorContext(session),
+      isTransient: true,
+    });
+  }
 
   const { accessToken, user, impersonator } = refreshResult;
 
@@ -611,13 +697,40 @@ function getExpectedIssuer(): string | string[] | undefined {
   return issuers.length <= 1 ? issuers[0] : issuers;
 }
 
-async function verifyAccessToken(accessToken: string) {
+async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerification> {
+  const issuer = getExpectedIssuer();
+
   try {
-    const issuer = getExpectedIssuer();
     await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
-    return true;
-  } catch {
-    return false;
+    return { status: 'valid' };
+  } catch (cause) {
+    if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ERR_JWT_EXPIRED') {
+      return { status: 'expired', cause };
+    }
+
+    // Logged without `debug`: a misconfigured WORKOS_ISSUER rejects every session and is otherwise silent.
+    // The signature was already verified, so this is a genuine token and each log is one rejected user action.
+    if (cause instanceof errors.JWTClaimValidationFailed && cause.claim === 'iss') {
+      console.warn(
+        `AuthKit: access token issuer "${cause.payload.iss ?? '(missing)'}" does not match WORKOS_ISSUER "${WORKOS_ISSUER}". ` +
+          'The session was rejected. WORKOS_ISSUER must equal the access token `iss` claim, not the AuthKit OAuth issuer.',
+      );
+    }
+
+    // Only a jose token error proves the token is bad. Anything else (a fetch TypeError on edge,
+    // ECONNREFUSED/ENOTFOUND from node:https on Node) or a JWKS download error is an outage.
+    if (cause instanceof errors.JOSEError && !JWKS_UNAVAILABLE_ERROR_CODES.has(cause.code)) {
+      return { status: 'invalid', cause };
+    }
+
+    return { status: 'unavailable', cause };
+  }
+}
+
+async function assertValidAccessToken(accessToken: string): Promise<void> {
+  const verification = await verifyAccessToken(accessToken);
+  if (verification.status !== 'valid') {
+    throw new AccessTokenVerificationError(verification.status, verification.cause);
   }
 }
 
@@ -658,6 +771,9 @@ const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 // "Failed to fetch"). Match its message so an unrelated programming TypeError
 // isn't misclassified as a transient (and therefore session-preserving) error.
 const NETWORK_ERROR_MESSAGE = /fetch failed|failed to fetch|network|load failed|terminated/i;
+// jose errors raised while downloading the JWKS, not while checking the token. jose uses its
+// generic error for non-200 and non-JSON JWKS responses.
+const JWKS_UNAVAILABLE_ERROR_CODES = new Set(['ERR_JOSE_GENERIC', 'ERR_JWKS_INVALID', 'ERR_JWKS_TIMEOUT']);
 
 // A raw network TypeError is not an HttpClientError, so the WorkOS SDK re-wraps
 // it in a plain Error whose `cause` is the original TypeError. Follow the cause
@@ -683,10 +799,15 @@ function isNetworkError(error: unknown): boolean {
  * (request timeout normalized to `408`, `429`, and `5xx`) surface as an
  * exception carrying a retryable numeric `status`, and a network-level failure
  * surfaces as a `TypeError` (wrapped by the SDK in an `Error` with the
- * `TypeError` as its `cause`). Anything else (a terminal `invalid_grant` at
- * 400, a 401, or an unrecognized error) is treated as terminal.
+ * `TypeError` as its `cause`). A refreshed token that could not be verified
+ * because the JWKS was unavailable is also transient. Anything else (a terminal
+ * `invalid_grant` at 400, a 401, or an unrecognized error) is treated as terminal.
  */
 export function isTransientRefreshError(error: unknown): boolean {
+  if (error instanceof AccessTokenVerificationError) {
+    return error.status === 'unavailable';
+  }
+
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const { status } = error;
     if (typeof status === 'number' && RETRYABLE_REFRESH_STATUS_CODES.has(status)) {
