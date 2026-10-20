@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sealData, unsealData } from 'iron-session';
-import { JWTPayload, createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
+import { JWTPayload, createRemoteJWKSet, decodeJwt, errors, jwtVerify } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
@@ -39,12 +39,13 @@ const jwtCookieName = 'workos-access-token';
 
 const JWKS = lazy(() => createRemoteJWKSet(new URL(getWorkOS().userManagement.getJwksUrl(WORKOS_CLIENT_ID))));
 
-type AccessTokenVerification = { status: 'valid' } | { status: 'expired' | 'invalid'; cause: unknown };
+type AccessTokenVerificationFailure = 'expired' | 'invalid' | 'unavailable';
+type AccessTokenVerification = { status: 'valid' } | { status: AccessTokenVerificationFailure; cause: unknown };
 
 class AccessTokenVerificationError extends Error {
-  readonly status: 'expired' | 'invalid';
+  readonly status: AccessTokenVerificationFailure;
 
-  constructor(status: 'expired' | 'invalid', cause: unknown) {
+  constructor(status: AccessTokenVerificationFailure, cause: unknown) {
     super(`Access token verification failed: ${status}`, { cause });
     this.name = 'AccessTokenVerificationError';
     this.status = status;
@@ -287,15 +288,22 @@ async function updateSession(
     return respondWithCurrentToken();
   }
 
-  if (accessTokenVerification.status === 'invalid') {
+  if (accessTokenVerification.status === 'invalid' || accessTokenVerification.status === 'unavailable') {
+    const isInvalid = accessTokenVerification.status === 'invalid';
+
     if (options.debug) {
       console.log(
-        'Session access token failed verification. Deleting cookie without attempting refresh.',
+        isInvalid
+          ? 'Session access token failed verification. Deleting cookie without attempting refresh.'
+          : 'Session access token could not be verified because the JWKS is unavailable. Preserving the session cookie.',
         accessTokenVerification.cause,
       );
     }
 
-    clearSessionCookies();
+    // An unavailable JWKS says nothing about the token, so keep the cookie for a later request.
+    if (isInvalid) {
+      clearSessionCookies();
+    }
 
     const { url: authorizationUrl, sealedState } = await getAuthorizationUrl({
       returnPathname: getReturnPathname(request.url),
@@ -380,7 +388,8 @@ async function updateSession(
       headers: newRequestHeaders,
     };
   } catch (e) {
-    if (isExpiring && !(e instanceof AccessTokenVerificationError)) {
+    const refreshedTokenRejected = e instanceof AccessTokenVerificationError && e.status !== 'unavailable';
+    if (isExpiring && !refreshedTokenRejected) {
       // A failed proactive refresh is not fatal while the current token is still
       // valid. Refresh tokens are single-use, so a concurrent request in the same
       // buffer window may have already rotated this one; that request has persisted
@@ -654,8 +663,9 @@ function getExpectedIssuer(): string | string[] | undefined {
 }
 
 async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerification> {
+  const issuer = getExpectedIssuer();
+
   try {
-    const issuer = getExpectedIssuer();
     await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
     return { status: 'valid' };
   } catch (cause) {
@@ -663,11 +673,13 @@ async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerifi
       return { status: 'expired', cause };
     }
 
-    // An unavailable JWKS does not prove the token is invalid. Propagate the
-    // error so the request is rejected without deleting the session cookie.
-    if (isJwksUnavailableError(cause)) throw cause;
+    // Only a jose token error proves the token is bad. Anything else (a fetch TypeError on edge,
+    // ECONNREFUSED/ENOTFOUND from node:https on Node) or a JWKS download error is an outage.
+    if (cause instanceof errors.JOSEError && !JWKS_UNAVAILABLE_ERROR_CODES.has(cause.code)) {
+      return { status: 'invalid', cause };
+    }
 
-    return { status: 'invalid', cause };
+    return { status: 'unavailable', cause };
   }
 }
 
@@ -715,13 +727,9 @@ const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 // "Failed to fetch"). Match its message so an unrelated programming TypeError
 // isn't misclassified as a transient (and therefore session-preserving) error.
 const NETWORK_ERROR_MESSAGE = /fetch failed|failed to fetch|network|load failed|terminated/i;
-// jose uses its generic error for non-200 and non-JSON JWKS responses.
+// jose errors raised while downloading the JWKS, not while checking the token. jose uses its
+// generic error for non-200 and non-JSON JWKS responses.
 const JWKS_UNAVAILABLE_ERROR_CODES = new Set(['ERR_JOSE_GENERIC', 'ERR_JWKS_INVALID', 'ERR_JWKS_TIMEOUT']);
-
-function isJwksUnavailableError(error: unknown): boolean {
-  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-  return isNetworkError(error) || (typeof code === 'string' && JWKS_UNAVAILABLE_ERROR_CODES.has(code));
-}
 
 // A raw network TypeError is not an HttpClientError, so the WorkOS SDK re-wraps
 // it in a plain Error whose `cause` is the original TypeError. Follow the cause
@@ -747,11 +755,15 @@ function isNetworkError(error: unknown): boolean {
  * (request timeout normalized to `408`, `429`, and `5xx`) surface as an
  * exception carrying a retryable numeric `status`, and a network-level failure
  * surfaces as a `TypeError` (wrapped by the SDK in an `Error` with the
- * `TypeError` as its `cause`). JWKS availability failures are also transient.
- * Anything else (a terminal `invalid_grant` at 400, a 401, or an unrecognized
- * error) is treated as terminal.
+ * `TypeError` as its `cause`). A refreshed token that could not be verified
+ * because the JWKS was unavailable is also transient. Anything else (a terminal
+ * `invalid_grant` at 400, a 401, or an unrecognized error) is treated as terminal.
  */
 export function isTransientRefreshError(error: unknown): boolean {
+  if (error instanceof AccessTokenVerificationError) {
+    return error.status === 'unavailable';
+  }
+
   if (typeof error === 'object' && error !== null && 'status' in error) {
     const { status } = error;
     if (typeof status === 'number' && RETRYABLE_REFRESH_STATUS_CODES.has(status)) {
@@ -759,7 +771,7 @@ export function isTransientRefreshError(error: unknown): boolean {
     }
   }
 
-  return isJwksUnavailableError(error);
+  return isNetworkError(error);
 }
 
 export async function getSessionFromCookie(request?: NextRequest) {

@@ -5,7 +5,7 @@ import { getPKCECookieNameForState } from './pkce.js';
 import { getSessionFromCookie, saveSession } from './session.js';
 import { NextRequest, NextResponse } from 'next/server';
 import { sealData } from 'iron-session';
-import { jwtVerify } from 'jose';
+import { errors, jwtVerify } from 'jose';
 
 // Mocked in vitest.setup.ts
 import { cookies, headers } from 'next/headers';
@@ -143,7 +143,9 @@ describe('authkit-callback-route', () => {
     it('should reject an access token that fails verification', async () => {
       cookieConfig.issuer = 'https://auth.example.com';
       vi.mocked(workos.userManagement.authenticateWithCode).mockResolvedValue(mockAuthResponse);
-      vi.mocked(jwtVerify).mockRejectedValueOnce(new Error('Unexpected issuer'));
+      vi.mocked(jwtVerify).mockRejectedValueOnce(
+        new errors.JWTClaimValidationFailed('unexpected "iss" claim value', {}, 'iss'),
+      );
 
       const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
       request.nextUrl.searchParams.set('code', 'test-code');
