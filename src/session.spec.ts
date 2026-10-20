@@ -416,6 +416,39 @@ describe('session.ts', () => {
       }
     });
 
+    it('should always warn with both issuers when WORKOS_ISSUER does not match the token', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalIssuer = envVariables.WORKOS_ISSUER;
+      setEnvVar(envVariables, 'WORKOS_ISSUER', 'https://example.authkit.app');
+
+      try {
+        (jwtVerify as Mock).mockRejectedValue(
+          new errors.JWTClaimValidationFailed(
+            'unexpected "iss" claim value',
+            { iss: 'https://api.workos.com/user_management/client_123' },
+            'iss',
+          ),
+        );
+        const request = new NextRequest(new URL('http://example.com'));
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const result = await updateSession(request);
+
+        expect(result.session.user).toBeNull();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'issuer "https://api.workos.com/user_management/client_123" does not match WORKOS_ISSUER "https://example.authkit.app"',
+          ),
+        );
+      } finally {
+        setEnvVar(envVariables, 'WORKOS_ISSUER', originalIssuer);
+        warnSpy.mockRestore();
+      }
+    });
+
     it('should reject an invalid access token without attempting to refresh it', async () => {
       mockSession.accessToken = await generateTestToken({}, true);
 

@@ -58,6 +58,9 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                                                           |
 | `WORKOS_ISSUER`          | None                  | Expected `iss` claim of access tokens (comma-separated to accept multiple issuers). When not set, the issuer claim is not validated |
 
+> [!WARNING]
+> `WORKOS_ISSUER` must equal the `iss` claim of your session access tokens: `https://api.workos.com/user_management/<WORKOS_CLIENT_ID>`, or `https://<your-auth-domain>/user_management/<WORKOS_CLIENT_ID>` with a custom authentication domain. The `issuer` field of `https://api.workos.com/user_management/<WORKOS_CLIENT_ID>/.well-known/openid-configuration` shows the value. It is **not** the AuthKit OAuth issuer (`https://<subdomain>.authkit.app`). If it does not match, every session is rejected: users are signed out, sign-in fails, and the server logs a warning naming both issuers.
+
 Example usage:
 
 ```sh

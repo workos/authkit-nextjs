@@ -673,6 +673,15 @@ async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerifi
       return { status: 'expired', cause };
     }
 
+    // Logged without `debug`: a misconfigured WORKOS_ISSUER rejects every session and is otherwise silent.
+    // The signature was already verified, so this is a genuine token and each log is one rejected user action.
+    if (cause instanceof errors.JWTClaimValidationFailed && cause.claim === 'iss') {
+      console.warn(
+        `AuthKit: access token issuer "${cause.payload.iss ?? '(missing)'}" does not match WORKOS_ISSUER "${WORKOS_ISSUER}". ` +
+          'The session was rejected. WORKOS_ISSUER must equal the access token `iss` claim, not the AuthKit OAuth issuer.',
+      );
+    }
+
     // Only a jose token error proves the token is bad. Anything else (a fetch TypeError on edge,
     // ECONNREFUSED/ENOTFOUND from node:https on Node) or a JWKS download error is an outage.
     if (cause instanceof errors.JOSEError && !JWKS_UNAVAILABLE_ERROR_CODES.has(cause.code)) {
