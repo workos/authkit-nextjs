@@ -74,8 +74,8 @@ describe('getSessionErrorContext', () => {
         profilePictureUrl: null,
         firstName: null,
         lastName: null,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-01'),
         object: 'user',
       } as User,
     };
@@ -96,8 +96,8 @@ describe('getSessionErrorContext', () => {
         profilePictureUrl: null,
         firstName: null,
         lastName: null,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01',
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-01'),
         object: 'user',
       } as User,
     };

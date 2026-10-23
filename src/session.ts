@@ -830,10 +830,36 @@ export async function getSessionFromCookie(request?: NextRequest) {
   }
 
   if (cookie) {
-    return unsealData<Session>(cookie.value, {
-      password: WORKOS_COOKIE_PASSWORD,
-    });
+    return reviveUserTimestamps(
+      await unsealData<Session>(cookie.value, {
+        password: WORKOS_COOKIE_PASSWORD,
+      }),
+    );
   }
+}
+
+/**
+ * `@workos-inc/node` 12 returns a user's timestamps as `Date` objects, which a
+ * sealed session stores as ISO strings. With that SDK installed, turns them back
+ * into `Date` objects so a user read from a session matches the SDK's `User`
+ * type. Earlier SDKs type them as strings, so their sessions are returned as is.
+ */
+function reviveUserTimestamps(session: Session): Session {
+  const sdkMajorVersion = Number.parseInt(getWorkOS().version, 10);
+  if (!(sdkMajorVersion >= 12) || !session.user) {
+    return session;
+  }
+
+  const { user } = session;
+  return {
+    ...session,
+    user: {
+      ...user,
+      createdAt: new Date(user.createdAt),
+      updatedAt: new Date(user.updatedAt),
+      lastSignInAt: user.lastSignInAt ? new Date(user.lastSignInAt) : user.lastSignInAt,
+    },
+  };
 }
 
 async function getSessionFromHeader(): Promise<Session | undefined> {
@@ -850,7 +876,7 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   const authHeader = headersList.get(sessionHeaderName);
   if (!authHeader) return;
 
-  return unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
+  return reviveUserTimestamps(await unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD }));
 }
 
 function getReturnPathname(url: string): string {

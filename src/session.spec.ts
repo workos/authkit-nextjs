@@ -2,8 +2,9 @@ import type { Mock, MockInstance } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { generateTestToken } from './test-helpers.js';
+import { generateSession, generateTestToken } from './test-helpers.js';
 import {
+  getSessionFromCookie,
   withAuth,
   updateSession,
   refreshSession,
@@ -66,8 +67,8 @@ describe('session.ts', () => {
       profilePictureUrl: null,
       firstName: null,
       lastName: null,
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01',
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
     } as User,
   };
 
@@ -210,6 +211,37 @@ describe('session.ts', () => {
         ttl: 0,
       });
       expect(routing).toMatchObject({ returnPathname: '/protected?test=123' });
+    });
+  });
+
+  describe('getSessionFromCookie', () => {
+    it('should return user timestamps as Date objects with @workos-inc/node 12', async () => {
+      await generateSession();
+
+      const session = await getSessionFromCookie();
+
+      expect(session?.user.createdAt).toEqual(new Date('2024-01-01T00:00:00Z'));
+      expect(session?.user.updatedAt).toEqual(new Date('2024-01-01T00:00:00Z'));
+      expect(session?.user.lastSignInAt).toEqual(new Date('2024-01-01T00:00:00Z'));
+    });
+
+    it('should keep a null lastSignInAt', async () => {
+      await generateSession({ lastSignInAt: null });
+
+      const session = await getSessionFromCookie();
+
+      expect(session?.user.lastSignInAt).toBeNull();
+    });
+
+    it('should leave user timestamps as strings with an earlier @workos-inc/node', async () => {
+      const versionSpy = vi.spyOn(workos, 'version', 'get').mockReturnValue('10.14.0');
+      onTestFinished(() => versionSpy.mockRestore());
+      await generateSession();
+
+      const session = await getSessionFromCookie();
+
+      expect(session?.user.createdAt).toBe('2024-01-01T00:00:00.000Z');
+      expect(session?.user.lastSignInAt).toBe('2024-01-01T00:00:00.000Z');
     });
   });
 
