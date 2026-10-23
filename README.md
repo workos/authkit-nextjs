@@ -69,7 +69,7 @@ Direct WorkOS management calls through `getWorkOS()`, such as `organizations.*` 
 
 An empty `WORKOS_API_KEY` counts as unset. The WorkOS SDK also reads `process.env.WORKOS_API_KEY` itself, so a non-empty key in the server's environment always wins: to run keyless, make sure the variable is absent from every env source Next.js loads (`.env*` files and the host environment).
 
-Keyless mode works with every `@workos-inc/node` version this package supports as a peer dependency (v9 and v10).
+Keyless mode works with every `@workos-inc/node` version this package supports as a peer dependency (v9 through v12).
 
 ### Optional configuration
 
@@ -511,6 +511,10 @@ import { getFeatureFlagsRuntimeClient, withAuth } from '@workos-inc/authkit-next
 
 const featureFlags = getFeatureFlagsRuntimeClient();
 
+featureFlags.on('error', (error) => {
+  console.error('Feature flag sync failed:', error.message);
+});
+
 export default async function DashboardPage() {
   const { user, organizationId } = await withAuth({ ensureSignedIn: true });
 
@@ -530,6 +534,10 @@ export default async function DashboardPage() {
 ```
 
 The `getFeatureFlagsRuntimeClient` helper returns the same runtime client for every call in the current server process. Options passed to `getFeatureFlagsRuntimeClient(options)` are only used when the client is created for the first time.
+
+Register an `error` listener on the client so failed syncs reach your logs. With `@workos-inc/node` v9 through v11, a failed sync with no `error` listener stops all further syncs and can crash the process.
+
+The runtime client evaluates flags with the `@workos-inc/node` version you install. Versions before v12 ignore targeting rules that serve `false`, so they can return `true` where the access token claim returns `false`. See the [Node runtime client guide](https://workos.com/docs/feature-flags/node-runtime-client).
 
 ### Requiring auth
 
