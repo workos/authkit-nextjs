@@ -86,6 +86,9 @@ export const StateSchema = v.object({
   customState: v.optional(v.string()),
   returnPathname: v.optional(v.string()),
   codeVerifier: v.string(),
+  // The browser-facing redirect URI this flow was started with. Optional so states
+  // sealed by earlier versions still parse.
+  redirectUri: v.optional(v.string()),
 });
 
 export type State = v.InferOutput<typeof StateSchema>;

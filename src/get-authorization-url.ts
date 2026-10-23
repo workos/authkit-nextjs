@@ -52,6 +52,7 @@ async function getAuthorizationUrl({
     return headersList.get('x-redirect-uri') ?? undefined;
   })();
 
+  const resolvedRedirectUri = redirectUriToUse ?? WORKOS_REDIRECT_URI;
   const pkce = await getWorkOS().pkce.generate();
   const claimNonce = WORKOS_CLAIM_TOKEN ? await fetchClaimNonce(getWorkOS().baseURL) : null;
 
@@ -60,6 +61,9 @@ async function getAuthorizationUrl({
     codeVerifier: pkce.codeVerifier,
     customState,
     returnPathname,
+    // Lets the callback derive cookie security from the browser-facing origin even
+    // when this redirect URI was only configured on the middleware.
+    redirectUri: resolvedRedirectUri || undefined,
   } satisfies State;
 
   const sealedState = await sealData(state, { password: WORKOS_COOKIE_PASSWORD, ttl: 600 });
@@ -67,7 +71,7 @@ async function getAuthorizationUrl({
   const url = getWorkOS().userManagement.getAuthorizationUrl({
     provider: 'authkit' as const,
     clientId: WORKOS_CLIENT_ID,
-    redirectUri: redirectUriToUse ?? WORKOS_REDIRECT_URI,
+    redirectUri: resolvedRedirectUri,
     screenHint,
     organizationId,
     loginHint,
