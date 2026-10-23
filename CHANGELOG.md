@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.6.0](https://github.com/workos/authkit-nextjs/compare/v4.5.0...v4.6.0) (2026-10-23)
+
+
+### Features
+
+* support @workos-inc/node v12 ([#503](https://github.com/workos/authkit-nextjs/issues/503)) ([0719e79](https://github.com/workos/authkit-nextjs/commit/0719e79b9e9a12ccca3d910ae60a07088bfa76b1))
+
 ## [4.5.0](https://github.com/workos/authkit-nextjs/compare/v4.4.0...v4.5.0) (2026-10-20)
 
 
