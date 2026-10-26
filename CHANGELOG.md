@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.6.2](https://github.com/workos/authkit-nextjs/compare/v4.6.1...v4.6.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* cap PKCE verifier cookies written by getSignInUrl/getSignUpUrl ([#505](https://github.com/workos/authkit-nextjs/issues/505)) ([89ba7d6](https://github.com/workos/authkit-nextjs/commit/89ba7d67ac8b2d2b301ba99d02972621627b62bc))
+
 ## [4.6.1](https://github.com/workos/authkit-nextjs/compare/v4.6.0...v4.6.1) (2026-10-26)
 
 
