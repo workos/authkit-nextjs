@@ -6,6 +6,8 @@ import { NextRequest } from 'next/server';
 import { RequestCookies, ResponseCookies } from 'next/dist/server/web/spec-extension/cookies.js';
 import { RequestCookiesAdapter } from 'next/dist/server/web/spec-extension/adapters/request-cookies.js';
 import { handleAuth } from './authkit-callback-route.js';
+import * as envVariables from './env-variables.js';
+import type { HandleAuthOptions } from './interfaces.js';
 import { getPKCECookieNameForState, getStateFromPKCECookieValue } from './pkce.js';
 import { updateSessionMiddleware, withAuth } from './session.js';
 import { getWorkOS } from './workos.js';
@@ -19,6 +21,10 @@ const routingData = {
   screenHint: 'sign-in',
 };
 const sealOptions = { password: process.env.WORKOS_COOKIE_PASSWORD!, ttl: 0 };
+
+function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
+  Object.defineProperty(mod, key, { value, configurable: true });
+}
 
 async function readFlow(response: Response) {
   expect(response.status).toBe(307);
@@ -227,5 +233,55 @@ describe('page authentication start', () => {
     const response = await handleAuth()(new NextRequest(url, { headers: documentHeaders }));
     expect(response.status).toBe(500);
     expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  // Behind a TLS-terminating proxy the start request reaches the app as an internal http:// URL.
+  // Any https origin signal (routing redirectUri, baseURL) must make the PKCE cookie Secure.
+  describe('PKCE cookie Secure flag behind a TLS-terminating proxy', () => {
+    const originalRedirectUri = envVariables.WORKOS_REDIRECT_URI;
+
+    beforeEach(() => {
+      // Pin the env redirect URI to http so it cannot decide Secure on its own.
+      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', 'http://localhost:3000/callback');
+    });
+
+    afterEach(() => {
+      setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalRedirectUri);
+    });
+
+    async function startPKCECookie(requestUrl: string, redirectUri: string, options?: HandleAuthOptions) {
+      const url = new URL(requestUrl);
+      url.searchParams.set('__authkit_start', await sealData({ ...routingData, redirectUri }, sealOptions));
+      const response = await handleAuth(options)(new NextRequest(url, { headers: documentHeaders }));
+      const { state } = await readFlow(response);
+      return response.headers.getSetCookie().find((c) => c.startsWith(`${getPKCECookieNameForState(state)}=`));
+    }
+
+    it('sets Secure when the request URL is internal http and the routing redirectUri is https', async () => {
+      const cookie = await startPKCECookie('http://internal:3000/auth/callback', callbackUri);
+
+      expect(cookie).toMatch(/; Secure/);
+    });
+
+    it('sets Secure from an https baseURL when the request URL and both redirect URIs are http', async () => {
+      const cookie = await startPKCECookie('http://internal:3000/auth/callback', 'http://internal:3000/auth/callback', {
+        baseURL: 'https://preview.example',
+      });
+
+      expect(cookie).toMatch(/; Secure/);
+    });
+
+    it('omits Secure when every origin signal is http on localhost', async () => {
+      const cookie = await startPKCECookie(
+        'http://localhost:3000/auth/callback',
+        'http://localhost:3000/auth/callback',
+        {
+          baseURL: 'http://localhost:3000',
+        },
+      );
+
+      expect(cookie).toBeDefined();
+      expect(cookie).not.toMatch(/Secure/);
+    });
   });
 });

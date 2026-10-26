@@ -220,7 +220,7 @@ describe('middleware-helpers', () => {
       const authorizationUrl = 'https://api.workos.com/user_management/authorize?client_id=client_123&state=abc';
       const headers = new Headers();
       setPendingPKCERedirectHeaders(headers, authorizationUrl, 'sealed-state');
-      appendPKCESetCookieHeader(request, headers, 'sealed-state');
+      appendPKCESetCookieHeader(request, headers, 'sealed-state', [request.url]);
 
       const response = handleAuthkitHeaders(request, headers, { redirect: authorizationUrl });
       const setCookies = response.headers.getSetCookie();
@@ -230,6 +230,22 @@ describe('middleware-helpers', () => {
       expect(response.headers.get('x-workos-authorization-url')).toBeNull();
     });
 
+    // Behind a TLS-terminating proxy request.url is the internal http:// origin. The
+    // middleware's browser-facing redirectUri (x-redirect-uri) must decide Secure on the
+    // PKCE cookie that is re-added for the AuthKit redirect.
+    it('should set Secure on the pending PKCE cookie from x-redirect-uri behind a TLS-terminating proxy', () => {
+      const request = new NextRequest('http://web:3000/app', { headers: { accept: 'text/html' } });
+      const authorizationUrl = 'https://api.workos.com/user_management/authorize?client_id=client_123&state=abc';
+      const headers = new Headers({ 'x-redirect-uri': 'https://app.example.com/callback' });
+      setPendingPKCERedirectHeaders(headers, authorizationUrl, 'sealed-state');
+      appendPKCESetCookieHeader(request, headers, 'sealed-state', [request.url]);
+
+      const response = handleAuthkitHeaders(request, headers, { redirect: authorizationUrl });
+      const pkceCookie = response.headers.getSetCookie().find((c) => c.startsWith('wos-auth-verifier-'));
+
+      expect(pkceCookie).toMatch(/; Secure/);
+    });
+
     it('should not set pending PKCE cookie without a matching AuthKit redirect', () => {
       const request = new NextRequest('https://example.com/app', {
         headers: { accept: 'text/html' },
@@ -237,7 +253,7 @@ describe('middleware-helpers', () => {
       const authorizationUrl = 'https://api.workos.com/user_management/authorize?client_id=client_123&state=abc';
       const headers = new Headers();
       setPendingPKCERedirectHeaders(headers, authorizationUrl, 'sealed-state');
-      appendPKCESetCookieHeader(request, headers, 'sealed-state');
+      appendPKCESetCookieHeader(request, headers, 'sealed-state', [request.url]);
       headers.append('Set-Cookie', 'other=value; Path=/; HttpOnly');
 
       const nextResponse = handleAuthkitHeaders(request, headers);

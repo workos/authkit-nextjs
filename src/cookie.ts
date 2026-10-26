@@ -8,8 +8,23 @@ import { CookieOptions } from './interfaces.js';
 
 type ValidSameSite = CookieOptions['sameSite'];
 
+/**
+ * Every URL known to describe where the app is served from: the incoming request
+ * URL plus any configured browser-facing URL (`baseURL`, `redirectUri`). Entries
+ * may be missing; `NEXT_PUBLIC_WORKOS_REDIRECT_URI` is always considered too.
+ */
+export type OriginUrls = ReadonlyArray<string | null | undefined>;
+
+interface CookieLifetime {
+  /** Produce options that delete the cookie (`Max-Age=0`). */
+  expired?: boolean;
+}
+
+const DEFAULT_COOKIE_MAX_AGE = 60 * 60 * 24 * 400; // 400 days, the maximum allowed by Chrome
+const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
 const JWT_COOKIE_MAX_AGE = 30; // seconds
 const JWT_COOKIE_NAME = 'workos-access-token';
+const EPOCH = new Date(0).toUTCString();
 
 function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite {
   if (!['lax', 'strict', 'none'].includes(sameSite.toLowerCase())) {
@@ -17,74 +32,73 @@ function assertValidSamSite(sameSite: string): asserts sameSite is ValidSameSite
   }
 }
 
-export function getCookieOptions(): CookieOptions;
-export function getCookieOptions(redirectUri?: string | null): CookieOptions;
-export function getCookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
-export function getCookieOptions(
-  redirectUri: string | null | undefined,
-  asString: false,
-  expired?: boolean,
-): CookieOptions;
-export function getCookieOptions(
-  redirectUri?: string | null,
-  asString?: boolean,
-  expired?: boolean,
-): CookieOptions | string;
-export function getCookieOptions(
-  redirectUri?: string | null,
-  asString: boolean = false,
-  expired: boolean = false,
-): CookieOptions | string {
+/** Unparseable URLs count as HTTPS so a bad value fails closed to `Secure`. */
+function isHttpsOrUnparseable(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return true;
+  }
+}
+
+function isLocalhost(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+interface SecurePolicyOptions {
+  /**
+   * Also force Secure in production builds unless every signal is localhost. Used by the
+   * script-readable eagerAuth access token cookie, which has always had this floor.
+   */
+  productionFloor?: boolean;
+}
+
+/**
+ * The single policy for the `Secure` attribute on every AuthKit cookie.
+ *
+ * Behind a TLS-terminating proxy the incoming request URL is the internal `http://`
+ * origin, so it can't be trusted on its own. If any origin signal is HTTPS, the
+ * cookie is Secure. With no signals at all, it fails closed to Secure.
+ */
+function isSecureOrigin(urls: OriginUrls, { productionFloor = false }: SecurePolicyOptions = {}): boolean {
+  const candidates = [...urls, WORKOS_REDIRECT_URI].filter((url): url is string => Boolean(url));
+  if (candidates.length === 0 || candidates.some(isHttpsOrUnparseable)) {
+    return true;
+  }
+
+  return productionFloor && process.env.NODE_ENV === 'production' && !candidates.every(isLocalhost);
+}
+
+/**
+ * Origin signals available in a server action / route handler: the request URL and
+ * redirect URI the AuthKit middleware recorded on the request headers.
+ */
+export function originUrlsFromHeaders(headers: Pick<Headers, 'get'>): OriginUrls {
+  return [headers.get('x-url'), headers.get('x-redirect-uri')];
+}
+
+export function getCookieOptions(urls: OriginUrls, { expired = false }: CookieLifetime = {}): CookieOptions {
   const sameSite = WORKOS_COOKIE_SAMESITE || 'lax';
   assertValidSamSite(sameSite);
 
-  const urlString = redirectUri || WORKOS_REDIRECT_URI;
-  // Default to secure=true when no URL available (production default)
-  // Developers should set WORKOS_REDIRECT_URI for proper local dev
-  let secure: boolean;
-  if (sameSite.toLowerCase() === 'none') {
-    secure = true;
-  } else if (urlString) {
-    try {
-      const url = new URL(urlString);
-      secure = url.protocol === 'https:';
-    } catch {
-      // Invalid URL - default to secure
-      secure = true;
-    }
-  } else {
-    secure = true;
-  }
-
-  let maxAge: number;
+  let maxAge = DEFAULT_COOKIE_MAX_AGE;
   if (expired) {
     maxAge = 0;
   } else if (WORKOS_COOKIE_MAX_AGE) {
     const parsed = parseInt(WORKOS_COOKIE_MAX_AGE, 10);
-    maxAge = Number.isFinite(parsed) ? parsed : 60 * 60 * 24 * 400;
-  } else {
-    maxAge = 60 * 60 * 24 * 400;
-  }
-
-  if (asString) {
-    const capitalizedSameSite = sameSite.charAt(0).toUpperCase() + sameSite.slice(1).toLowerCase();
-    const parts = ['Path=/', 'HttpOnly', `SameSite=${capitalizedSameSite}`, `Max-Age=${maxAge}`];
-    if (WORKOS_COOKIE_DOMAIN) {
-      parts.push(`Domain=${WORKOS_COOKIE_DOMAIN}`);
-    }
-    if (secure) {
-      parts.push('Secure');
-    }
-
-    return parts.join('; ');
+    maxAge = Number.isFinite(parsed) ? parsed : DEFAULT_COOKIE_MAX_AGE;
   }
 
   return {
     path: '/',
     httpOnly: true,
-    secure,
+    secure: sameSite.toLowerCase() === 'none' || isSecureOrigin(urls),
     sameSite,
-    // Defaults to 400 days, the maximum allowed by Chrome
     // It's fine to have a long cookie expiry date as the access/refresh tokens
     // act as the actual time-limited aspects of the session.
     maxAge,
@@ -92,34 +106,14 @@ export function getCookieOptions(
   };
 }
 
-const PKCE_COOKIE_MAX_AGE = 600; // 10 minutes
-
 /**
  * Cookie options for the PKCE verifier cookie.
  * 'strict' blocks the cookie on the cross-site redirect back from WorkOS; downgrade to 'lax'.
  * 'none' is more permissive and must be preserved for iframe/cross-origin embed flows.
  * Max-age is always capped to 10 minutes — PKCE cookies are single-use and short-lived.
  */
-export function getPKCECookieOptions(): CookieOptions;
-export function getPKCECookieOptions(redirectUri: string | null | undefined, asString: true, expired?: boolean): string;
-export function getPKCECookieOptions(
-  redirectUri?: string | null,
-  asString?: boolean,
-  expired?: boolean,
-): CookieOptions | string;
-export function getPKCECookieOptions(
-  redirectUri?: string | null,
-  asString: boolean = false,
-  expired: boolean = false,
-): CookieOptions | string {
-  if (asString) {
-    const options = getCookieOptions(redirectUri, true, expired);
-    return options
-      .replace(/SameSite=Strict/i, 'SameSite=Lax')
-      .replace(/Max-Age=\d+/, `Max-Age=${expired ? 0 : PKCE_COOKIE_MAX_AGE}`);
-  }
-
-  const options = getCookieOptions(redirectUri);
+export function getPKCECookieOptions(urls: OriginUrls, { expired = false }: CookieLifetime = {}): CookieOptions {
+  const options = getCookieOptions(urls, { expired });
   return {
     ...options,
     sameSite: options.sameSite.toLowerCase() === 'strict' ? 'lax' : options.sameSite,
@@ -127,54 +121,44 @@ export function getPKCECookieOptions(
   };
 }
 
-export function getJwtCookie(body: string | null, requestUrlOrRedirectUri?: string | null, expired?: boolean): string {
-  const cookie = `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`;
-
-  // Force Secure in production, except for localhost
-  let secure = false;
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  if (requestUrlOrRedirectUri) {
-    try {
-      const url = new URL(requestUrlOrRedirectUri);
-      const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-      // In production, always use Secure unless explicitly on localhost
-      secure = isProduction ? !isLocalhost : url.protocol === 'https:';
-    } catch {
-      // If URL parsing fails, default to secure in production
-      secure = isProduction;
-      // If it's not a valid URL, fall back to WORKOS_REDIRECT_URI
-      const fallbackUrl = WORKOS_REDIRECT_URI;
-      if (fallbackUrl) {
-        try {
-          const url = new URL(fallbackUrl);
-          secure = url.protocol === 'https:';
-        } catch {
-          secure = false;
-        }
-      }
-    }
-  } else if (WORKOS_REDIRECT_URI) {
-    // No URL provided, check WORKOS_REDIRECT_URI
-    try {
-      const url = new URL(WORKOS_REDIRECT_URI);
-      secure = url.protocol === 'https:';
-    } catch {
-      secure = false;
-    }
+/** Serialize a cookie for a raw `Set-Cookie` header (e.g. in middleware, where `cookies()` is unavailable). */
+export function serializeCookie(name: string, value: string, options: CookieOptions): string {
+  const sameSite = options.sameSite.charAt(0).toUpperCase() + options.sameSite.slice(1).toLowerCase();
+  const parts = [
+    `${name}=${value}`,
+    `Path=${options.path}`,
+    'HttpOnly',
+    `SameSite=${sameSite}`,
+    `Max-Age=${options.maxAge}`,
+  ];
+  if (options.maxAge === 0) {
+    parts.push(`Expires=${EPOCH}`);
   }
-
-  const maxAge = expired ? 0 : JWT_COOKIE_MAX_AGE;
-
-  const parts = [cookie, 'SameSite=Lax', `Max-Age=${maxAge}`];
-
-  // Only add Secure flag if on HTTPS
-  if (secure) {
+  if (options.domain) {
+    parts.push(`Domain=${options.domain}`);
+  }
+  if (options.secure) {
     parts.push('Secure');
   }
 
+  return parts.join('; ');
+}
+
+/**
+ * The short-lived, script-readable access token cookie used by `eagerAuth`.
+ * Uses the same `Secure` policy as every other AuthKit cookie, plus the production floor.
+ */
+export function getJwtCookie(body: string | null, urls: OriginUrls, expired: boolean = false): string {
+  const parts = [
+    `${JWT_COOKIE_NAME}=${expired ? '' : (body ?? '')}`,
+    'SameSite=Lax',
+    `Max-Age=${expired ? 0 : JWT_COOKIE_MAX_AGE}`,
+  ];
+  if (isSecureOrigin(urls, { productionFloor: true })) {
+    parts.push('Secure');
+  }
   if (expired) {
-    parts.push(`Expires=${new Date(0).toUTCString()}`);
+    parts.push(`Expires=${EPOCH}`);
   }
 
   return parts.join('; ');
