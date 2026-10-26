@@ -40,7 +40,15 @@ export function getPKCECookieNameForState(state: string): string {
  */
 export async function setPKCECookie(sealedState: string, originUrls: OriginUrls): Promise<void> {
   const nextCookies = await cookies();
-  nextCookies.set(getPKCECookieNameForState(sealedState), sealedState, getPKCECookieOptions(originUrls));
+  const newCookieName = getPKCECookieNameForState(sealedState);
+
+  // Sign-in routes run on every request, so this path needs the same cap as the middleware.
+  const expiredOptions = getPKCECookieOptions(originUrls, { expired: true });
+  for (const name of getPKCECookiesToExpire(nextCookies.getAll(), newCookieName)) {
+    nextCookies.set(name, '', expiredOptions);
+  }
+
+  nextCookies.set(newCookieName, sealedState, getPKCECookieOptions(originUrls));
 }
 
 /**
@@ -72,19 +80,9 @@ export function appendPKCESetCookieHeader(
   }
 
   const newCookieName = getPKCECookieNameForState(sealedState);
-  const pkceCookies = request.cookies
-    .getAll()
-    .filter(({ name }) => name === PKCE_COOKIE_NAME || name.startsWith(`${PKCE_COOKIE_NAME}-`));
-
-  // A small number of concurrent PKCE cookies is normal (multiple tabs each
-  // starting an OAuth flow). Only purge when accumulation risks HTTP 431.
-  if (pkceCookies.length >= MAX_PKCE_COOKIES) {
-    const expiredOptions = getPKCECookieOptions(originUrls, { expired: true });
-    for (const { name } of pkceCookies) {
-      if (name !== newCookieName) {
-        headers.append('Set-Cookie', serializeCookie(name, '', expiredOptions));
-      }
-    }
+  const expiredOptions = getPKCECookieOptions(originUrls, { expired: true });
+  for (const name of getPKCECookiesToExpire(request.cookies.getAll(), newCookieName)) {
+    headers.append('Set-Cookie', serializeCookie(name, '', expiredOptions));
   }
 
   headers.append('Set-Cookie', serializeCookie(newCookieName, sealedState, getPKCECookieOptions(originUrls)));
@@ -118,13 +116,26 @@ export function isInitialDocumentRequest(request: NextRequest): boolean {
   return isDocumentRequest && !isRSCRequest && !isPrefetch;
 }
 
+function isPKCECookieName(name: string): boolean {
+  return name === PKCE_COOKIE_NAME || name.startsWith(`${PKCE_COOKIE_NAME}-`);
+}
+
+/**
+ * Verifier cookies to expire before writing `newCookieName`. A small number of
+ * concurrent PKCE cookies is normal (multiple tabs each starting an OAuth flow),
+ * so only purge when accumulation risks HTTP 431.
+ */
+function getPKCECookiesToExpire(existing: { name: string }[], newCookieName: string): string[] {
+  const names = existing.map(({ name }) => name).filter(isPKCECookieName);
+  return names.length >= MAX_PKCE_COOKIES ? names.filter((name) => name !== newCookieName) : [];
+}
+
 function isPKCESetCookieHeader(setCookieHeader: string): boolean {
   const separatorIndex = setCookieHeader.indexOf('=');
   if (separatorIndex === -1) {
     return false;
   }
-  const cookieName = setCookieHeader.slice(0, separatorIndex);
-  return cookieName === PKCE_COOKIE_NAME || cookieName.startsWith(`${PKCE_COOKIE_NAME}-`);
+  return isPKCECookieName(setCookieHeader.slice(0, separatorIndex));
 }
 
 /**

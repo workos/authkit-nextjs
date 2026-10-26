@@ -239,6 +239,22 @@ describe('cookie.ts', () => {
       expect(getPKCECookieOptions([], { expired: true })).toEqual(expect.objectContaining({ maxAge: 0 }));
     });
 
+    it('should stay expired when Next.js re-serializes the header next to cookies().set()', async () => {
+      const { getPKCECookieOptions, serializeCookie } = await import('./cookie');
+      const { NextResponse } = await import('next/server');
+
+      const response = new NextResponse(null, {
+        headers: {
+          'Set-Cookie': serializeCookie('wos-auth-verifier-abc', '', getPKCECookieOptions([], { expired: true })),
+        },
+      });
+      // Next merges cookies().set() into a route's response this way, rewriting every Set-Cookie header.
+      response.cookies.set('wos-session', 'sealed');
+
+      const verifier = response.headers.getSetCookie().find((c) => c.startsWith('wos-auth-verifier-abc='));
+      expect(verifier).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    });
+
     it('should downgrade SameSite=Strict to Lax', async () => {
       await setEnv({ WORKOS_COOKIE_SAMESITE: 'strict' });
 
