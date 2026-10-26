@@ -31,7 +31,7 @@ describe('setPKCECookie SameSite override', () => {
     vi.clearAllMocks();
     vi.resetModules();
     vi.doMock('next/headers', () => ({
-      cookies: async () => ({ set: mockSet, get: vi.fn(), getAll: vi.fn(), delete: vi.fn() }),
+      cookies: async () => ({ set: mockSet, get: vi.fn(), getAll: vi.fn(() => []), delete: vi.fn() }),
       headers: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }),
     }));
     vi.doMock('./env-variables', async (importOriginal) => {
@@ -100,6 +100,45 @@ describe('setPKCECookie SameSite override', () => {
       getPKCECookieNameForState('sealed-state'),
       'sealed-state',
       expect.objectContaining({ sameSite: 'lax' }),
+    );
+  });
+});
+
+describe('setPKCECookie verifier cap', () => {
+  const mockSet = vi.fn();
+  let existing: { name: string; value: string }[] = [];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    vi.doMock('next/headers', () => ({
+      cookies: async () => ({ set: mockSet, get: vi.fn(), getAll: () => existing, delete: vi.fn() }),
+    }));
+  });
+
+  const verifiers = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ name: `wos-auth-verifier-${i}`, value: `state-${i}` }));
+
+  it('keeps existing verifiers below the cap', async () => {
+    existing = [...verifiers(4), { name: 'unrelated', value: 'x' }];
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state', []);
+
+    expect(mockSet).toHaveBeenCalledTimes(1);
+    expect(mockSet).toHaveBeenCalledWith(getPKCECookieNameForState('sealed-state'), 'sealed-state', expect.anything());
+  });
+
+  it('expires every other verifier once the cap is reached', async () => {
+    existing = [...verifiers(5), { name: 'wos-auth-verifier', value: 'legacy' }, { name: 'unrelated', value: 'x' }];
+    const { setPKCECookie } = await import('./pkce');
+    await setPKCECookie('sealed-state', []);
+
+    const expired = mockSet.mock.calls.filter(([, , options]) => options.maxAge === 0).map(([name]) => name);
+    expect(expired).toEqual([...verifiers(5).map(({ name }) => name), 'wos-auth-verifier']);
+    expect(mockSet).toHaveBeenLastCalledWith(
+      getPKCECookieNameForState('sealed-state'),
+      'sealed-state',
+      expect.objectContaining({ maxAge: 600 }),
     );
   });
 });
