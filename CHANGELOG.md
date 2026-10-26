@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.6.1](https://github.com/workos/authkit-nextjs/compare/v4.6.0...v4.6.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* derive session cookie Secure flag from the browser-facing origin ([#493](https://github.com/workos/authkit-nextjs/issues/493)) ([7e7d53e](https://github.com/workos/authkit-nextjs/commit/7e7d53ec28bf31433655ae08d26fa3c1202030c3))
+
 ## [4.6.0](https://github.com/workos/authkit-nextjs/compare/v4.5.0...v4.6.0) (2026-10-23)
 
 
