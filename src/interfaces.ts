@@ -21,6 +21,13 @@ export interface HandleAuthOptions {
   onError?: (params: { error?: unknown; request: NextRequest }) => Response | Promise<Response>;
 }
 
+export interface HandleGoogleOneTapOptions {
+  returnPathname?: string;
+  baseURL?: string;
+  onSuccess?: (data: AuthenticationResponse) => void | Promise<void>;
+  onError?: (params: { error?: unknown; request: NextRequest }) => Response | Promise<Response>;
+}
+
 export interface HandleAuthSuccessData extends Session {
   oauthTokens?: OauthTokens;
   organizationId?: string;
