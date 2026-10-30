@@ -945,10 +945,12 @@ export async function saveSession(
   sessionOrResponse: Session | AuthenticationResponse,
   request: NextRequest | string,
 ): Promise<void> {
-  await setSessionCookie(
-    sessionOrResponse,
-    typeof request === 'string' ? [request] : [request.url, forwardedOriginUrl(request.headers)],
-  );
+  // For a request, x-redirect-uri is the middleware's redirectUri when the middleware covers the route.
+  const originUrls =
+    typeof request === 'string'
+      ? [request]
+      : [request.url, request.headers.get('x-redirect-uri'), forwardedOriginUrl(request.headers)];
+  await setSessionCookie(sessionOrResponse, originUrls);
 }
 
 /**

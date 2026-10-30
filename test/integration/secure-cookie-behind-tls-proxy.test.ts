@@ -113,6 +113,7 @@ let publicJwk: JWK;
 let authkit: typeof import('../../src/index.js');
 let callbackRoute: ReturnType<(typeof authkit)['handleAuth']>;
 let middleware: ReturnType<(typeof authkit)['authkitProxy']>;
+let httpsRedirectMiddleware: ReturnType<(typeof authkit)['authkitProxy']>;
 
 // ---------------------------------------------------------------------------
 // Stand-in WorkOS API
@@ -177,8 +178,17 @@ async function route(request: NextRequest): Promise<Response> {
     return callbackRoute(request);
   }
 
+  if (pathname.startsWith('/dashboard')) {
+    // Protected by a middleware whose redirectUri option is https.
+    return runMiddleware(httpsRedirectMiddleware, request);
+  }
+
   // Every other path goes through the middleware, as in examples/next/src/proxy.ts.
-  const response = await middleware(request, {} as NextFetchEvent);
+  return runMiddleware(middleware, request);
+}
+
+async function runMiddleware(proxy: typeof middleware, request: NextRequest): Promise<Response> {
+  const response = await proxy(request, {} as NextFetchEvent);
   if (!response || response.headers.has('x-middleware-next')) {
     // Stands in for the page the middleware lets through, keeping the middleware's headers.
     return new Response('ok', { status: 200, headers: response?.headers });
@@ -321,8 +331,8 @@ function cookiePair(setCookie: string): string {
 }
 
 /** Starts sign-in, follows it back to the callback and returns the session Set-Cookie line. */
-async function signIn(target: Target): Promise<string> {
-  const login = await send(target, '/login');
+async function signIn(target: Target, startPath = '/login'): Promise<string> {
+  const login = await send(target, startPath, { accept: 'text/html' });
   expect(login.status, login.body).toBe(307);
   const state = new URL(login.location!).searchParams.get('state');
   const pkceCookie = findSetCookie(login.setCookies, 'wos-auth-verifier-');
@@ -459,6 +469,10 @@ beforeAll(async () => {
   authkit = await import('../../src/index.js');
   callbackRoute = authkit.handleAuth();
   middleware = authkit.authkitProxy();
+  httpsRedirectMiddleware = authkit.authkitProxy({
+    redirectUri: `https://127.0.0.1:${proxyPort}/callback`,
+    middlewareAuth: { enabled: true, unauthenticatedPaths: [] },
+  });
 });
 
 afterAll(async () => {
@@ -489,6 +503,18 @@ describe('behind a TLS-terminating proxy', () => {
     const refreshed = await refreshThroughMiddleware(viaProxy(), sessionCookie);
 
     expect(refreshed).toMatch(SECURE);
+  });
+});
+
+describe('with an https middleware redirect URI and no forwarded protocol', () => {
+  // Plain HTTP reaches the app without x-forwarded-proto, and the callback route sits outside
+  // the middleware. The https redirect URI sealed in the sign-in state is the only sign of HTTPS.
+  const plainHttpUpstream = (): Target => ({ baseUrl: `http://127.0.0.1:${appPort}` });
+
+  it('sets Secure on the session cookie issued by the callback', async () => {
+    const sessionCookie = await signIn(plainHttpUpstream(), '/dashboard');
+
+    expect(sessionCookie).toMatch(SECURE);
   });
 });
 

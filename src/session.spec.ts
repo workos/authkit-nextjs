@@ -1723,6 +1723,19 @@ describe('session.ts', () => {
       expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
     });
 
+    it('saveSession sets Secure for a request whose middleware redirect URI is https', async () => {
+      const request = new NextRequest('http://web:3000/account', {
+        headers: { 'x-redirect-uri': 'https://app.example.com/callback' },
+      });
+
+      await saveSession(
+        { accessToken: await generateTestToken(), refreshToken: 'refresh', user: mockSession.user },
+        request,
+      );
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
     it('saveSession leaves Secure off in plain local http development and keeps the URL-string result', async () => {
       const session = { accessToken: await generateTestToken(), refreshToken: 'refresh', user: mockSession.user };
 
