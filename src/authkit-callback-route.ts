@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getURLFromRedirectError } from 'next/dist/client/components/redirect.js';
 import * as v from 'valibot';
-import { getCookieOptions, getPKCECookieOptions, serializeCookie } from './cookie.js';
+import { forwardedOriginUrl, getCookieOptions, getPKCECookieOptions, serializeCookie } from './cookie.js';
 import { WORKOS_CLIENT_ID, WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { CallbackError } from './errors.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
@@ -49,9 +49,10 @@ export function handleAuth(options: HandleAuthOptions = {}) {
     const requestUrl = request.nextUrl ?? new URL(request.url);
 
     // Origin signals known so far. Behind a TLS-terminating proxy request.url is the
-    // internal http:// origin; baseURL is the browser-facing origin, so it also counts
-    // toward Secure. The redirect URI sealed into the PKCE state is added once unsealed.
-    const originUrls: Array<string | undefined> = [request.url, baseURL];
+    // internal http:// origin; baseURL and the forwarded protocol describe the
+    // browser-facing origin, so they also count toward Secure. The redirect URI sealed
+    // into the PKCE state is added once unsealed.
+    const originUrls: Array<string | undefined> = [request.url, baseURL, forwardedOriginUrl(request.headers)];
 
     // Gather mandatory information
     const code = requestUrl.searchParams.get('code');

@@ -132,6 +132,62 @@ describe('cookie.ts', () => {
     });
   });
 
+  describe('behind a TLS-terminating proxy', () => {
+    const forwarded = (proto: string, extra: Record<string, string> = {}) =>
+      new Headers({ 'x-forwarded-proto': proto, ...extra });
+
+    it('reports the forwarded https origin', async () => {
+      const { forwardedOriginUrl } = await import('./cookie');
+
+      expect(forwardedOriginUrl(forwarded('https', { 'x-forwarded-host': 'app.example.com', host: 'web:3000' }))).toBe(
+        'https://app.example.com',
+      );
+      expect(forwardedOriginUrl(forwarded('https', { host: 'web:3000' }))).toBe('https://web:3000');
+    });
+
+    it('uses the first value of a comma-separated x-forwarded-proto', async () => {
+      const { forwardedOriginUrl } = await import('./cookie');
+
+      expect(forwardedOriginUrl(forwarded('https,http', { host: 'web:3000' }))).toBe('https://web:3000');
+      expect(forwardedOriginUrl(forwarded(' HTTPS , http', { host: 'web:3000' }))).toBe('https://web:3000');
+      expect(forwardedOriginUrl(forwarded('http,https', { host: 'web:3000' }))).toBeUndefined();
+    });
+
+    it('yields nothing for http or a missing header, so it never turns Secure off', async () => {
+      const { forwardedOriginUrl } = await import('./cookie');
+
+      expect(forwardedOriginUrl(forwarded('http', { host: 'web:3000' }))).toBeUndefined();
+      expect(forwardedOriginUrl(new Headers({ host: 'localhost:3000' }))).toBeUndefined();
+    });
+
+    it('sets Secure for an http request URL with x-forwarded-proto: https', async () => {
+      const { forwardedOriginUrl, getCookieOptions, getPKCECookieOptions, getJwtCookie } = await import('./cookie');
+      const urls = ['http://web:3000/callback', forwardedOriginUrl(forwarded('https', { host: 'web:3000' }))];
+
+      expect(getCookieOptions(urls).secure).toBe(true);
+      expect(getPKCECookieOptions(urls).secure).toBe(true);
+      expect(getJwtCookie('token', urls)).toBe('workos-access-token=token; SameSite=Lax; Max-Age=30; Secure');
+    });
+
+    it('keeps Secure from an https redirect URI when x-forwarded-proto is http', async () => {
+      const { forwardedOriginUrl, getCookieOptions } = await import('./cookie');
+      const http = forwardedOriginUrl(forwarded('http', { host: 'web:3000' }));
+
+      expect(getCookieOptions(['http://web:3000/callback', 'https://app.example.com/callback', http]).secure).toBe(
+        true,
+      );
+      expect(getCookieOptions(['https://app.example.com/callback', http]).secure).toBe(true);
+    });
+
+    it('leaves Secure off in plain local http development', async () => {
+      const { forwardedOriginUrl, getCookieOptions, getJwtCookie } = await import('./cookie');
+      const urls = ['http://localhost:3000/callback', forwardedOriginUrl(new Headers({ host: 'localhost:3000' }))];
+
+      expect(getCookieOptions(urls).secure).toBe(false);
+      expect(getJwtCookie('token', urls)).not.toContain('Secure');
+    });
+  });
+
   describe('serializeCookie', () => {
     it('serializes options in Set-Cookie format', async () => {
       const { getCookieOptions, serializeCookie } = await import('./cookie');

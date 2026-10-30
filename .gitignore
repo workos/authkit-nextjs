@@ -4,6 +4,7 @@ dist
 coverage
 .idea
 package-lock.json
+.scratch
 
 # Example apps
 examples/next/.next

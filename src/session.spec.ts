@@ -12,6 +12,7 @@ import {
   updateSessionMiddleware,
   getTokenClaims,
   checkRecentAuth,
+  saveSession,
 } from './session.js';
 import { getWorkOS } from './workos.js';
 import * as envVariables from './env-variables.js';
@@ -1137,7 +1138,10 @@ describe('session.ts', () => {
         setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalRedirectUri);
       });
 
-      async function refreshBehindProxy(options: Parameters<typeof updateSession>[1] = {}) {
+      async function refreshBehindProxy(
+        options: Parameters<typeof updateSession>[1] = {},
+        { url = 'http://web:3000/account', headers = {} }: { url?: string; headers?: Record<string, string> } = {},
+      ) {
         mockSession.accessToken = await generateTestToken({}, true);
         mockExpiredAccessToken();
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
@@ -1146,7 +1150,7 @@ describe('session.ts', () => {
           user: mockSession.user,
         });
 
-        const request = new NextRequest(new URL('http://web:3000/account'));
+        const request = new NextRequest(new URL(url), { headers });
         request.cookies.set(
           'wos-session',
           await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
@@ -1155,6 +1159,69 @@ describe('session.ts', () => {
         const response = await updateSession(request, options);
         return response.headers.getSetCookie().find((c) => c.startsWith('wos-session='));
       }
+
+      it('sets Secure on the refreshed session cookie when x-forwarded-proto is https', async () => {
+        expect(await refreshBehindProxy({}, { headers: { 'x-forwarded-proto': 'https' } })).toMatch(/; Secure/);
+      });
+
+      it('uses the first value of a comma-separated x-forwarded-proto', async () => {
+        expect(await refreshBehindProxy({}, { headers: { 'x-forwarded-proto': 'https,http' } })).toMatch(/; Secure/);
+        expect(await refreshBehindProxy({}, { headers: { 'x-forwarded-proto': 'http,https' } })).not.toMatch(
+          /; Secure/,
+        );
+      });
+
+      it('keeps Secure from an https redirectUri when x-forwarded-proto is http', async () => {
+        expect(
+          await refreshBehindProxy(
+            { redirectUri: 'https://app.example.com/callback' },
+            { headers: { 'x-forwarded-proto': 'http' } },
+          ),
+        ).toMatch(/; Secure/);
+      });
+
+      it('leaves Secure off the refreshed session cookie in plain local http development', async () => {
+        expect(await refreshBehindProxy({}, { url: 'http://localhost:3000/account' })).not.toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the eager-auth JWT cookie when x-forwarded-proto is https', async () => {
+        mockSession.accessToken = await generateTestToken({}, true);
+        mockExpiredAccessToken();
+        vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+          accessToken: await generateTestToken(),
+          refreshToken: 'new-refresh-token',
+          user: mockSession.user,
+        });
+        const request = new NextRequest(new URL('http://web:3000/account'), {
+          headers: { accept: 'text/html', 'x-forwarded-proto': 'https' },
+        });
+        request.cookies.set(
+          'wos-session',
+          await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+        );
+
+        const response = await updateSession(request, { eagerAuth: true });
+
+        expect(response.headers.getSetCookie().find((c) => c.startsWith('workos-access-token='))).toMatch(/; Secure/);
+      });
+
+      it('sets Secure on the PKCE verifier cookie the middleware issues when x-forwarded-proto is https', async () => {
+        const request = new NextRequest(new URL('http://web:3000/account'), {
+          headers: { accept: 'text/html', 'x-forwarded-proto': 'https' },
+        });
+
+        const response = await updateSessionMiddleware(
+          request,
+          false,
+          { enabled: true, unauthenticatedPaths: [] },
+          'http://localhost:3000/callback',
+          [],
+        );
+
+        expect(response.status).toBe(307);
+        const pkceCookie = response.headers.getSetCookie().find((c) => c.startsWith('wos-auth-verifier'));
+        expect(pkceCookie).toMatch(/; Secure/);
+      });
 
       it('sets Secure on the refreshed session cookie when WORKOS_REDIRECT_URI is https', async () => {
         setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', 'https://app.example.com/callback');
@@ -1624,6 +1691,59 @@ describe('session.ts', () => {
       await refreshSession({ ensureSignedIn: false });
 
       expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
+    it('refreshSession sets Secure from x-forwarded-proto alone', async () => {
+      const nextHeaders = await headers();
+      nextHeaders.delete('x-redirect-uri');
+      nextHeaders.set('x-forwarded-proto', 'https');
+      cookieResponse.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+      vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
+        accessToken: await generateTestToken(),
+        refreshToken: 'new-refresh-token',
+        user: mockSession.user,
+      });
+
+      await refreshSession({ ensureSignedIn: false });
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
+    it('saveSession sets Secure for a request with x-forwarded-proto: https', async () => {
+      const request = new NextRequest('http://web:3000/callback', { headers: { 'x-forwarded-proto': 'https' } });
+
+      await saveSession(
+        { accessToken: await generateTestToken(), refreshToken: 'refresh', user: mockSession.user },
+        request,
+      );
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
+    it('saveSession sets Secure for a request whose middleware redirect URI is https', async () => {
+      const request = new NextRequest('http://web:3000/account', {
+        headers: { 'x-redirect-uri': 'https://app.example.com/callback' },
+      });
+
+      await saveSession(
+        { accessToken: await generateTestToken(), refreshToken: 'refresh', user: mockSession.user },
+        request,
+      );
+
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: true });
+    });
+
+    it('saveSession leaves Secure off in plain local http development and keeps the URL-string result', async () => {
+      const session = { accessToken: await generateTestToken(), refreshToken: 'refresh', user: mockSession.user };
+
+      await saveSession(session, new NextRequest('http://localhost:3000/callback'));
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
+
+      await saveSession(session, 'http://localhost:3000/callback');
+      expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
     });
   });
 
