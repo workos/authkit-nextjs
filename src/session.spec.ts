@@ -268,6 +268,26 @@ describe('session.ts', () => {
       setEnvVar(envVariables, 'WORKOS_REDIRECT_URI', originalWorkosRedirectUri);
     });
 
+    it('should throw an error pointing to the installer if the client ID is not set', async () => {
+      const originalClientId = envVariables.WORKOS_CLIENT_ID;
+
+      setEnvVar(envVariables, 'WORKOS_CLIENT_ID', '');
+
+      try {
+        await expect(
+          updateSessionMiddleware(
+            new NextRequest(new URL('http://example.com')),
+            false,
+            { enabled: false, unauthenticatedPaths: [] },
+            '',
+            [],
+          ),
+        ).rejects.toThrow(/WORKOS_CLIENT_ID.*npx workos@latest install/);
+      } finally {
+        setEnvVar(envVariables, 'WORKOS_CLIENT_ID', originalClientId);
+      }
+    });
+
     it('should throw an error if the cookie password is not set', async () => {
       const originalWorkosCookiePassword = envVariables.WORKOS_COOKIE_PASSWORD;
 
