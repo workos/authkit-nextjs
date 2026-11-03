@@ -7,6 +7,10 @@ describe('workos', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('initializes WorkOS with the correct configuration', () => {
     // Extracting the config to avoid a circular dependency error
     const workosConfig = {
@@ -42,7 +46,6 @@ describe('workos', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][1]).toMatchObject({ method: 'POST', redirect: 'manual' });
-    fetchSpy.mockRestore();
   });
 
   describe('with custom environment variables', () => {
