@@ -75,6 +75,21 @@ function isSecureOrigin(urls: OriginUrls, { productionFloor = false }: SecurePol
 }
 
 /**
+ * The browser-facing origin a TLS-terminating proxy reports with `x-forwarded-proto`
+ * (first value) and `x-forwarded-host`. Only an `https` protocol yields a URL, so the
+ * header can turn `Secure` on but never off.
+ */
+export function forwardedOriginUrl(headers: Pick<Headers, 'get'>): string | undefined {
+  const proto = headers.get('x-forwarded-proto')?.split(',')[0].trim().toLowerCase();
+  if (proto !== 'https') {
+    return undefined;
+  }
+
+  const host = (headers.get('x-forwarded-host') || headers.get('host') || 'localhost').split(',')[0].trim();
+  return `https://${host}`;
+}
+
+/**
  * Origin signals available in a server action / route handler: the request URL and
  * redirect URI the AuthKit middleware recorded on the request headers.
  */

@@ -102,6 +102,10 @@ WORKOS_COOKIE_NAME='my-auth-cookie'
 
 > [!TIP] >`WORKOS_COOKIE_DOMAIN` can be used to share WorkOS sessions between apps/domains. Note: The `WORKOS_COOKIE_PASSWORD` would need to be the same across apps/domains. Not needed for most use cases.
 
+#### The `Secure` cookie attribute
+
+The session cookie gets the `Secure` attribute when any of these is HTTPS: the request URL, the first value of the request's `x-forwarded-proto` header, the callback's `baseURL`, or the redirect URI in use (the proxy/middleware `redirectUri` option, the one the sign-in flow started with, or `NEXT_PUBLIC_WORKOS_REDIRECT_URI`). It's always set with `WORKOS_COOKIE_SAMESITE='none'`. This keeps the cookie `Secure` behind a load balancer or reverse proxy that terminates HTTPS and forwards plain HTTP to your app. `x-forwarded-proto` can only turn `Secure` on, never off. Local development on `http://localhost` with an `http://` redirect URI is unaffected.
+
 ## Setup
 
 ### Callback route

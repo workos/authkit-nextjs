@@ -5,7 +5,14 @@ import { JWTPayload, createRemoteJWKSet, decodeJwt, errors, jwtVerify } from 'jo
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
-import { type OriginUrls, getCookieOptions, getJwtCookie, originUrlsFromHeaders, serializeCookie } from './cookie.js';
+import {
+  type OriginUrls,
+  forwardedOriginUrl,
+  getCookieOptions,
+  getJwtCookie,
+  originUrlsFromHeaders,
+  serializeCookie,
+} from './cookie.js';
 import {
   WORKOS_CLIENT_ID,
   WORKOS_COOKIE_NAME,
@@ -232,8 +239,8 @@ async function updateSession(
   newRequestHeaders.delete(sessionHeaderName);
 
   // Behind a TLS-terminating proxy request.url is the internal http:// origin, so
-  // the browser-facing redirect URI must also count toward the Secure attribute.
-  const originUrls = [request.url, options.redirectUri];
+  // the browser-facing redirect URI and forwarded protocol also count toward Secure.
+  const originUrls = [request.url, options.redirectUri, forwardedOriginUrl(request.headers)];
 
   if (!session) {
     if (options.debug) {
@@ -521,10 +528,11 @@ async function refreshSession({
   }
 
   const { sealed, error } = await encryptRefreshedSession(session, refreshResult);
+  const headersList = await headers();
   (await cookies()).set(
     WORKOS_COOKIE_NAME || 'wos-session',
     sealed,
-    getCookieOptions(originUrlsFromHeaders(await headers())),
+    getCookieOptions([...originUrlsFromHeaders(headersList), forwardedOriginUrl(headersList)]),
   );
   if (error) {
     throw new TokenRefreshError(`Failed to refresh session: ${error.message}`, error, {
@@ -937,7 +945,12 @@ export async function saveSession(
   sessionOrResponse: Session | AuthenticationResponse,
   request: NextRequest | string,
 ): Promise<void> {
-  await setSessionCookie(sessionOrResponse, [typeof request === 'string' ? request : request.url]);
+  // For a request, x-redirect-uri is the middleware's redirectUri when the middleware covers the route.
+  const originUrls =
+    typeof request === 'string'
+      ? [request]
+      : [request.url, request.headers.get('x-redirect-uri'), forwardedOriginUrl(request.headers)];
+  await setSessionCookie(sessionOrResponse, originUrls);
 }
 
 /**

@@ -730,6 +730,52 @@ describe('authkit-callback-route', () => {
 
         expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
       });
+
+      it.each([
+        { forwardedProto: 'https', redirectUri: 'http://localhost:3000/callback', secure: true },
+        { forwardedProto: 'https,http', redirectUri: 'http://localhost:3000/callback', secure: true },
+        { forwardedProto: 'http,https', redirectUri: 'http://localhost:3000/callback', secure: false },
+        { forwardedProto: 'http', redirectUri: 'https://app.example.com/callback', secure: true },
+      ])(
+        'issues the session with x-forwarded-proto: $forwardedProto and redirect URI $redirectUri: Secure is $secure',
+        async ({ forwardedProto, redirectUri, secure }) => {
+          cookieConfig.redirectUri = redirectUri;
+          request = new NextRequest('http://web:3000/callback', { headers: { 'x-forwarded-proto': forwardedProto } });
+
+          const { response, pkceCookieName } = await completeCallback({}, redirectUri);
+
+          expect(response.status).toBe(307);
+          expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure });
+          const pkceDelete = response.headers.getSetCookie().find((c) => c.startsWith(`${pkceCookieName}=`));
+          expect(/; Secure/.test(pkceDelete!)).toBe(secure);
+        },
+      );
+
+      it('leaves Secure off the session cookie in plain local http development', async () => {
+        request = new NextRequest('http://localhost:3000/callback');
+
+        const { response, pkceCookieName } = await completeCallback({}, 'http://localhost:3000/callback');
+
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ secure: false });
+        const pkceDelete = response.headers.getSetCookie().find((c) => c.startsWith(`${pkceCookieName}=`));
+        expect(pkceDelete).not.toMatch(/; Secure/);
+      });
+
+      it('sets Secure when clearing the session after onSuccess fails with x-forwarded-proto: https', async () => {
+        request = new NextRequest('http://web:3000/callback', { headers: { 'x-forwarded-proto': 'https' } });
+
+        const { response } = await completeCallback(
+          {
+            onSuccess: () => {
+              throw new Error('onSuccess failed');
+            },
+          },
+          'http://localhost:3000/callback',
+        );
+
+        expect(response.status).toBe(500);
+        expect(cookieResponse.cookies.get('wos-session')).toMatchObject({ value: '', secure: true });
+      });
     });
 
     describe('state verification', () => {

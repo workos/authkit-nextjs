@@ -10,9 +10,11 @@
     "**/*.spec.ts",
     "**/*.spec.tsx",
     "vitest.config.ts",
+    "vitest.integration.config.ts",
     "vitest.setup.ts",
     "vitest.server-only-stub.ts",
     "/dist/**/*",
-    "examples"
+    "examples",
+    "test"
   ]
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { forwardedOriginUrl } from './cookie.js';
 import {
   PKCE_AUTHORIZATION_URL_HEADER,
   PKCE_STATE_HEADER,
@@ -137,7 +138,11 @@ export function handleAuthkitProxy(
 
     if (pkceAuthorizationUrl && sealedState && redirectUrl.toString() === new URL(pkceAuthorizationUrl).toString()) {
       // x-redirect-uri carries the middleware's browser-facing redirectUri, if configured.
-      appendPKCESetCookieHeader(request, headers, sealedState, [request.url, headers.get('x-redirect-uri')]);
+      appendPKCESetCookieHeader(request, headers, sealedState, [
+        request.url,
+        headers.get('x-redirect-uri'),
+        forwardedOriginUrl(request.headers),
+      ]);
     }
   }
 

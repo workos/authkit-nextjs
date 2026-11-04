@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WORKOS_COOKIE_NAME } from './env-variables.js';
-import { getCookieOptions, getPKCECookieOptions, originUrlsFromHeaders } from './cookie.js';
+import { forwardedOriginUrl, getCookieOptions, getPKCECookieOptions, originUrlsFromHeaders } from './cookie.js';
 import { getAuthorizationUrl } from './get-authorization-url.js';
 import type { AccessToken, GetAuthURLOptions, SwitchToOrganizationOptions, UserInfo } from './interfaces.js';
 import { PKCE_COOKIE_NAME, setPKCECookie } from './pkce.js';
@@ -23,7 +23,12 @@ function revalidateTagCompat(tag: string): void {
 
 async function getAuthURLAndSetPKCECookie(options: GetAuthURLOptions): Promise<string> {
   const { url, sealedState } = await getAuthorizationUrl(options);
-  await setPKCECookie(sealedState, [...originUrlsFromHeaders(await headers()), options.redirectUri]);
+  const headersList = await headers();
+  await setPKCECookie(sealedState, [
+    ...originUrlsFromHeaders(headersList),
+    forwardedOriginUrl(headersList),
+    options.redirectUri,
+  ]);
 
   return url;
 }
@@ -84,7 +89,8 @@ export async function signOut({ returnTo }: { returnTo?: string } = {}) {
   } finally {
     const nextCookies = await cookies();
     const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
-    const originUrls = originUrlsFromHeaders(await headers());
+    const headersList = await headers();
+    const originUrls = [...originUrlsFromHeaders(headersList), forwardedOriginUrl(headersList)];
     const { domain, path, sameSite, secure } = getCookieOptions(originUrls);
     try {
       nextCookies.delete({ name: cookieName, domain, path, sameSite, secure });
