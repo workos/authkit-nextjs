@@ -8,6 +8,8 @@ async function fetchClaimNonce(baseURL: string): Promise<string | null> {
   try {
     const response = await fetch(`${baseURL}/x/one-shot-environments/claim-nonces`, {
       method: 'POST',
+      // Don't re-post claim_token to a redirect target; a 3xx falls into the !ok branch.
+      redirect: 'manual',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: WORKOS_CLIENT_ID,

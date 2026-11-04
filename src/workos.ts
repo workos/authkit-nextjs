@@ -18,6 +18,21 @@ const options = {
     name: 'authkit/nextjs',
     version: VERSION,
   },
+  // The WorkOS API never redirects; following one would re-POST client_secret to the redirect target.
+  // 'manual' rather than 'error': Cloudflare workerd rejects 'error', and the SDK retries the TypeError it throws.
+  // A 3xx is thrown as a plain Error (not a TypeError) so the SDK surfaces it without retrying.
+  // The SDK's worker build (Edge, workerd) ignores fetchFn, so those runtimes need the fix in @workos-inc/node.
+  fetchFn: (async (input, init) => {
+    const res = await globalThis.fetch(input, { ...init, redirect: 'manual' });
+    if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+      const location = res.headers.get('location');
+      throw new Error(
+        `WorkOS API responded with a redirect (${res.status}${location ? ` to ${location}` : ''}). ` +
+          'Redirects are not followed; check WORKOS_API_HOSTNAME, WORKOS_API_PORT and WORKOS_API_HTTPS.',
+      );
+    }
+    return res;
+  }) satisfies typeof fetch,
 };
 
 /**

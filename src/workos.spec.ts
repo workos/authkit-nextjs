@@ -7,6 +7,10 @@ describe('workos', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('initializes WorkOS with the correct configuration', () => {
     // Extracting the config to avoid a circular dependency error
     const workosConfig = {
@@ -29,6 +33,19 @@ describe('workos', () => {
 
   it('exports a WorkOS instance', () => {
     expect(workos).toBeInstanceOf(WorkOS);
+  });
+
+  it('does not follow redirects, so client_secret is never re-posted to a redirect target', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 307, headers: { Location: 'https://evil.example/' } }));
+
+    await expect(
+      workos.userManagement.authenticateWithRefreshToken({ clientId: 'client_123', refreshToken: 'rt_123' }),
+    ).rejects.toThrow('WorkOS API responded with a redirect (307 to https://evil.example/)');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ method: 'POST', redirect: 'manual' });
   });
 
   describe('with custom environment variables', () => {
