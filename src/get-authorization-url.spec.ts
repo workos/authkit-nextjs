@@ -138,6 +138,7 @@ describe('getAuthorizationUrl', () => {
         'https://api.workos.com/x/one-shot-environments/claim-nonces',
         expect.objectContaining({
           method: 'POST',
+          redirect: 'manual',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ client_id: 'client_1234567890', claim_token: 'test-claim-token' }),
         }),
