@@ -69,7 +69,7 @@ function setApiKey(apiKey: string | undefined) {
 
 beforeEach(() => {
   vi.resetModules();
-  jwtVerify.mockReset().mockResolvedValue({});
+  jwtVerify.mockReset().mockResolvedValue({ payload: { sid: 'session_123', auth_time: 1700000000 } });
   savedApiKey = process.env.WORKOS_API_KEY;
   // The SDK binds fetch when the client is constructed, so stub it before importing.
   fetchMock = vi.fn<typeof fetch>();
