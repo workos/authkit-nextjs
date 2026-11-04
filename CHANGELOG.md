@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.6.3](https://github.com/workos/authkit-nextjs/compare/v4.6.2...v4.6.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* don't follow redirects on WorkOS API requests ([#511](https://github.com/workos/authkit-nextjs/issues/511)) ([afdb10e](https://github.com/workos/authkit-nextjs/commit/afdb10e14a6e5e56b1b75985477be1df754e4cec))
+* secure session cookie behind proxies ([#508](https://github.com/workos/authkit-nextjs/issues/508)) ([eda5f8b](https://github.com/workos/authkit-nextjs/commit/eda5f8bc6a8ab71b033e5dcb77984805f07bc405))
+
 ## [4.6.2](https://github.com/workos/authkit-nextjs/compare/v4.6.1...v4.6.2) (2026-10-26)
 
 
