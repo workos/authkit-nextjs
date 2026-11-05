@@ -136,6 +136,10 @@ async function encryptRefreshedSession(
   }
 }
 
+/** Coding agents read this from the error, so the fix needs no human or account. */
+const MISSING_CONFIG_HINT =
+  'To set up AuthKit without a WorkOS account, run `npx workos@latest install`: it creates an environment you can claim later and writes these variables. Or copy them from https://dashboard.workos.com.';
+
 async function updateSessionMiddleware(
   request: NextRequest,
   debug: boolean,
@@ -145,13 +149,19 @@ async function updateSessionMiddleware(
   eagerAuth = false,
   refreshBufferSeconds?: number,
 ) {
+  if (!WORKOS_CLIENT_ID) {
+    throw new Error(`You must provide WORKOS_CLIENT_ID in the environment variables. ${MISSING_CONFIG_HINT}`);
+  }
+
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
-    throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
+    throw new Error(
+      `You must provide a redirect URI in the AuthKit middleware or in the environment variables. ${MISSING_CONFIG_HINT}`,
+    );
   }
 
   if (!WORKOS_COOKIE_PASSWORD || WORKOS_COOKIE_PASSWORD.length < 32) {
     throw new Error(
-      'You must provide a valid cookie password that is at least 32 characters in the environment variables.',
+      `You must provide a valid cookie password that is at least 32 characters in the environment variables. ${MISSING_CONFIG_HINT}`,
     );
   }
 
