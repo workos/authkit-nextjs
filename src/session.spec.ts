@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import * as nextHeadersModule from 'next/headers';
 import { redirect } from 'next/navigation';
-import { generateSession, generateTestToken } from './test-helpers.js';
+import { generateSession, generateTestToken, verifiedUserAccessToken } from './test-helpers.js';
 import {
   getSessionFromCookie,
   withAuth,
@@ -26,7 +26,7 @@ function setEnvVar(mod: Record<string, unknown>, key: string, value: unknown) {
 
 function mockExpiredAccessToken() {
   const error = Object.assign(new Error('Access token expired'), { code: 'ERR_JWT_EXPIRED' });
-  (jwtVerify as Mock).mockRejectedValueOnce(error).mockResolvedValue(undefined);
+  (jwtVerify as Mock).mockRejectedValueOnce(error).mockResolvedValue(verifiedUserAccessToken);
   return error;
 }
 import { sealData, unsealData } from 'iron-session';
@@ -90,7 +90,7 @@ describe('session.ts', () => {
     nextHeaders._reset();
     nextHeaders.set('x-workos-middleware', 'true');
 
-    (jwtVerify as Mock).mockReset();
+    (jwtVerify as Mock).mockReset().mockResolvedValue(verifiedUserAccessToken);
 
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
       if (DEBUG) {
@@ -370,7 +370,7 @@ describe('session.ts', () => {
         await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
       );
 
-      (jwtVerify as Mock).mockImplementation(() => true);
+      (jwtVerify as Mock).mockResolvedValue(verifiedUserAccessToken);
 
       await updateSessionMiddleware(
         request,
@@ -397,7 +397,7 @@ describe('session.ts', () => {
           await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
         );
 
-        (jwtVerify as Mock).mockImplementation(() => true);
+        (jwtVerify as Mock).mockResolvedValue(verifiedUserAccessToken);
 
         await updateSessionMiddleware(
           request,
@@ -431,7 +431,7 @@ describe('session.ts', () => {
           await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
         );
 
-        (jwtVerify as Mock).mockImplementation(() => true);
+        (jwtVerify as Mock).mockResolvedValue(verifiedUserAccessToken);
 
         await updateSessionMiddleware(
           request,
@@ -515,6 +515,33 @@ describe('session.ts', () => {
         'Session access token failed verification. Deleting cookie without attempting refresh.',
         verificationError,
       );
+    });
+
+    it.each([
+      ['an agent sub_profile', { sub_profile: 'ai_agent' }],
+      ['a widget sub_type', { sub_type: 'authkit' }],
+      ['a missing auth_time', { auth_time: undefined }],
+      ['a string auth_time', { auth_time: '1700000000' }],
+      ['a missing sid', { sid: undefined }],
+      ['a numeric sid', { sid: 123 }],
+    ])('should reject a verified token with %s without attempting to refresh it', async (_description, claims) => {
+      (jwtVerify as Mock).mockResolvedValue({
+        ...verifiedUserAccessToken,
+        payload: { ...verifiedUserAccessToken.payload, ...claims },
+      });
+
+      const refreshSpy = vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken');
+
+      const request = new NextRequest(new URL('http://example.com'));
+      request.cookies.set(
+        'wos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await updateSession(request);
+
+      expect(result.session.user).toBeNull();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -1572,7 +1599,9 @@ describe('session.ts', () => {
       });
 
       it('should serve the still-valid token when the refreshed token cannot be verified because the JWKS is unavailable', async () => {
-        (jwtVerify as Mock).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new TypeError('fetch failed'));
+        (jwtVerify as Mock)
+          .mockResolvedValueOnce(verifiedUserAccessToken)
+          .mockRejectedValueOnce(new TypeError('fetch failed'));
         vi.spyOn(workos.userManagement, 'authenticateWithRefreshToken').mockResolvedValue({
           accessToken: await generateTestToken(),
           refreshToken: 'new-refresh-token',
@@ -1966,7 +1995,7 @@ describe('session.ts', () => {
 
   describe('checkRecentAuth', () => {
     async function authenticate(authTime?: number) {
-      mockSession.accessToken = await generateTestToken(authTime === undefined ? {} : { auth_time: authTime });
+      mockSession.accessToken = await generateTestToken({ auth_time: authTime });
       const nextHeaders = await headers();
       nextHeaders.set(
         'x-workos-session',

@@ -1,15 +1,22 @@
 // istanbul ignore file
 
 import { sealData } from 'iron-session';
-import { SignJWT } from 'jose';
+import { SignJWT, type JWTVerifyResult } from 'jose';
 import { WORKOS_COOKIE_NAME, WORKOS_COOKIE_PASSWORD } from './env-variables.js';
 import { cookies } from 'next/headers';
 import { User } from '@workos-inc/node';
+
+// What a mocked `jwtVerify` resolves with for a verified user access token.
+export const verifiedUserAccessToken: JWTVerifyResult = {
+  payload: { sid: 'session_123', auth_time: 1700000000 },
+  protectedHeader: { alg: 'RS256' },
+};
 
 export async function generateTestToken(payload = {}, expired = false) {
   const defaultPayload = {
     sub: 'user_123',
     sid: 'session_123',
+    auth_time: Math.floor(Date.now() / 1000),
     org_id: 'org_123',
     role: 'member',
     roles: ['member'],
@@ -53,6 +60,7 @@ export async function generateSession(overrides: Partial<User> = {}) {
 
   const accessToken = await generateTestToken({
     sid: 'session_123',
+    auth_time: Math.floor(Date.now() / 1000),
     org_id: 'org_123',
   });
 

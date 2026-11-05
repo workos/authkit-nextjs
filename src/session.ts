@@ -712,11 +712,25 @@ function getExpectedIssuer(): string | string[] | undefined {
   return issuers.length <= 1 ? issuers[0] : issuers;
 }
 
+// Other token types signed by the same environment key (agent and widget
+// tokens) must not authenticate a session cookie.
+function isUserAccessTokenPayload(payload: JWTPayload): boolean {
+  return (
+    typeof payload.sid === 'string' &&
+    typeof payload.auth_time === 'number' &&
+    (payload.sub_profile === undefined || payload.sub_profile === 'user') &&
+    payload.sub_type === undefined
+  );
+}
+
 async function verifyAccessToken(accessToken: string): Promise<AccessTokenVerification> {
   const issuer = getExpectedIssuer();
 
   try {
-    await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
+    const { payload } = await jwtVerify(accessToken, JWKS(), issuer ? { issuer } : undefined);
+    if (!isUserAccessTokenPayload(payload)) {
+      return { status: 'invalid', cause: new Error('Access token is not a user access token') };
+    }
     return { status: 'valid' };
   } catch (cause) {
     if (typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ERR_JWT_EXPIRED') {

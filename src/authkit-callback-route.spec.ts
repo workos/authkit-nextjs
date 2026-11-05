@@ -46,6 +46,7 @@ vi.mock('jose', async () => {
   };
 });
 import { State } from './interfaces.js';
+import { verifiedUserAccessToken } from './test-helpers.js';
 
 // Mock dependencies
 const { fakeWorkosInstance } = vi.hoisted(() => ({
@@ -112,7 +113,7 @@ describe('authkit-callback-route', () => {
       vi.clearAllMocks();
       vi.mocked(jwtVerify)
         .mockReset()
-        .mockResolvedValue({} as Awaited<ReturnType<typeof jwtVerify>>);
+        .mockResolvedValue(verifiedUserAccessToken as Awaited<ReturnType<typeof jwtVerify>>);
       cookieConfig.issuer = undefined;
 
       // Create a new request with searchParams
