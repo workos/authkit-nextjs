@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.6.4](https://github.com/workos/authkit-nextjs/compare/v4.6.3...v4.6.4) (2026-11-05)
+
+
+### Bug Fixes
+
+* **session:** Reject non-user access tokens in session cookies ([#514](https://github.com/workos/authkit-nextjs/issues/514)) ([6dd859e](https://github.com/workos/authkit-nextjs/commit/6dd859eb4aa53a7bb10d8bd14e0c21980dce2267))
+
 ## [4.6.3](https://github.com/workos/authkit-nextjs/compare/v4.6.2...v4.6.3) (2026-11-04)
 
 
