@@ -189,3 +189,55 @@ describe('continuous token refresh scheduling', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 });
+
+describe('local clock behind the server', () => {
+  const skew = 600;
+
+  function makeServerToken(lifetime: number, serverNow = Math.floor(Date.now() / 1000) + skew) {
+    const payload = { sub: 'user_123', sid: 'session_123', iat: serverNow, exp: serverNow + lifetime };
+    return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
+  }
+
+  it('refreshes before the server expiry instead of the local-clock expiry', async () => {
+    document.cookie = `workos-access-token=${makeServerToken(300)}`;
+    refresh.mockImplementation(async () => ({ accessToken: makeServerToken(300) }));
+    store = new TokenStore();
+    store.subscribe(() => {});
+
+    for (let count = 1; count <= 3; count++) {
+      await vi.advanceTimersByTimeAsync(269_999);
+      expect(refresh).toHaveBeenCalledTimes(count - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(refresh).toHaveBeenCalledTimes(count);
+    }
+  });
+
+  it('does not return a token the server already considers expired', async () => {
+    const issuedAt = Math.floor(Date.now() / 1000) + skew;
+    const initial = makeServerToken(300, issuedAt);
+    const freshToken = makeServerToken(300, issuedAt + 300);
+    document.cookie = `workos-access-token=${initial}`;
+    refresh.mockResolvedValue({ accessToken: freshToken });
+    store = new TokenStore();
+
+    vi.setSystemTime(Date.now() + 300_000);
+    expect(await store.getAccessToken()).toBe(freshToken);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows the local clock again once it catches up with the server', async () => {
+    document.cookie = `workos-access-token=${makeServerToken(300)}`;
+    store = new TokenStore();
+    store.subscribe(() => {});
+
+    vi.setSystemTime(Date.now() + skew * 1000);
+    refresh.mockImplementation(async () => ({ accessToken: makeToken(600) }));
+    await store.refreshToken();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(539_999);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+});

@@ -42,6 +42,7 @@ export class TokenStore {
     };
 
     if (initialToken) {
+      this.updateClockSkew(initialToken);
       // Mark as consumed if we found a token. Refresh scheduling is deferred
       // to the first subscriber: the store is constructed at module-evaluation
       // time, before hydration, and a refresh timer that fires before Next.js
@@ -56,6 +57,7 @@ export class TokenStore {
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
   private fastCookieConsumed = false;
+  private clockSkewSeconds = 0;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -89,6 +91,9 @@ export class TokenStore {
   }
 
   private setState(updates: Partial<TokenState>) {
+    if (updates.token && updates.token !== this.state.token) {
+      this.updateClockSkew(updates.token);
+    }
     this.state = { ...this.state, ...updates };
     this.notify();
   }
@@ -206,12 +211,25 @@ export class TokenStore {
     }
   }
 
+  // A token's iat proves the server clock had already reached that time. When
+  // the local clock is behind it, keep the difference so expiry checks and
+  // refresh timers follow server time instead of the skewed local clock.
+  private updateClockSkew(token: string) {
+    try {
+      const { payload } = decodeJwt(token);
+      const localNow = Math.floor(Date.now() / 1000);
+      this.clockSkewSeconds = typeof payload.iat === 'number' ? Math.max(0, payload.iat - localNow) : 0;
+    } catch {
+      this.clockSkewSeconds = 0;
+    }
+  }
+
   parseToken(token: string | undefined) {
     if (!token) return null;
 
     try {
       const { payload } = decodeJwt(token);
-      const now = Math.floor(Date.now() / 1000);
+      const now = Math.floor(Date.now() / 1000) + this.clockSkewSeconds;
 
       if (typeof payload.exp !== 'number') {
         return null;
@@ -417,6 +435,7 @@ export class TokenStore {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
     this.fastCookieConsumed = false;
+    this.clockSkewSeconds = 0;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
