@@ -207,7 +207,6 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
       return response;
     } catch (error) {
-      console.error('[AuthKit callback error]', error);
       const response = await errorResponse(request, error);
 
       // Always delete the PKCE cookie after handling the callback, regardless of success or error
@@ -225,10 +224,14 @@ export function handleAuth(options: HandleAuthOptions = {}) {
 
   async function errorResponse(request: NextRequest, error?: unknown) {
     if (onError) {
+      // Leave logging to the application when a custom onError hook is provided
+      // so apps can redact, downgrade, or suppress expected callback failures.
       const response = await onError({ error, request });
       preventCaching(response.headers);
       return response;
     }
+
+    console.error('[AuthKit callback error]', error);
 
     const response = errorResponseWithFallback({
       error: {

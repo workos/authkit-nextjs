@@ -220,6 +220,43 @@ describe('authkit-callback-route', () => {
       expect(data.error.message).toBe('Custom error');
     });
 
+    it('logs the callback error when no onError handler is provided', async () => {
+      const failure = new Error('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue(failure);
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      await handleAuth()(request);
+
+      expect(console.error).toHaveBeenCalledWith('[AuthKit callback error]', failure);
+    });
+
+    /**
+     * @see https://github.com/workos/authkit-nextjs/issues/488
+     */
+    it('does not log the callback error when a custom onError handler is provided', async () => {
+      const failure = new Error('Auth failed');
+      vi.mocked(workos.userManagement.authenticateWithCode).mockRejectedValue(failure);
+
+      const sealedState = await setAuthCookie(request, { nonce: 'foo', codeVerifier: 'test-verifier' });
+      request.nextUrl.searchParams.set('code', 'invalid-code');
+      request.nextUrl.searchParams.set('state', sealedState);
+
+      const onError = vi.fn(() => {
+        return new Response(JSON.stringify({ error: { message: 'Custom error' } }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+
+      await handleAuth({ onError })(request);
+
+      expect(onError).toHaveBeenCalledWith({ error: failure, request });
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
     it('should handle missing code parameter', async () => {
       const handler = handleAuth();
       const response = await handler(request);
