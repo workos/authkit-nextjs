@@ -42,6 +42,7 @@ export class TokenStore {
     };
 
     if (initialToken) {
+      this.updateClockSkew(initialToken, false);
       // Mark as consumed if we found a token. Refresh scheduling is deferred
       // to the first subscriber: the store is constructed at module-evaluation
       // time, before hydration, and a refresh timer that fires before Next.js
@@ -56,6 +57,8 @@ export class TokenStore {
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
   private fastCookieConsumed = false;
+  private clockSkewSeconds = 0;
+  private clockSkewUnverified = false;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -88,7 +91,10 @@ export class TokenStore {
     this.listeners.forEach((listener) => listener());
   }
 
-  private setState(updates: Partial<TokenState>) {
+  private setState(updates: Partial<TokenState>, freshlyIssued = false) {
+    if (updates.token && updates.token !== this.state.token) {
+      this.updateClockSkew(updates.token, freshlyIssued);
+    }
     this.state = { ...this.state, ...updates };
     this.notify();
   }
@@ -116,7 +122,8 @@ export class TokenStore {
   private getRefreshDelay(timeUntilExpiry: number, minimumDelaySeconds: number) {
     // Match parseToken's short-token buffer; never spin on an unchanged token.
     const bufferSeconds = this.parseToken(this.state.token)?.bufferSeconds ?? TOKEN_EXPIRY_BUFFER_SECONDS;
-    const idealDelay = (timeUntilExpiry - bufferSeconds) * 1000;
+    // An unverified skew may undercount by the token's age, so fetch a fresh token first.
+    const idealDelay = this.clockSkewUnverified ? 0 : (timeUntilExpiry - bufferSeconds) * 1000;
     return Math.min(Math.max(idealDelay, minimumDelaySeconds * 1000), MAX_REFRESH_DELAY_SECONDS * 1000);
   }
 
@@ -206,12 +213,36 @@ export class TokenStore {
     }
   }
 
+  // A token's iat proves the server clock had already reached that time. When
+  // the local clock is behind it, keep the difference so expiry checks and
+  // refresh timers follow server time instead of the skewed local clock.
+  // Only a freshly refreshed token's iat is the current server time. A cookie
+  // or session token may be older, so its iat is a lower bound: it can raise
+  // the skew but not lower it, and a raise is verified by refreshing early.
+  private updateClockSkew(token: string, freshlyIssued: boolean) {
+    let skew = 0;
+    try {
+      const { payload } = decodeJwt(token);
+      const localNow = Math.floor(Date.now() / 1000);
+      skew = typeof payload.iat === 'number' ? Math.max(0, payload.iat - localNow) : 0;
+    } catch {
+      // Opaque token: no server time reference.
+    }
+    if (freshlyIssued) {
+      this.clockSkewSeconds = skew;
+      this.clockSkewUnverified = false;
+    } else if (skew > this.clockSkewSeconds) {
+      this.clockSkewSeconds = skew;
+      this.clockSkewUnverified = true;
+    }
+  }
+
   parseToken(token: string | undefined) {
     if (!token) return null;
 
     try {
       const { payload } = decodeJwt(token);
-      const now = Math.floor(Date.now() / 1000);
+      const now = Math.floor(Date.now() / 1000) + this.clockSkewSeconds;
 
       if (typeof payload.exp !== 'number') {
         return null;
@@ -300,8 +331,8 @@ export class TokenStore {
 
     const tokenData = this.parseToken(this.state.token);
 
-    // If we have a valid JWT that's not expiring, return it
-    if (tokenData && !tokenData.isExpiring) {
+    // If we have a valid JWT that's not expiring, return it (unless its skew needs a fresh token)
+    if (tokenData && !tokenData.isExpiring && !this.clockSkewUnverified) {
       // Re-arm if an early/clamped timer checked a still-fresh token.
       if (!this.refreshTimeout) this.scheduleRefresh(tokenData.timeUntilExpiry);
       return this.state.token;
@@ -345,10 +376,12 @@ export class TokenStore {
         // For manual refresh, always call refreshAccessTokenAction
         // For silent refresh, try to get existing first, then refresh if needed
         let token: string | undefined;
+        let freshlyIssued = false;
 
         if (!silent) {
           // Manual refresh - always force refresh
           token = unwrapRefreshResult(await refreshAccessTokenAction());
+          freshlyIssued = true;
         } else {
           // Silent refresh - only fetch from server if we don't have a local token
           if (!previousToken) {
@@ -370,21 +403,19 @@ export class TokenStore {
               const refreshedToken = unwrapRefreshResult(await refreshAccessTokenAction());
               if (refreshedToken) {
                 token = refreshedToken;
+                freshlyIssued = true;
               }
             }
           } else {
             // We have a local token that needs refreshing (already checked by getAccessTokenSilently)
             token = unwrapRefreshResult(await refreshAccessTokenAction());
+            freshlyIssued = true;
           }
         }
 
         // Only update state if token actually changed or if loading was true
         if (token !== previousToken || !silent) {
-          this.setState({
-            token,
-            loading: false,
-            error: null,
-          });
+          this.setState({ token, loading: false, error: null }, freshlyIssued);
         }
 
         const tokenData = this.parseToken(token);
@@ -417,6 +448,8 @@ export class TokenStore {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
     this.fastCookieConsumed = false;
+    this.clockSkewSeconds = 0;
+    this.clockSkewUnverified = false;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;

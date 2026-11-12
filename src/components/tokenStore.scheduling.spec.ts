@@ -189,3 +189,71 @@ describe('continuous token refresh scheduling', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 });
+
+describe('local clock behind the server', () => {
+  const skew = 600;
+
+  function makeServerToken(lifetime: number, serverNow = Math.floor(Date.now() / 1000) + skew) {
+    const payload = { sub: 'user_123', sid: 'session_123', iat: serverNow, exp: serverNow + lifetime };
+    return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(payload))}.mock-signature`;
+  }
+
+  it('refreshes before the server expiry instead of the local-clock expiry', async () => {
+    document.cookie = `workos-access-token=${makeServerToken(300, Math.floor(Date.now() / 1000) + skew - 1)}`;
+    refresh.mockImplementation(async () => ({ accessToken: makeServerToken(300) }));
+    store = new TokenStore();
+    store.subscribe(() => {});
+
+    // A cookie token's age is unknown, so the skew is verified with a fresh token first.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    for (let count = 2; count <= 4; count++) {
+      await vi.advanceTimersByTimeAsync(269_999);
+      expect(refresh).toHaveBeenCalledTimes(count - 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(refresh).toHaveBeenCalledTimes(count);
+    }
+  });
+
+  it('does not return a token the server already considers expired', async () => {
+    const issuedAt = Math.floor(Date.now() / 1000) + skew;
+    const initial = makeServerToken(300, issuedAt);
+    const freshToken = makeServerToken(300, issuedAt + 300);
+    document.cookie = `workos-access-token=${initial}`;
+    refresh.mockResolvedValue({ accessToken: freshToken });
+    store = new TokenStore();
+
+    vi.setSystemTime(Date.now() + 300_000);
+    expect(await store.getAccessToken()).toBe(freshToken);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes an older cookie token before its server expiry', async () => {
+    const serverNow = Math.floor(Date.now() / 1000) + skew;
+    document.cookie = `workos-access-token=${makeServerToken(300, serverNow - 120)}`;
+    refresh.mockImplementation(async () => ({ accessToken: makeServerToken(300) }));
+    store = new TokenStore();
+    store.subscribe(() => {});
+
+    // The token expires 180 seconds from now on the server clock; 30 seconds of buffer.
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('follows the local clock again once it catches up with the server', async () => {
+    document.cookie = `workos-access-token=${makeServerToken(300)}`;
+    store = new TokenStore();
+    store.subscribe(() => {});
+
+    vi.setSystemTime(Date.now() + skew * 1000);
+    refresh.mockImplementation(async () => ({ accessToken: makeToken(600) }));
+    await store.refreshToken();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(539_999);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+});
