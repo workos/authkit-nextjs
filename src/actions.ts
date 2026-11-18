@@ -35,7 +35,13 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
   await signOut({ returnTo });
 };
 
-export const getOrganizationAction = async (organizationId: string) => {
+export const getOrganizationAction = async (organizationId?: string) => {
+  // Both sides must be strings and equal. A missing session org id used to pass
+  // `undefined !== undefined` as false and call getOrganization(undefined).
+  if (typeof organizationId !== 'string') {
+    return null;
+  }
+
   const workos = getWorkOSWithApiKey('getOrganizationAction');
 
   // Authorization: only resolve the organization the caller is currently
@@ -43,7 +49,11 @@ export const getOrganizationAction = async (organizationId: string) => {
   // read any organization in the environment, so without this check any caller
   // could fetch arbitrary organizations by ID (authorization bypass / IDOR).
   const { user, organizationId: sessionOrganizationId } = await withAuth();
-  if (!user || sessionOrganizationId !== organizationId) {
+  if (
+    !user ||
+    typeof sessionOrganizationId !== 'string' ||
+    sessionOrganizationId !== organizationId
+  ) {
     return null;
   }
 
@@ -75,22 +85,45 @@ export const refreshAuthAction = async ({
 }: {
   ensureSignedIn?: boolean;
   organizationId?: string;
-}) => {
+} = {}) => {
   // Never pass ensureSignedIn to refreshSession from a server action for the
   // same CORS reason as getAuthAction above.
-  const auth = await refreshSession({ organizationId });
-  const sanitized = sanitize(auth);
+  //
+  // Errors are caught and returned as data rather than thrown, to prevent
+  // Next.js from returning 500 responses for server action failures (same as
+  // refreshAccessTokenAction).
+  try {
+    const auth = await refreshSession({ organizationId });
+    const sanitized = sanitize(auth);
 
-  if (ensureSignedIn && !auth.user) {
-    const signInUrl = await getSignInUrl();
-    return { ...sanitized, signInUrl };
+    if (ensureSignedIn && !auth.user) {
+      const signInUrl = await getSignInUrl();
+      return { ...sanitized, signInUrl };
+    }
+
+    return sanitized;
+  } catch (error) {
+    console.warn('Failed to refresh auth:', error instanceof Error ? error.message : String(error));
+    return {
+      user: null,
+      error: 'Failed to refresh auth',
+    };
   }
-
-  return sanitized;
 };
 
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
-  return sanitize(await switchToOrganization(organizationId, options));
+  try {
+    return sanitize(await switchToOrganization(organizationId, options));
+  } catch (error) {
+    console.warn(
+      'Failed to switch organization:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      user: null,
+      error: 'Failed to switch organization',
+    };
+  }
 };
 
 /**

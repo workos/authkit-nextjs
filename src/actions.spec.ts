@@ -100,6 +100,28 @@ describe('actions', () => {
       expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
     });
 
+    it('returns null when called with no organization id', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+      });
+      const result = await getOrganizationAction();
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the session has no organization id', async () => {
+      vi.mocked(withAuth).mockResolvedValue({
+        user: 'testUser' as never,
+        sessionId: 'session_123',
+        accessToken: 'access_token',
+      });
+      const result = await getOrganizationAction('org_123');
+      expect(result).toBeNull();
+      expect(workos.organizations.getOrganization).not.toHaveBeenCalled();
+    });
+
     it('returns only id and name, never the full organization object', async () => {
       vi.mocked(withAuth).mockResolvedValue({
         user: 'testUser' as never,
@@ -177,6 +199,21 @@ describe('actions', () => {
       expect(getSignInUrl).not.toHaveBeenCalled();
       expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
     });
+
+    it('accepts a missing options argument', async () => {
+      const result = await refreshAuthAction();
+      expect(refreshSession).toHaveBeenCalledWith({ organizationId: undefined });
+      expect(result).toEqual({ user: 'testUser', sessionId: 'session_123' });
+    });
+
+    it('should catch errors and return a generic error instead of throwing', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(refreshSession).mockRejectedValueOnce(new Error('organization_not_found'));
+      const result = await refreshAuthAction({ organizationId: 'org_missing' });
+      expect(result).toEqual({ user: null, error: 'Failed to refresh auth' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to refresh auth:', 'organization_not_found');
+      warnSpy.mockRestore();
+    });
   });
 
   describe('switchToOrganizationAction', () => {
@@ -185,6 +222,15 @@ describe('actions', () => {
       const result = await switchToOrganizationAction('org_123', options);
       expect(switchToOrganization).toHaveBeenCalledWith('org_123', options);
       expect(result).toEqual({ organizationId: 'org_123' });
+    });
+
+    it('should catch errors and return a generic error instead of throwing', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(switchToOrganization).mockRejectedValueOnce(new Error('organization_not_found'));
+      const result = await switchToOrganizationAction('org_missing');
+      expect(result).toEqual({ user: null, error: 'Failed to switch organization' });
+      expect(warnSpy).toHaveBeenCalledWith('Failed to switch organization:', 'organization_not_found');
+      warnSpy.mockRestore();
     });
   });
 
