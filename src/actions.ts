@@ -23,6 +23,22 @@ function sanitize<T extends UserInfo | NoUserInfo>(value: T) {
 }
 
 /**
+ * Next.js `redirect()` throws a special error (digest starts with NEXT_REDIRECT).
+ * Catch blocks that convert failures to data must rethrow it so navigation still works.
+ */
+function rethrowIfNextRedirect(error: unknown): void {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest: unknown }).digest === 'string' &&
+    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  ) {
+    throw error;
+  }
+}
+
+/**
  * This action is only accessible to authenticated users,
  * there is no need to check the session here as the middleware will
  * be responsible for that.
@@ -35,7 +51,13 @@ export const handleSignOutAction = async ({ returnTo }: { returnTo?: string } = 
   await signOut({ returnTo });
 };
 
-export const getOrganizationAction = async (organizationId: string) => {
+export const getOrganizationAction = async (organizationId?: string) => {
+  // Both sides must be strings and equal. A missing session org id used to pass
+  // `undefined !== undefined` as false and call getOrganization(undefined).
+  if (typeof organizationId !== 'string') {
+    return null;
+  }
+
   const workos = getWorkOSWithApiKey('getOrganizationAction');
 
   // Authorization: only resolve the organization the caller is currently
@@ -43,7 +65,11 @@ export const getOrganizationAction = async (organizationId: string) => {
   // read any organization in the environment, so without this check any caller
   // could fetch arbitrary organizations by ID (authorization bypass / IDOR).
   const { user, organizationId: sessionOrganizationId } = await withAuth();
-  if (!user || sessionOrganizationId !== organizationId) {
+  if (
+    !user ||
+    typeof sessionOrganizationId !== 'string' ||
+    sessionOrganizationId !== organizationId
+  ) {
     return null;
   }
 
@@ -75,22 +101,47 @@ export const refreshAuthAction = async ({
 }: {
   ensureSignedIn?: boolean;
   organizationId?: string;
-}) => {
+} = {}) => {
   // Never pass ensureSignedIn to refreshSession from a server action for the
   // same CORS reason as getAuthAction above.
-  const auth = await refreshSession({ organizationId });
-  const sanitized = sanitize(auth);
+  //
+  // Errors are caught and returned as data rather than thrown, to prevent
+  // Next.js from returning 500 responses for server action failures (same as
+  // refreshAccessTokenAction).
+  try {
+    const auth = await refreshSession({ organizationId });
+    const sanitized = sanitize(auth);
 
-  if (ensureSignedIn && !auth.user) {
-    const signInUrl = await getSignInUrl();
-    return { ...sanitized, signInUrl };
+    if (ensureSignedIn && !auth.user) {
+      const signInUrl = await getSignInUrl();
+      return { ...sanitized, signInUrl };
+    }
+
+    return sanitized;
+  } catch (error) {
+    console.warn('Failed to refresh auth:', error instanceof Error ? error.message : String(error));
+    return {
+      user: null,
+      error: 'Failed to refresh auth',
+    };
   }
-
-  return sanitized;
 };
 
 export const switchToOrganizationAction = async (organizationId: string, options?: SwitchToOrganizationOptions) => {
-  return sanitize(await switchToOrganization(organizationId, options));
+  try {
+    return sanitize(await switchToOrganization(organizationId, options));
+  } catch (error) {
+    // switchToOrganization calls redirect() for SSO/MFA and post-switch navigation.
+    rethrowIfNextRedirect(error);
+    console.warn(
+      'Failed to switch organization:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      user: null,
+      error: 'Failed to switch organization',
+    };
+  }
 };
 
 /**

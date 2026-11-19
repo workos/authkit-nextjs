@@ -105,16 +105,24 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
   const switchToOrganization = useCallback(
     async (organizationId: string, options: SwitchToOrganizationOptions = {}) => {
       const opts = { revalidationStrategy: 'none', ...options };
-      const result = await switchToOrganizationAction(organizationId, {
-        revalidationStrategy: 'none',
-        ...options,
-      });
+      try {
+        const result = await switchToOrganizationAction(organizationId, {
+          revalidationStrategy: 'none',
+          ...options,
+        });
 
-      if (opts.revalidationStrategy === 'none') {
-        await getAuth({ ensureSignedIn: true });
+        if (result && 'error' in result && result.error) {
+          return { error: String(result.error) };
+        }
+
+        if (opts.revalidationStrategy === 'none') {
+          await getAuth({ ensureSignedIn: true });
+        }
+
+        return result;
+      } catch (error) {
+        return error instanceof Error ? { error: error.message } : { error: String(error) };
       }
-
-      return result;
     },
     [],
   );
@@ -125,6 +133,12 @@ export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: Aut
       try {
         setLoading(true);
         const auth = await refreshAuthAction({ ensureSignedIn, organizationId });
+
+        // Server action returns errors as data (avoids Next.js 500s); surface them
+        // without clearing the current session.
+        if (auth && 'error' in auth && auth.error) {
+          return { error: String(auth.error) };
+        }
 
         if (handleSignInRedirect(auth)) return;
 
