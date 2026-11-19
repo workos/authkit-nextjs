@@ -11,9 +11,10 @@ function unwrapRefreshResult(result: RefreshAccessTokenActionResult): string | u
 
 async function requestAccessTokenEndpoint(endpoint: string, method: 'GET' | 'POST'): Promise<string | undefined> {
   const response = await fetch(endpoint, { method, cache: 'no-store', credentials: 'same-origin' });
-  const body: Partial<RefreshAccessTokenActionResult> = await response.json().catch(() => ({}));
-  if (!response.ok || body.error) {
-    throw new Error(body.error ?? `Failed to fetch access token (${response.status})`);
+  // Non-JSON (e.g. an HTML sign-in page after a redirect) is an error, so the stale token is kept and retried.
+  const body: Partial<RefreshAccessTokenActionResult> | null = await response.json().catch(() => null);
+  if (!response.ok || !body || body.error) {
+    throw new Error(body?.error ?? `Failed to fetch access token (${response.status})`);
   }
   return body.accessToken;
 }

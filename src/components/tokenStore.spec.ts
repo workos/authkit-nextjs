@@ -374,6 +374,17 @@ describe('tokenStore', () => {
       expect(tokenStore.getSnapshot().token).toBe(token);
     });
 
+    it('treats a 200 response that is not JSON as an error', async () => {
+      const token = jwt(now() + 3600);
+      fetchMock
+        .mockResolvedValueOnce(respond(200, { accessToken: token }))
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => Promise.reject(new Error('html')) });
+      await tokenStore.getAccessTokenSilently();
+
+      await expect(tokenStore.refreshToken()).rejects.toThrow('Failed to fetch access token (200)');
+      expect(tokenStore.getSnapshot().token).toBe(token);
+    });
+
     it('falls back to the Server Actions when unset', async () => {
       tokenStore.setAccessTokenEndpoint(undefined);
       mockGetAccessTokenAction.mockResolvedValue(jwt(now() + 3600));

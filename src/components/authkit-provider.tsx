@@ -60,7 +60,8 @@ export const AuthKitProvider = ({
   accessTokenEndpoint,
 }: AuthKitProviderProps) => {
   // Set during render: child effects (useAccessToken) run before this component's effects.
-  tokenStore.setAccessTokenEndpoint(accessTokenEndpoint);
+  // Only when given, so a nested provider without the prop doesn't reset the shared store.
+  if (accessTokenEndpoint) tokenStore.setAccessTokenEndpoint(accessTokenEndpoint);
 
   const [user, setUser] = useState<User | null>(initialAuth?.user ?? null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialAuth?.sessionId);
