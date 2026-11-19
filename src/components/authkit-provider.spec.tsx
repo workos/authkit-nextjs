@@ -10,6 +10,7 @@ import {
   handleSignOutAction,
   switchToOrganizationAction,
 } from '../actions.js';
+import { tokenStore } from './tokenStore.js';
 
 vi.mock('../actions', () => ({
   checkSessionAction: vi.fn(),
@@ -34,6 +35,37 @@ describe('AuthKitProvider', () => {
     });
 
     expect(getByText('Test Child')).toBeInTheDocument();
+  });
+
+  it('passes accessTokenEndpoint to the token store', async () => {
+    const spy = vi.spyOn(tokenStore, 'setAccessTokenEndpoint');
+    await act(async () => {
+      render(
+        <AuthKitProvider accessTokenEndpoint="/api/auth/access-token">
+          <div />
+        </AuthKitProvider>,
+      );
+    });
+
+    expect(spy).toHaveBeenCalledWith('/api/auth/access-token');
+    spy.mockRestore();
+  });
+
+  it('does not reset the endpoint from a nested provider without the prop', async () => {
+    const spy = vi.spyOn(tokenStore, 'setAccessTokenEndpoint');
+    await act(async () => {
+      render(
+        <AuthKitProvider accessTokenEndpoint="/api/auth/access-token">
+          <AuthKitProvider>
+            <div />
+          </AuthKitProvider>
+        </AuthKitProvider>,
+      );
+    });
+
+    expect(spy).toHaveBeenCalledWith('/api/auth/access-token');
+    expect(spy).not.toHaveBeenCalledWith(undefined);
+    spy.mockRestore();
   });
 
   it('should skip initial getAuthAction call when initialAuth is provided', async () => {

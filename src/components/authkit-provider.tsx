@@ -8,6 +8,7 @@ import {
   refreshAuthAction,
   switchToOrganizationAction,
 } from '../actions.js';
+import { tokenStore } from './tokenStore.js';
 import type { Impersonator, User } from '@workos-inc/node';
 import type { UserInfo, SwitchToOrganizationOptions, NoUserInfo } from '../interfaces.js';
 
@@ -44,9 +45,24 @@ interface AuthKitProviderProps {
    * Initial auth data from the server. If provided, the provider will skip the initial client-side fetch.
    */
   initialAuth?: Omit<UserInfo | NoUserInfo, 'accessToken'>;
+  /**
+   * Path of a route that exports `handleAccessToken()`. When set, `useAccessToken` gets and refreshes
+   * tokens from it with `fetch` instead of Server Actions, so a token refresh doesn't re-render the
+   * page or clear the client router cache.
+   */
+  accessTokenEndpoint?: string;
 }
 
-export const AuthKitProvider = ({ children, onSessionExpired, initialAuth }: AuthKitProviderProps) => {
+export const AuthKitProvider = ({
+  children,
+  onSessionExpired,
+  initialAuth,
+  accessTokenEndpoint,
+}: AuthKitProviderProps) => {
+  // Set during render: child effects (useAccessToken) run before this component's effects.
+  // Only when given, so a nested provider without the prop doesn't reset the shared store.
+  if (accessTokenEndpoint) tokenStore.setAccessTokenEndpoint(accessTokenEndpoint);
+
   const [user, setUser] = useState<User | null>(initialAuth?.user ?? null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialAuth?.sessionId);
   const [organizationId, setOrganizationId] = useState<string | undefined>(initialAuth?.organizationId);

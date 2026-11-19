@@ -700,6 +700,25 @@ function ApiClient() {
 
 The `useAccessToken` hook automatically synchronizes with the main authentication session. When you call `refreshAuth()` from `useAuth`, the access token will update accordingly. Similarly, using the `refresh()` method from `useAccessToken` will update the entire authentication session.
 
+##### Refreshing tokens through a route handler
+
+By default, `useAccessToken` gets and refreshes tokens with Server Actions. A refresh writes the session cookie, and when a Server Action sets a cookie, Next.js re-renders the current page and clears the client router cache, so prefetched `<Link>`s are fetched again each time the token refreshes.
+
+To avoid that, mount `handleAccessToken` in a route covered by the proxy/middleware and pass its path to `AuthKitProvider`:
+
+```ts
+// app/api/auth/access-token/route.ts
+import { handleAccessToken } from '@workos-inc/authkit-nextjs';
+
+export const { GET, POST } = handleAccessToken();
+```
+
+```tsx
+<AuthKitProvider accessTokenEndpoint="/api/auth/access-token">{children}</AuthKitProvider>
+```
+
+`useAccessToken` then uses `fetch` against that route, which updates the session cookie without touching the router cache.
+
 ##### Security Considerations
 
 JWT tokens are sensitive credentials and should be handled carefully:
