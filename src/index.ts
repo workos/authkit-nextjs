@@ -1,5 +1,6 @@
 import { getSignInUrl, getSignUpUrl, signOut, switchToOrganization } from './auth.js';
 import { handleAuth } from './authkit-callback-route.js';
+import { handleAccessToken } from './access-token-route.js';
 import { AuthKitError, CallbackError, TokenRefreshError } from './errors.js';
 import { authkit, authkitMiddleware, authkitProxy } from './middleware.js';
 export {
@@ -36,6 +37,7 @@ export {
   getFeatureFlagsRuntimeClient,
   getTokenClaims,
   getWorkOS,
+  handleAccessToken,
   handleAuth,
   refreshSession,
   saveSession,

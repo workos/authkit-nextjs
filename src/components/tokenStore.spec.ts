@@ -317,6 +317,74 @@ describe('tokenStore', () => {
     });
   });
 
+  describe('accessTokenEndpoint', () => {
+    const now = () => Math.floor(Date.now() / 1000);
+    const jwt = (exp: number) =>
+      `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify({ sub: 'u', sid: 's', exp, iat: now() }))}.sig`;
+    const respond = (status: number, body: unknown) =>
+      ({ ok: status < 400, status, json: async () => body }) as Response;
+    let fetchMock: Mock;
+
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      tokenStore.setAccessTokenEndpoint('/api/auth/access-token');
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('gets the token with GET and never calls the Server Actions', async () => {
+      const token = jwt(now() + 3600);
+      fetchMock.mockResolvedValue(respond(200, { accessToken: token }));
+
+      await expect(tokenStore.getAccessTokenSilently()).resolves.toBe(token);
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/auth/access-token', expect.objectContaining({ method: 'GET' }));
+      expect(mockGetAccessTokenAction).not.toHaveBeenCalled();
+      expect(mockRefreshAccessTokenAction).not.toHaveBeenCalled();
+    });
+
+    it('refreshes with POST, including the scheduled refresh', async () => {
+      const expiring = jwt(now() + 20);
+      const fresh = jwt(now() + 3600);
+      fetchMock
+        .mockResolvedValueOnce(respond(200, { accessToken: expiring }))
+        .mockResolvedValue(respond(200, { accessToken: fresh }));
+
+      await expect(tokenStore.getAccessTokenSilently()).resolves.toBe(fresh);
+      expect(fetchMock.mock.calls.map(([, init]) => init.method)).toEqual(['GET', 'POST']);
+
+      await expect(tokenStore.refreshToken()).resolves.toBe(fresh);
+      expect(fetchMock).toHaveBeenLastCalledWith('/api/auth/access-token', expect.objectContaining({ method: 'POST' }));
+      expect(mockRefreshAccessTokenAction).not.toHaveBeenCalled();
+    });
+
+    it('surfaces endpoint errors and keeps the stale token', async () => {
+      const token = jwt(now() + 3600);
+      fetchMock
+        .mockResolvedValueOnce(respond(200, { accessToken: token }))
+        .mockResolvedValueOnce(respond(500, { error: 'Failed to refresh access token' }))
+        .mockResolvedValueOnce({ ok: false, status: 404, json: async () => Promise.reject(new Error('html')) });
+      await tokenStore.getAccessTokenSilently();
+
+      await expect(tokenStore.refreshToken()).rejects.toThrow('Failed to refresh access token');
+      await expect(tokenStore.refreshToken()).rejects.toThrow('Failed to fetch access token (404)');
+      expect(tokenStore.getSnapshot().token).toBe(token);
+    });
+
+    it('falls back to the Server Actions when unset', async () => {
+      tokenStore.setAccessTokenEndpoint(undefined);
+      mockGetAccessTokenAction.mockResolvedValue(jwt(now() + 3600));
+
+      await tokenStore.getAccessTokenSilently();
+
+      expect(mockGetAccessTokenAction).toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getAccessTokenSilently caching behavior', () => {
     it('should return cached opaque token without making server call', async () => {
       const opaqueToken = 'opaque-token-value';

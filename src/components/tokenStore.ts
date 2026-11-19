@@ -9,6 +9,15 @@ function unwrapRefreshResult(result: RefreshAccessTokenActionResult): string | u
   return result.accessToken;
 }
 
+async function requestAccessTokenEndpoint(endpoint: string, method: 'GET' | 'POST'): Promise<string | undefined> {
+  const response = await fetch(endpoint, { method, cache: 'no-store', credentials: 'same-origin' });
+  const body: Partial<RefreshAccessTokenActionResult> = await response.json().catch(() => ({}));
+  if (!response.ok || body.error) {
+    throw new Error(body.error ?? `Failed to fetch access token (${response.status})`);
+  }
+  return body.accessToken;
+}
+
 interface TokenState {
   token: string | undefined;
   loading: boolean;
@@ -56,6 +65,23 @@ export class TokenStore {
   private refreshPromise: Promise<string | undefined> | null = null;
   private refreshTimeout: ReturnType<typeof setTimeout> | undefined;
   private fastCookieConsumed = false;
+  private accessTokenEndpoint: string | undefined;
+
+  // Set by AuthKitProvider. When set, tokens come from a Route Handler instead of
+  // Server Actions, whose cookie writes make Next.js clear the router cache.
+  setAccessTokenEndpoint(endpoint: string | undefined) {
+    this.accessTokenEndpoint = endpoint;
+  }
+
+  private async fetchAccessToken(): Promise<string | undefined> {
+    if (!this.accessTokenEndpoint) return getAccessTokenAction();
+    return requestAccessTokenEndpoint(this.accessTokenEndpoint, 'GET');
+  }
+
+  private async fetchRefreshedAccessToken(): Promise<string | undefined> {
+    if (!this.accessTokenEndpoint) return unwrapRefreshResult(await refreshAccessTokenAction());
+    return requestAccessTokenEndpoint(this.accessTokenEndpoint, 'POST');
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -348,12 +374,12 @@ export class TokenStore {
 
         if (!silent) {
           // Manual refresh - always force refresh
-          token = unwrapRefreshResult(await refreshAccessTokenAction());
+          token = await this.fetchRefreshedAccessToken();
         } else {
           // Silent refresh - only fetch from server if we don't have a local token
           if (!previousToken) {
             // No local token, need to check server
-            token = await getAccessTokenAction();
+            token = await this.fetchAccessToken();
             const tokenData = this.parseToken(token);
 
             // Set the token even if it's expiring, to preserve it in case refresh fails
@@ -367,14 +393,14 @@ export class TokenStore {
 
             // If the token from server is expiring, refresh it
             if (!token || (tokenData && tokenData.isExpiring)) {
-              const refreshedToken = unwrapRefreshResult(await refreshAccessTokenAction());
+              const refreshedToken = await this.fetchRefreshedAccessToken();
               if (refreshedToken) {
                 token = refreshedToken;
               }
             }
           } else {
             // We have a local token that needs refreshing (already checked by getAccessTokenSilently)
-            token = unwrapRefreshResult(await refreshAccessTokenAction());
+            token = await this.fetchRefreshedAccessToken();
           }
         }
 
@@ -417,6 +443,7 @@ export class TokenStore {
     this.state = { token: undefined, loading: false, error: null };
     this.refreshPromise = null;
     this.fastCookieConsumed = false;
+    this.accessTokenEndpoint = undefined;
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = undefined;
