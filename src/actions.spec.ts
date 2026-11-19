@@ -232,6 +232,15 @@ describe('actions', () => {
       expect(warnSpy).toHaveBeenCalledWith('Failed to switch organization:', 'organization_not_found');
       warnSpy.mockRestore();
     });
+
+    it('rethrows Next.js redirect errors instead of converting them to data', async () => {
+      const redirectError = Object.assign(new Error('NEXT_REDIRECT'), {
+        digest: 'NEXT_REDIRECT;replace;/sso;307;',
+      });
+      vi.mocked(switchToOrganization).mockRejectedValueOnce(redirectError);
+
+      await expect(switchToOrganizationAction('org_sso')).rejects.toBe(redirectError);
+    });
   });
 
   describe('getAccessTokenAction', () => {

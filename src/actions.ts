@@ -23,6 +23,22 @@ function sanitize<T extends UserInfo | NoUserInfo>(value: T) {
 }
 
 /**
+ * Next.js `redirect()` throws a special error (digest starts with NEXT_REDIRECT).
+ * Catch blocks that convert failures to data must rethrow it so navigation still works.
+ */
+function rethrowIfNextRedirect(error: unknown): void {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest: unknown }).digest === 'string' &&
+    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  ) {
+    throw error;
+  }
+}
+
+/**
  * This action is only accessible to authenticated users,
  * there is no need to check the session here as the middleware will
  * be responsible for that.
@@ -115,6 +131,8 @@ export const switchToOrganizationAction = async (organizationId: string, options
   try {
     return sanitize(await switchToOrganization(organizationId, options));
   } catch (error) {
+    // switchToOrganization calls redirect() for SSO/MFA and post-switch navigation.
+    rethrowIfNextRedirect(error);
     console.warn(
       'Failed to switch organization:',
       error instanceof Error ? error.message : String(error),

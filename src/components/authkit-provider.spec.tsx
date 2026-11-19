@@ -577,6 +577,150 @@ describe('useAuth', () => {
     });
   });
 
+  it('surfaces refreshAuthAction error data without clearing the current session', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        name: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+        lastSignInAt: new Date('2024-01-01T00:00:00Z'),
+        externalId: null,
+        locale: 'en-US',
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read'],
+      entitlements: [],
+      featureFlags: [],
+      impersonator: undefined,
+    };
+
+    (refreshAuthAction as Mock).mockResolvedValueOnce({
+      user: null,
+      error: 'Failed to refresh auth',
+    });
+
+    let error: string | undefined;
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="loading">{auth.loading.toString()}</div>
+          <div data-testid="email">{auth.user?.email}</div>
+          <div data-testid="org">{auth.organizationId}</div>
+          <button
+            onClick={async () => {
+              const result = await auth.refreshAuth({ organizationId: 'org_missing' });
+              error = result?.error;
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      );
+    };
+
+    const { getByRole, getByTestId } = render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    act(() => {
+      getByRole('button').click();
+    });
+
+    await waitFor(() => {
+      expect(error).toBe('Failed to refresh auth');
+      expect(getByTestId('loading')).toHaveTextContent('false');
+      expect(getByTestId('email')).toHaveTextContent('test@example.com');
+      expect(getByTestId('org')).toHaveTextContent('test-org');
+    });
+  });
+
+  it('surfaces switchToOrganizationAction error data without calling getAuthAction', async () => {
+    const initialAuth = {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        profilePictureUrl: null,
+        name: null,
+        firstName: 'Test',
+        lastName: 'User',
+        object: 'user' as const,
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        updatedAt: new Date('2024-01-01T00:00:00Z'),
+        lastSignInAt: new Date('2024-01-01T00:00:00Z'),
+        externalId: null,
+        locale: 'en-US',
+        metadata: {},
+      },
+      sessionId: 'test-session',
+      organizationId: 'test-org',
+      role: 'admin',
+      roles: ['admin'],
+      permissions: ['read'],
+      entitlements: [],
+      featureFlags: [],
+      impersonator: undefined,
+    };
+
+    (switchToOrganizationAction as Mock).mockResolvedValueOnce({
+      user: null,
+      error: 'Failed to switch organization',
+    });
+
+    let error: string | undefined;
+
+    const TestComponent = () => {
+      const auth = useAuth();
+      return (
+        <div>
+          <div data-testid="email">{auth.user?.email}</div>
+          <div data-testid="org">{auth.organizationId}</div>
+          <button
+            onClick={async () => {
+              const result = await auth.switchToOrganization('org_missing');
+              error = result && 'error' in result ? String(result.error) : undefined;
+            }}
+          >
+            Switch
+          </button>
+        </div>
+      );
+    };
+
+    const { getByRole, getByTestId } = render(
+      <AuthKitProvider initialAuth={initialAuth}>
+        <TestComponent />
+      </AuthKitProvider>,
+    );
+
+    act(() => {
+      getByRole('button').click();
+    });
+
+    await waitFor(() => {
+      expect(error).toBe('Failed to switch organization');
+      expect(getByTestId('email')).toHaveTextContent('test@example.com');
+      expect(getByTestId('org')).toHaveTextContent('test-org');
+      expect(getAuthAction).not.toHaveBeenCalled();
+      expect(switchToOrganizationAction).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('should receive an error when refreshAuth fails with a string error', async () => {
     (refreshAuthAction as Mock).mockRejectedValueOnce('Refresh failed');
 
