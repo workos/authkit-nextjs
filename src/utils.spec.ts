@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server';
-import { redirectWithFallback, errorResponseWithFallback, evaluateRecentAuth } from './utils.js';
+import {
+  redirectWithFallback,
+  errorResponseWithFallback,
+  evaluateRecentAuth,
+  setCachePreventionHeaders,
+} from './utils.js';
 
 describe('utils', () => {
   afterEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+  });
+
+  describe('setCachePreventionHeaders', () => {
+    it('sets Cache-Control and x-middleware-cache when absent', () => {
+      const headers = new Headers();
+      setCachePreventionHeaders(headers);
+      expect(headers.get('Cache-Control')).toBe('private, no-cache, no-store, must-revalidate, max-age=0');
+      expect(headers.get('x-middleware-cache')).toBe('no-cache');
+    });
+
+    it('does not overwrite an existing Cache-Control', () => {
+      const headers = new Headers();
+      headers.set('Cache-Control', 'private, no-cache');
+      setCachePreventionHeaders(headers);
+      expect(headers.get('Cache-Control')).toBe('private, no-cache');
+      expect(headers.get('x-middleware-cache')).toBe('no-cache');
+    });
   });
 
   describe('redirectWithFallback', () => {

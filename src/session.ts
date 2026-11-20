@@ -66,11 +66,13 @@ class AccessTokenVerificationError extends Error {
  * @param headers - The Headers object to set the cache security headers on.
  * @param request - The NextRequest object to check for authentication.
  * @param sessionData - Optional session data to check for authentication.
+ * @param cacheHeaders - When false, still set Vary but skip Cache-Control / x-middleware-cache.
  */
 function applyCacheSecurityHeaders(
   headers: Headers,
   request: NextRequest,
   sessionData?: { accessToken?: string } | Session,
+  cacheHeaders = true,
 ): void {
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
@@ -99,7 +101,9 @@ function applyCacheSecurityHeaders(
       .join(', '),
   );
 
-  setCachePreventionHeaders(headers);
+  if (cacheHeaders) {
+    setCachePreventionHeaders(headers);
+  }
 }
 
 async function encryptSession(session: Session) {
@@ -144,6 +148,7 @@ async function updateSessionMiddleware(
   signUpPaths: string[],
   eagerAuth = false,
   refreshBufferSeconds?: number,
+  cacheHeaders = true,
 ) {
   if (!redirectUri && !WORKOS_REDIRECT_URI) {
     throw new Error('You must provide a redirect URI in the AuthKit middleware or in the environment variables.');
@@ -190,6 +195,7 @@ async function updateSessionMiddleware(
     screenHint: getScreenHint(signUpPaths, request.nextUrl.pathname),
     eagerAuth,
     refreshBufferSeconds,
+    cacheHeaders,
   });
 
   // Record the sign up paths so we can use them later
@@ -197,7 +203,7 @@ async function updateSessionMiddleware(
     headers.set(signUpPathsHeaderName, signUpPaths.join(','));
   }
 
-  applyCacheSecurityHeaders(headers, request, session);
+  applyCacheSecurityHeaders(headers, request, session, cacheHeaders);
 
   // If the user is logged out and this path isn't on the allowlist for logged out paths, redirect to AuthKit.
   if (middlewareAuth.enabled && matchedPaths.length === 0 && !session.user) {
@@ -269,7 +275,7 @@ async function updateSession(
 
   const cookieName = WORKOS_COOKIE_NAME || 'wos-session';
 
-  applyCacheSecurityHeaders(newRequestHeaders, request, session);
+  applyCacheSecurityHeaders(newRequestHeaders, request, session, options.cacheHeaders !== false);
 
   const clearSessionCookies = () => {
     newRequestHeaders.append(

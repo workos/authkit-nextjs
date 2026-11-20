@@ -10,6 +10,7 @@ export function authkitProxy({
   signUpPaths = [],
   eagerAuth = false,
   refreshBufferSeconds,
+  cacheHeaders = true,
 }: AuthkitMiddlewareOptions = {}): NextMiddleware {
   return function (request) {
     return updateSessionMiddleware(
@@ -20,6 +21,7 @@ export function authkitProxy({
       signUpPaths,
       eagerAuth,
       refreshBufferSeconds,
+      cacheHeaders,
     );
   };
 }
