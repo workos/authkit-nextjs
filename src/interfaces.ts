@@ -136,6 +136,12 @@ export interface AuthkitMiddlewareOptions {
    * to disable proactive refresh and only refresh once the token has expired.
    */
   refreshBufferSeconds?: number;
+  /**
+   * When `false`, skip writing Cache-Control / x-middleware-cache on authenticated
+   * responses so a Route Handler can set its own (Next.js will not override a
+   * proxy-set Cache-Control). `Vary: Cookie` is still applied. Defaults to `true`.
+   */
+  cacheHeaders?: boolean;
 }
 
 export interface AuthkitOptions {
@@ -149,6 +155,12 @@ export interface AuthkitOptions {
    * a total lifetime of 5 minutes or less). Set to `0` to disable.
    */
   refreshBufferSeconds?: number;
+  /**
+   * When `false`, skip writing Cache-Control / x-middleware-cache on authenticated
+   * responses so a Route Handler can set its own. `Vary: Cookie` is still applied.
+   * Defaults to `true`.
+   */
+  cacheHeaders?: boolean;
   onSessionRefreshSuccess?: (data: {
     accessToken: string;
     user: User;

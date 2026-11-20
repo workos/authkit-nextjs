@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 
 /**
  * Sets cache prevention headers to prevent CDN/proxy caching.
+ * Does not overwrite an existing Cache-Control or x-middleware-cache value,
+ * matching partitionAuthkitHeaders' deference to a caller-set cache-control.
  * @param headers - The Headers object to set the cache prevention headers on.
  */
 export function setCachePreventionHeaders(headers: Headers): void {
-  headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate, max-age=0');
-  headers.set('x-middleware-cache', 'no-cache');
+  if (!headers.has('Cache-Control')) {
+    headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate, max-age=0');
+  }
+  if (!headers.has('x-middleware-cache')) {
+    headers.set('x-middleware-cache', 'no-cache');
+  }
 }
 
 export function redirectWithFallback(redirectUri: string, headers?: Headers) {

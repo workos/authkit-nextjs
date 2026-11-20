@@ -13,6 +13,7 @@ describe('middleware', () => {
         middlewareAuth: { enabled: true, unauthenticatedPaths: ['/public'] },
         signUpPaths: ['/sign-up'],
         refreshBufferSeconds: 120,
+        cacheHeaders: false,
       });
       expect(typeof middleware).toBe('function');
     });
