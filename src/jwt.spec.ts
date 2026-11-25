@@ -65,6 +65,14 @@ describe('decodeJwt', () => {
       const result = decodeJwt(singleAudToken);
       expect(result.payload.aud).toBe('single-audience');
     });
+
+    it('should decode non-ASCII claim values as UTF-8', () => {
+      // Payload: {"sub":"123","name":"José Müller","team":"開発"}
+      const utf8Token =
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMiLCJuYW1lIjoiSm9zw6kgTcO8bGxlciIsInRlYW0iOiLplovnmboifQ.signature';
+      const result = decodeJwt(utf8Token);
+      expect(result.payload).toEqual({ sub: '123', name: 'José Müller', team: '開発' });
+    });
   });
 
   describe('invalid JWT tokens', () => {
