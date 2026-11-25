@@ -83,7 +83,9 @@ export type TokenClaims<T> = Partial<JWTPayload & T>;
 function decodeBase64Url(input: string): string {
   const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
+  const binary = atob(base64 + padding);
+  // atob yields one char per byte; JWT JSON is UTF-8, so decode the bytes.
+  return new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)));
 }
 
 /**
