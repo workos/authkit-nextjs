@@ -3,12 +3,25 @@ import {
   WORKOS_API_HOSTNAME,
   WORKOS_API_HTTPS,
   WORKOS_API_KEY,
+  WORKOS_API_MAX_RETRIES,
   WORKOS_API_PORT,
+  WORKOS_API_TIMEOUT,
   WORKOS_CLIENT_ID,
 } from './env-variables.js';
 import { lazy } from './utils.js';
 
 export const VERSION = '2.14.0';
+
+function parsePositiveInteger(name: string, value: string | undefined, maximum = Number.MAX_SAFE_INTEGER) {
+  if (!value) return undefined;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > maximum) {
+    throw new Error(`${name} must be an integer between 1 and ${maximum}.`);
+  }
+
+  return parsed;
+}
 
 const options = {
   apiHostname: WORKOS_API_HOSTNAME,
@@ -47,7 +60,18 @@ const options = {
  * The WorkOS SDK also falls back to `process.env.WORKOS_API_KEY`, the same
  * variable read here, so a non-empty key in the environment always wins.
  */
-export const getWorkOS = lazy(() => new WorkOS({ apiKey: WORKOS_API_KEY, clientId: WORKOS_CLIENT_ID, ...options }));
+export const getWorkOS = lazy(
+  () =>
+    new WorkOS({
+      apiKey: WORKOS_API_KEY,
+      clientId: WORKOS_CLIENT_ID,
+      ...options,
+      // Node.js timers treat delays above the signed 32-bit integer limit as 1 ms.
+      timeout: parsePositiveInteger('WORKOS_API_TIMEOUT', WORKOS_API_TIMEOUT, 2_147_483_647),
+      // Refresh tokens are single-use, and the SDK only adds idempotency keys when retries are enabled.
+      maxRetries: parsePositiveInteger('WORKOS_API_MAX_RETRIES', WORKOS_API_MAX_RETRIES),
+    }),
+);
 
 /**
  * Returns the WorkOS client for a feature that needs an API key, or throws an

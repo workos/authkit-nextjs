@@ -87,7 +87,9 @@ const USER = {
 const ENV_NAMES = [
   'WORKOS_API_HOSTNAME',
   'WORKOS_API_HTTPS',
+  'WORKOS_API_MAX_RETRIES',
   'WORKOS_API_PORT',
+  'WORKOS_API_TIMEOUT',
   'WORKOS_CLIENT_ID',
   'WORKOS_API_KEY',
   'WORKOS_COOKIE_PASSWORD',
@@ -121,7 +123,7 @@ let httpsRedirectMiddleware: ReturnType<(typeof authkit)['authkitProxy']>;
 
 async function authenticationResponse(expiresInSeconds: number) {
   const now = Math.floor(Date.now() / 1000);
-  const accessToken = await new SignJWT({ sid: 'session_integration_test' })
+  const accessToken = await new SignJWT({ sid: 'session_integration_test', auth_time: now - 120 })
     .setProtectedHeader({ alg: 'ES256', kid: publicJwk.kid })
     .setSubject(USER.id)
     .setIssuedAt(now - 120)

@@ -7,7 +7,9 @@ function getEnvVariable(name: string): string | undefined {
 // Optional env variables
 const WORKOS_API_HOSTNAME = getEnvVariable('WORKOS_API_HOSTNAME');
 const WORKOS_API_HTTPS = getEnvVariable('WORKOS_API_HTTPS');
+const WORKOS_API_MAX_RETRIES = getEnvVariable('WORKOS_API_MAX_RETRIES');
 const WORKOS_API_PORT = getEnvVariable('WORKOS_API_PORT');
+const WORKOS_API_TIMEOUT = getEnvVariable('WORKOS_API_TIMEOUT');
 const WORKOS_COOKIE_DOMAIN = getEnvVariable('WORKOS_COOKIE_DOMAIN');
 const WORKOS_COOKIE_MAX_AGE = getEnvVariable('WORKOS_COOKIE_MAX_AGE');
 const WORKOS_COOKIE_NAME = getEnvVariable('WORKOS_COOKIE_NAME');
@@ -26,7 +28,9 @@ export {
   WORKOS_API_HOSTNAME,
   WORKOS_API_HTTPS,
   WORKOS_API_KEY,
+  WORKOS_API_MAX_RETRIES,
   WORKOS_API_PORT,
+  WORKOS_API_TIMEOUT,
   WORKOS_CLAIM_TOKEN,
   WORKOS_CLIENT_ID,
   WORKOS_COOKIE_DOMAIN,

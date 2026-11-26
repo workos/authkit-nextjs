@@ -17,6 +17,8 @@ describe('workos', () => {
       apiHostname: workos.options.apiHostname,
       https: workos.options.https,
       port: workos.options.port,
+      timeout: workos.options.timeout,
+      maxRetries: workos.options.maxRetries,
       appInfo: workos.options.appInfo,
     };
 
@@ -24,6 +26,8 @@ describe('workos', () => {
       apiHostname: undefined,
       https: true,
       port: undefined,
+      timeout: undefined,
+      maxRetries: undefined,
       appInfo: {
         name: 'authkit/nextjs',
         version: VERSION,
@@ -131,6 +135,56 @@ describe('workos', () => {
         expect(getWorkOSWithApiKey('someFeature')).toBe(customWorkos());
         expect(customWorkos().key).toBe('sk_test_confidential');
       });
+    });
+
+    it('uses custom API timeout and retry count when provided', async () => {
+      process.env.WORKOS_API_TIMEOUT = '10000';
+      process.env.WORKOS_API_MAX_RETRIES = '1';
+      const { getWorkOS: customWorkos } = await import('./workos.js');
+
+      expect(customWorkos().options).toMatchObject({ timeout: 10000, maxRetries: 1 });
+    });
+
+    it('uses the configured timeout for each of the configured HTTP attempts', async () => {
+      process.env.WORKOS_API_TIMEOUT = '100';
+      process.env.WORKOS_API_MAX_RETRIES = '1';
+      const { getWorkOS: customWorkos } = await import('./workos.js');
+      vi.useFakeTimers();
+      try {
+        const attemptDurations: number[] = [];
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+          const startedAt = Date.now();
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              attemptDurations.push(Date.now() - startedAt);
+              reject(init.signal?.reason);
+            });
+          });
+        });
+
+        const request = customWorkos().organizations.getOrganization('org_123');
+        const result = expect(request).rejects.toMatchObject({ status: 408 });
+        await vi.runAllTimersAsync();
+        await result;
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        expect(attemptDurations).toEqual([100, 100]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each([
+      ['WORKOS_API_TIMEOUT', '0'],
+      ['WORKOS_API_TIMEOUT', '2147483648'],
+      ['WORKOS_API_TIMEOUT', '10000ms'],
+      ['WORKOS_API_MAX_RETRIES', '0'],
+      ['WORKOS_API_MAX_RETRIES', '1.5'],
+    ])('rejects an invalid %s value of %s', async (name, value) => {
+      process.env[name] = value;
+      const { getWorkOS: customWorkos } = await import('./workos.js');
+
+      expect(() => customWorkos()).toThrow(`${name} must be an integer`);
     });
 
     it('uses custom port when provided', async () => {
