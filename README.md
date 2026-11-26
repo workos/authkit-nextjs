@@ -73,7 +73,7 @@ Keyless mode works with every `@workos-inc/node` version this package supports a
 
 ### Optional configuration
 
-Certain environment variables are optional and can be used to debug or configure cookie settings.
+Optional environment variables configure cookies, WorkOS API requests, and access token validation.
 
 | Environment Variable     | Default Value         | Description                                                                                                                         |
 | ------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,8 +83,12 @@ Certain environment variables are optional and can be used to debug or configure
 | `WORKOS_API_HOSTNAME`    | `'api.workos.com'`    | Base WorkOS API URL                                                                                                                 |
 | `WORKOS_API_HTTPS`       | `true`                | Whether to use HTTPS in API calls                                                                                                   |
 | `WORKOS_API_PORT`        | None                  | Port to use for API calls. When not set, uses standard ports (443 for HTTPS, 80 for HTTP)                                           |
+| `WORKOS_API_TIMEOUT`     | SDK default           | Per-attempt WorkOS API timeout in milliseconds. Accepts integers from 1 to 2,147,483,647.                                           |
+| `WORKOS_API_MAX_RETRIES` | SDK default           | Maximum retries for transient WorkOS API failures. Accepts positive integers so refresh requests retain idempotency keys.           |
 | `WORKOS_COOKIE_SAMESITE` | `'lax'`               | SameSite attribute for cookies. Options: `'lax'`, `'strict'`, or `'none'`                                                           |
 | `WORKOS_ISSUER`          | None                  | Expected `iss` claim of access tokens (comma-separated to accept multiple issuers). When not set, the issuer claim is not validated |
+
+`WORKOS_API_MAX_RETRIES` requires `@workos-inc/node` 10.8.0 or later. On Worker runtimes such as Edge and Cloudflare Workers, `WORKOS_API_TIMEOUT` requires SDK 12.3.0 or later.
 
 > [!WARNING]
 > `WORKOS_ISSUER` must equal the `iss` claim of your session access tokens: `https://api.workos.com/user_management/<WORKOS_CLIENT_ID>`, or `https://<your-auth-domain>/user_management/<WORKOS_CLIENT_ID>` with a custom authentication domain. The `issuer` field of `https://api.workos.com/user_management/<WORKOS_CLIENT_ID>/.well-known/openid-configuration` shows the value. It is **not** the AuthKit OAuth issuer (`https://<subdomain>.authkit.app`). If it does not match, every session is rejected: users are signed out, sign-in fails, and the server logs a warning naming both issuers.
