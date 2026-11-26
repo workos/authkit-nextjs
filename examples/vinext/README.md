@@ -5,15 +5,14 @@ This example demonstrates how to use [`@workos-inc/authkit-nextjs`](https://gith
 ## Features
 
 - Sign in / sign out via WorkOS AuthKit
-- Middleware-based route protection
-- Server component auth via `withAuth()`
+- Middleware-based session management
 - Client-side auth via `useAuth()` hook
 - PKCE support for OAuth 2.1
 
 ## Prerequisites
 
 - A [WorkOS](https://workos.com) account with AuthKit configured
-- Node.js 18+
+- Node.js 22.12+
 - pnpm
 
 ## Setup
@@ -30,14 +29,14 @@ This example demonstrates how to use [`@workos-inc/authkit-nextjs`](https://gith
    cp .env.local.example .env.local
    ```
 
-   Required variables:
+   Environment variables:
 
-   | Variable                          | Description                                                      |
-   | --------------------------------- | ---------------------------------------------------------------- |
-   | `WORKOS_CLIENT_ID`                | Your WorkOS Client ID                                            |
-   | `WORKOS_API_KEY`                  | Your WorkOS API Key (secret)                                     |
-   | `WORKOS_COOKIE_PASSWORD`          | A random string of at least 32 characters for session encryption |
-   | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | OAuth callback URL (default: `http://localhost:3000/callback`)   |
+   | Variable                          | Description                                                                         |
+   | --------------------------------- | ----------------------------------------------------------------------------------- |
+   | `WORKOS_CLIENT_ID`                | Your WorkOS Client ID                                                               |
+   | `WORKOS_API_KEY`                  | Your WorkOS API Key (secret). Optional: without it, AuthKit runs as a public client |
+   | `WORKOS_COOKIE_PASSWORD`          | A random string of at least 32 characters for session encryption                    |
+   | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | OAuth callback URL (e.g. `http://localhost:3000/callback`)                          |
 
 3. In your WorkOS Dashboard, add `http://localhost:3000/callback` as a redirect URI.
 
@@ -61,7 +60,7 @@ Vinext shims the Next.js API surface (`next/headers`, `next/server`, `next/navig
 src/
 ├── app/
 │   ├── layout.tsx              # Root layout with AuthKitProvider
-│   ├── page.tsx                # Home page (server component with withAuth)
+│   ├── page.tsx                # Home page (client component with useAuth)
 │   ├── account/page.tsx        # Protected account page
 │   ├── callback/route.ts       # OAuth callback handler
 │   ├── login/route.ts          # Sign-in redirect
@@ -69,7 +68,7 @@ src/
 │   └── components/
 │       ├── sign-in-button.tsx  # Client component with useAuth hook
 │       └── footer.tsx          # Footer with WorkOS links
-└── proxy.ts                    # Route protection via authkitMiddleware (Next.js 16 convention)
+└── proxy.ts                    # Session handling via authkitProxy (Next.js 16 convention)
 ```
 
 ## Known Limitations

@@ -118,7 +118,7 @@ import { handleAuth } from '@workos-inc/authkit-nextjs';
 export const GET = handleAuth();
 ```
 
-Make sure this route matches the `WORKOS_REDIRECT_URI` variable and the configured redirect URI in your WorkOS dashboard. For instance if your redirect URI is `http://localhost:3000/auth/callback` then you'd put the above code in `/app/auth/callback/route.ts`.
+Make sure this route matches the `NEXT_PUBLIC_WORKOS_REDIRECT_URI` variable and the configured redirect URI in your WorkOS dashboard. For instance if your redirect URI is `http://localhost:3000/auth/callback` then you'd put the above code in `/app/auth/callback/route.ts`.
 
 You can also control the pathname the user will be sent to after signing-in by passing a `returnPathname` option to `handleAuth` like so:
 
@@ -238,8 +238,8 @@ The proxy/middleware can be configured with several options.
 
 | Option                 | Default                                                     | Description                                                                                                                                                     |
 | ---------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `redirectUri`          | `undefined`                                                 | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                                                          |
-| `middlewareAuth`       | `undefined`                                                 | Used to configure proxy/middleware auth options. See [middleware auth](#middleware-auth) for more details.                                                      |
+| `redirectUri`          | `NEXT_PUBLIC_WORKOS_REDIRECT_URI`                           | Used in cases where you need your redirect URI to be set dynamically (e.g. Vercel preview deployments)                                                          |
+| `middlewareAuth`       | `{ enabled: false, unauthenticatedPaths: [] }`              | Used to configure proxy/middleware auth options. See [middleware auth](#proxy--middleware-auth) for more details.                                               |
 | `debug`                | `false`                                                     | Enables debug logs.                                                                                                                                             |
 | `signUpPaths`          | `[]`                                                        | Used to specify paths that should use the 'sign-up' screen hint when redirecting to AuthKit.                                                                    |
 | `eagerAuth`            | `false`                                                     | Enables synchronous access token availability for third-party services. See [eager auth](#eager-auth) for more details.                                         |
@@ -606,7 +606,7 @@ function SensitiveActionButton() {
 
 Use the `refreshSession` method in a server action or route handler to fetch the latest session details, including any changes to the user's roles or permissions.
 
-The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, an appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors) will be returned.
+The `organizationId` parameter can be passed to `refreshSession` in order to switch the session to a different organization. If the current session is not authorized for the next organization, `refreshSession` throws a `TokenRefreshError` whose `cause` is the appropriate [authentication error](https://workos.com/docs/reference/user-management/authentication-errors).
 
 In client components, you can refresh the session with the `refreshAuth` hook.
 
@@ -785,7 +785,7 @@ const { session, headers } = await authkit(request, {
     // Notify monitoring system
     await notifyMonitoring('session_refresh_failed', {
       url: request.url,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     });
   },
 });
@@ -903,7 +903,7 @@ export default authkitProxy({
 });
 ```
 
-If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current access token, provided it is still valid at that point; the session is never destroyed while the access token remains valid. If the token expired during the failed refresh attempt, the session is cleared and the request is redirected to sign in, as with any expired session.
+If a proactive refresh fails (for example, a concurrent request already rotated the single-use refresh token), the request is served with the current access token, provided it is still valid at that point; the session is not destroyed while the access token remains valid, unless the new access token returned by WorkOS fails verification. If the token expired during the failed refresh attempt, the request is redirected to sign in, as with any expired session, and the session is cleared unless the failure was transient (a network error, timeout, 429 or 5xx).
 
 Note that when several requests land inside the buffer window at the same time, only one wins the refresh; each of the others may pay a failed-refresh round trip to WorkOS before being served with the current token. This costs some added latency on those requests during the buffer window, but no user-visible failure.
 
@@ -1068,8 +1068,6 @@ AuthKit automatically implements cache security measures to protect against sess
 The library automatically sets appropriate cache headers on all authenticated requests:
 
 - `Cache-Control: private, no-cache, no-store, must-revalidate, max-age=0` - Aggressive cache prevention with multiple directives
-- `Pragma: no-cache` - HTTP/1.0 compatibility
-- `Expires: 0` - HTTP/1.0 cache expiration
 - `Vary: Cookie` - Ensures CDNs differentiate between different users (defense-in-depth)
 - `x-middleware-cache: no-cache` - Prevents Next.js proxy/middleware result caching
 
@@ -1099,14 +1097,14 @@ export default authkitMiddleware({ debug: true });
 
 #### PKCE and CSRF protection
 
-This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) and a sealed (encrypted) OAuth state parameter on every authorization request. The state contains a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/) and a code verifier for protection against authorization code interception. During sign-in, a short-lived `wos-auth-verifier` cookie is set containing the sealed state. This cookie is automatically cleaned up after the callback completes.
+This library uses [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) (Proof Key for Code Exchange) and a sealed (encrypted) OAuth state parameter on every authorization request. The state contains a cryptographic nonce for CSRF protection per [RFC 9700](https://datatracker.ietf.org/doc/rfc9700/) and a code verifier for protection against authorization code interception. During sign-in, a short-lived `wos-auth-verifier-<hash>` cookie is set containing the sealed state, named from a hash of the state so concurrent sign-in flows each get their own cookie. This cookie is automatically cleaned up after the callback completes.
 
 > [!NOTE]
 > **Upgrading to v3:** PKCE is now always enabled. The `WORKOS_ENABLE_PKCE` environment variable is no longer needed and can be removed from your configuration.
 
 #### Cookie requirements
 
-The `wos-auth-verifier` cookie must survive the round-trip from sign-in initiation to the callback. On callback, the library verifies that the cookie is present and matches the URL `state` parameter — this two-channel check is what prevents CSRF attacks.
+The `wos-auth-verifier-<hash>` cookie must survive the round-trip from sign-in initiation to the callback. On callback, the library verifies that the cookie is present and matches the URL `state` parameter — this two-channel check is what prevents CSRF attacks.
 
 If the cookie is missing or doesn't match, authentication will fail with one of:
 
