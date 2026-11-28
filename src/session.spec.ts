@@ -156,6 +156,114 @@ describe('session.ts', () => {
       warnSpy.mockRestore();
     });
 
+    it('rejects the session when the access token has expired', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalledWith('withAuth: access token has expired; rejecting session.');
+      warnSpy.mockRestore();
+    });
+
+    it('redirects on an expired access token when ensureSignedIn is true', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockSession.accessToken = await generateTestToken({}, true);
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-url', 'https://example.com/protected');
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      await withAuth({ ensureSignedIn: true });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith('withAuth: access token has expired; rejecting session.');
+      warnSpy.mockRestore();
+    });
+
+    it('rejects the session when the access token is missing an expiration claim', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const secret = new TextEncoder().encode(process.env.WORKOS_COOKIE_PASSWORD as string);
+      mockSession.accessToken = await new SignJWT({ sub: 'user_123', sid: 'session_123' })
+        .setProtectedHeader({ alg: 'HS256' })
+        .sign(secret);
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalledWith('withAuth: access token is missing an expiration claim; rejecting session.');
+      warnSpy.mockRestore();
+    });
+
+    it('rejects the session when the access token has nbf in the future', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const now = Math.floor(Date.now() / 1000);
+      mockSession.accessToken = await generateTestToken({ nbf: now + 3600 });
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(mockSession, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalledWith('withAuth: access token is not yet valid; rejecting session.');
+      warnSpy.mockRestore();
+    });
+
+    it('rejects the session when the access token is malformed', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const sessionWithBadToken = { ...mockSession, accessToken: 'not-a-valid-jwt' };
+
+      const nextHeaders = await headers();
+      nextHeaders.set(
+        'x-workos-session',
+        await sealData(sessionWithBadToken, { password: process.env.WORKOS_COOKIE_PASSWORD as string }),
+      );
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'withAuth: failed to decode access token; rejecting session.',
+        expect.anything(),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('rejects the session when the session header does not contain a valid session', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const nextHeaders = await headers();
+      nextHeaders.set('x-workos-session', 'invalid-tampered-sealed-data');
+
+      const result = await withAuth();
+
+      expect(result).toEqual({ user: null });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'withAuth: session header does not contain a valid session; rejecting session.',
+      );
+      warnSpy.mockRestore();
+    });
+
     it('should return null when user is not authenticated', async () => {
       const result = await withAuth();
 

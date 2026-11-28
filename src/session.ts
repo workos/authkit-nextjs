@@ -661,6 +661,17 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     return { user: null };
   }
 
+  let decoded: JWTPayload & AccessToken;
+  try {
+    decoded = decodeJwt<JWTPayload & AccessToken>(session.accessToken);
+  } catch (error) {
+    console.warn('withAuth: failed to decode access token; rejecting session.', error);
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
+
   const {
     sub,
     sid: sessionId,
@@ -670,7 +681,35 @@ async function withAuth(options?: { ensureSignedIn?: boolean }): Promise<UserInf
     permissions,
     entitlements,
     feature_flags: featureFlags,
-  } = decodeJwt<AccessToken>(session.accessToken);
+    exp,
+    nbf,
+  } = decoded;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (typeof exp !== 'number') {
+    console.warn('withAuth: access token is missing an expiration claim; rejecting session.');
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
+
+  if (exp <= now) {
+    console.warn('withAuth: access token has expired; rejecting session.');
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
+
+  if (typeof nbf === 'number' && nbf > now) {
+    console.warn('withAuth: access token is not yet valid; rejecting session.');
+    if (options?.ensureSignedIn) {
+      await redirectToSignIn();
+    }
+    return { user: null };
+  }
 
   // Defense-in-depth (SEC-1219): bind the sealed `user` to the access token's
   // subject. `saveSession` seals whatever `user` object it is handed, so a
@@ -905,7 +944,17 @@ async function getSessionFromHeader(): Promise<Session | undefined> {
   const authHeader = headersList.get(sessionHeaderName);
   if (!authHeader) return;
 
-  return reviveUserTimestamps(await unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD }));
+  try {
+    const unsealed = await unsealData<Session>(authHeader, { password: WORKOS_COOKIE_PASSWORD });
+    if (!unsealed || typeof unsealed !== 'object' || !('accessToken' in unsealed) || !unsealed.accessToken) {
+      console.warn('withAuth: session header does not contain a valid session; rejecting session.');
+      return;
+    }
+    return reviveUserTimestamps(unsealed);
+  } catch (error) {
+    console.warn('withAuth: failed to unseal session header; rejecting session.', error);
+    return;
+  }
 }
 
 function getReturnPathname(url: string): string {
